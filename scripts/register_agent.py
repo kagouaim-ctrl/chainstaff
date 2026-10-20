@@ -2,7 +2,7 @@
 
 BSC testnet registration is gas-free (MegaFuel paymaster), so a new wallet works without tBNB.
 
-    pip install bnbagent
+    pip install -e .                  # includes bnbagent
     export WALLET_PASSWORD=...        # encrypts the local keystore
     export PRIVATE_KEY=0x...          # only on first run; omit to generate a new testnet wallet
     python3 scripts/register_agent.py --name "ChainStaff Finance Ops" --url https://your-public-url
