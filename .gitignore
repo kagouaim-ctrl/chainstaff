@@ -7,3 +7,5 @@ __pycache__/
 *.egg-info/
 node_modules/
 config/policy.json
+data/
+config/chain.json

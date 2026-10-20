@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>链工控制台</title>
+<style>
+:root{--ink:#10202b;--paper:#f3f6f5;--sheet:#fff;--line:#d5dedb;--muted:#5b6b70;--accent:#0f7a6c;--go:#178a4a;--hold:#a86a00;--stop:#c0392b;
+  --mono:ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--ink:#e4ecea;--paper:#0d1619;--sheet:#142126;--line:#25363c;--muted:#93a5a9;--accent:#3cc2ad;--go:#4fd08a;--hold:#f0b54a;--stop:#ff7a6b;color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 60px;display:grid;gap:20px}
+h1{font-size:20px;margin:0} h2{font-size:16px;margin:0 0 10px}
+.card{background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+button{white-space:nowrap;font:inherit;border:1px solid var(--ink);background:var(--sheet);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--ink);color:var(--paper)}
+button.danger{border-color:var(--stop);color:var(--stop)}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--paper);color:var(--ink);min-width:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid currentColor}
+.go{color:var(--go)} .hold{color:var(--hold)} .stop{color:var(--stop)} .muted{color:var(--muted)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:6px 8px;white-space:nowrap}
+td{border-bottom:1px dashed var(--line);padding:6px 8px;vertical-align:top}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+pre{white-space:pre-wrap;margin:0;font:14px/1.6 inherit}
+#msg{min-height:1.5em}
+#app:not([hidden]){display:grid;gap:20px}
+</style>
+</head>
+<body>
+<main>
+  <div class="row"><h1 class="grow">链工 · AI 财务运营员控制台</h1><span id="mode" class="pill muted">未连接</span><span id="pausedPill" class="pill" hidden></span></div>
+
+  <div class="card row" id="login">
+    <label class="grow">控制台令牌<input id="token" type="password" autocomplete="off" placeholder="CHAINSTAFF_CONSOLE_TOKEN"></label>
+    <button class="primary" id="connect">连接</button>
+  </div>
+  <div id="msg" class="muted"></div>
+
+  <div id="app" hidden>
+    <div class="card row">
+      <div class="grow"><h2 style="margin:0">一键暂停</h2><span class="muted">暂停后所有付款请求都会被拦截。</span></div>
+      <button class="danger" id="pause">暂停所有付款</button>
+      <button id="resume">恢复付款</button>
+    </div>
+
+    <div class="card">
+      <h2>等老板签字</h2>
+      <div class="scroll"><table><thead><tr><th>编号</th><th>收款方</th><th>金额</th><th>用途</th><th>原因</th><th></th></tr></thead><tbody id="pending"></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2 class="grow">账本</h2><button id="refresh">刷新</button></div>
+      <div class="scroll"><table><thead><tr><th>时间</th><th>编号</th><th>收款方</th><th>金额</th><th>用途</th><th>状态</th><th>交易</th></tr></thead><tbody id="ledger"></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h2>规则</h2>
+      <div class="grid2" id="limits"></div>
+      <div class="grid2" style="margin-top:10px">
+        <label>需审批类别（逗号分隔）<input id="cats"></label>
+        <label>老板 Telegram 用户名（逗号分隔）<input id="owners"></label>
+        <label>重复检测天数<input id="dupdays" type="number" min="1"></label>
+        <label>时区<input id="tz"></label>
+        <label><span><input type="checkbox" id="readonly"> 试用期只读（所有付款都要老板确认）</span></label>
+      </div>
+      <h2 style="margin-top:16px">白名单</h2>
+      <div class="scroll"><table><thead><tr><th>名称</th><th>别名</th><th>地址</th><th>需审批</th><th></th></tr></thead><tbody id="wl"></tbody></table></div>
+      <div class="row" style="margin-top:10px"><button id="addPayee">添加收款方</button><span class="grow"></span><button class="primary" id="save">保存规则</button></div>
+    </div>
+
+    <div class="card"><div class="row"><h2 class="grow">上周周报</h2><button id="loadReport">生成</button></div><pre id="report" class="muted">点「生成」查看。</pre></div>
+  </div>
+</main>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  let token='', rules=null;
+  try{token=sessionStorage.getItem('cs-token')||''}catch(e){}
+  $('token').value=token;
+  const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  async function api(path,opt={}){
+    const r=await fetch(path,{...opt,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
+    const body=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(body.detail||('请求失败 '+r.status));
+    return body;
+  }
+  const say=(t,bad)=>{$('msg').textContent=t;$('msg').className=bad?'stop':'muted'};
+  const STATUS={executing:['执行中','hold'],paid:['已付','go'],failed:['失败','stop'],pending_approval:['待签','hold'],approved:['老板已签','go'],rejected:['已驳回','muted'],blocked:['拦截','stop']};
+
+  async function load(){
+    const s=await api('/api/status');
+    $('mode').textContent=s.live?'实盘':'测试模式';$('mode').className='pill '+(s.live?'stop':'muted');
+    $('pausedPill').hidden=!s.paused;$('pausedPill').textContent='已暂停';$('pausedPill').className='pill stop';
+    const rows=await api('/api/payments?limit=200');
+    const name=r=>esc(r.payee_name||r.payee.slice(0,6)+'…'+r.payee.slice(-4));
+    $('pending').innerHTML=rows.filter(r=>r.status==='pending_approval').map(r=>`<tr><td class="mono">${esc(r.request_id)}</td><td>${name(r)}</td><td class="mono">${esc(r.amount)} ${esc(r.token)}</td><td>${esc(r.memo)}</td><td>${r.messages.map(esc).join('<br>')}</td><td class="row"><button data-act="approve" data-id="${esc(r.request_id)}">已签字</button><button data-act="reject" data-id="${esc(r.request_id)}">驳回</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">没有待签字的付款。</td></tr>';
+    $('ledger').innerHTML=rows.map(r=>{const [l,c]=STATUS[r.status]||[r.status,'muted'];return `<tr><td class="mono">${esc(r.created_at.slice(0,16).replace('T',' '))}</td><td class="mono">${esc(r.request_id)}</td><td>${name(r)}</td><td class="mono">${esc(r.amount)} ${esc(r.token)}</td><td>${esc(r.memo)}</td><td class="${c}">${l}</td><td class="mono">${esc(r.tx_hash||r.safe_tx_hash||'')}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">还没有付款记录。</td></tr>';
+    rules=await api('/api/rules'); renderRules();
+  }
+  function renderRules(){
+    const tokens=[...new Set([...Object.keys(rules.single_limit||{}),...Object.keys(rules.daily_limit||{})])];
+    $('limits').innerHTML=tokens.map(t=>`<label>${esc(t)} 单笔上限<input data-lim="single_limit" data-tok="${esc(t)}" value="${esc(rules.single_limit[t]??0)}" inputmode="decimal"></label><label>${esc(t)} 每日上限<input data-lim="daily_limit" data-tok="${esc(t)}" value="${esc(rules.daily_limit[t]??0)}" inputmode="decimal"></label>`).join('');
+    $('cats').value=(rules.approval_categories||[]).join(', ');
+    $('owners').value=(rules.owners||[]).join(', ');
+    $('dupdays').value=rules.duplicate_window_days||30;
+    $('tz').value=rules.timezone||'UTC';
+    $('readonly').checked=!!rules.read_only;
+    $('wl').innerHTML=(rules.payees||[]).map((p,i)=>`<tr data-i="${i}"><td><input data-f="name" value="${esc(p.name)}"></td><td><input data-f="aliases" value="${esc((p.aliases||[]).join(', '))}"></td><td><input class="mono" data-f="address" value="${esc(p.address)}" size="44"></td><td><input type="checkbox" data-f="needs_approval" ${p.needs_approval?'checked':''}></td><td><button data-del="${i}">删除</button></td></tr>`).join('');
+  }
+  function collect(){
+    const list=s=>s.split(/[,，]/).map(x=>x.trim()).filter(Boolean);
+    document.querySelectorAll('[data-lim]').forEach(i=>rules[i.dataset.lim][i.dataset.tok]=i.value.trim());
+    rules.approval_categories=list($('cats').value);
+    rules.owners=list($('owners').value);
+    rules.duplicate_window_days=parseInt($('dupdays').value,10)||30;
+    rules.timezone=$('tz').value.trim()||'UTC';
+    rules.read_only=$('readonly').checked;
+    rules.payees=[...$('wl').querySelectorAll('tr')].map(tr=>{const g=f=>tr.querySelector(`[data-f="${f}"]`);return{name:g('name').value.trim(),aliases:list(g('aliases').value),address:g('address').value.trim(),needs_approval:g('needs_approval').checked}});
+    return rules;
+  }
+  async function run(fn,ok){try{const r=await fn();say(ok||r.message||'已完成');await load()}catch(e){say(e.message,true)}}
+
+  $('connect').onclick=async()=>{token=$('token').value.trim();try{sessionStorage.setItem('cs-token',token)}catch(e){}
+    try{await load();$('app').hidden=false;$('login').hidden=true;say('已连接')}catch(e){say(e.message,true)}};
+  $('refresh').onclick=()=>run(async()=>({}),'已刷新');
+  $('pause').onclick=()=>run(()=>api('/api/pause',{method:'POST'}));
+  $('resume').onclick=()=>run(()=>api('/api/resume',{method:'POST'}));
+  $('pending').onclick=e=>{const b=e.target.closest('button[data-act]');if(b)run(()=>api(`/api/payments/${encodeURIComponent(b.dataset.id)}/${b.dataset.act}`,{method:'POST'}))};
+  $('wl').onclick=e=>{const b=e.target.closest('button[data-del]');if(b){collect();rules.payees.splice(+b.dataset.del,1);renderRules()}};
+  $('addPayee').onclick=()=>{collect();rules.payees.push({name:'',aliases:[],address:'0x',needs_approval:false});renderRules()};
+  $('save').onclick=()=>run(()=>api('/api/rules',{method:'PUT',body:JSON.stringify(collect())}),'规则已保存，机器人下一条消息起生效');
+  $('loadReport').onclick=async()=>{try{$('report').textContent=(await api('/api/report/weekly')).text;$('report').className=''}catch(e){say(e.message,true)}};
+  if(token) $('connect').click();
+})();
+</script>
+</body>
+</html>
