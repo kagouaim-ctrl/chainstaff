@@ -1,0 +1,12 @@
+[project]
+name = "chainstaff"
+version = "0.0.1"
+description = "链工 ChainStaff · AI 财务运营员"
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
