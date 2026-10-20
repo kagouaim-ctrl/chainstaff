@@ -23,7 +23,7 @@ from .models import (
 )
 
 
-def _day_bounds(at: datetime, tz: str) -> tuple[datetime, datetime]:
+def day_bounds(at: datetime, tz: str) -> tuple[datetime, datetime]:
     local = at.astimezone(ZoneInfo(tz))
     start = datetime.combine(local.date(), time.min, tzinfo=local.tzinfo)
     return start, start + timedelta(days=1)
@@ -91,7 +91,7 @@ def evaluate(req: PaymentRequest, policy: Policy, ledger: LedgerView) -> Decisio
             hit(Reason.OVER_SINGLE_LIMIT, f"超过单笔上限 {_fmt(single)} {token}")
 
         daily = policy.daily_limit.get(token, Decimal(0))
-        start, end = _day_bounds(req.created_at, policy.timezone)
+        start, end = day_bounds(req.created_at, policy.timezone)
         spent = ledger.auto_paid_total(token, start, end)
         if spent + amount > daily:
             hit(

@@ -1,0 +1,15 @@
+{
+  "owners": ["your_telegram_username"],
+  "timezone": "Asia/Shanghai",
+  "read_only": false,
+  "single_limit": {"USDT": "500", "USDC": "500", "BNB": "0.5"},
+  "daily_limit": {"USDT": "2000", "USDC": "2000", "BNB": "1"},
+  "approval_categories": ["KOL"],
+  "duplicate_window_days": 30,
+  "payees": [
+    {"name": "Alice", "aliases": ["alice", "爱丽丝"], "address": "0xA11ce00000000000000000000000000000007e2D"},
+    {"name": "Bob", "aliases": ["bob"], "address": "0xB0b5000000000000000000000000000000041a90"},
+    {"name": "Mia", "aliases": ["mia"], "address": "0x7a3F000000000000000000000000000000000bE8", "needs_approval": true}
+  ],
+  "risk_addresses": ["0xdEAd00000000000000000000000000000000bEEF"]
+}
