@@ -50,6 +50,8 @@ python3 -m bot.main
 
 ## 2. 主网前必须完成（代码会强制检查前两条）
 
+一步步的操作见 [mainnet-turnkey.md](mainnet-turnkey.md)。`scripts/turnkey_policy.py` 会按白名单生成 Turnkey 策略。
+
 | # | 事项 | 谁来做 |
 |---|---|---|
 | 1 | 老板书面同意上主网，部署时设置 `CHAINSTAFF_ALLOW_MAINNET=yes` | 老板 |

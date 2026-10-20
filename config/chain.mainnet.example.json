@@ -1,0 +1,13 @@
+{
+  "network": "bsc-mainnet",
+  "chain_id": 56,
+  "rpc_url": "https://bsc-dataseed.bnbchain.org",
+  "explorer_tx_url": "https://bscscan.com/tx/",
+  "explorer_api_url": "https://api.etherscan.io/v2/api?chainid=56",
+  "tokens": {
+    "USDT": {"decimals": 18, "address": "0x55d398326f99059fF775485246999027B3197955"}
+  },
+  "safe_address": null,
+  "treasury_addresses": [],
+  "alert_outflow_threshold": {"USDT": "1000"}
+}
