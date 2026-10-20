@@ -42,6 +42,15 @@ python3 scripts/turnkey_policy.py --user-id 你的UserID
 
 ## 4. 启动
 
+一键启动（推荐）：第一次把不保密的设置填进 `config/mainnet.env`，以后每次只运行一行，脚本会提示你粘贴 Telegram token 和 Turnkey 私钥，不会显示也不会存盘。
+
+```bash
+cp config/mainnet.env.example config/mainnet.env   # 只做一次，填 TURNKEY_ORG_ID 等
+./scripts/start-mainnet.sh
+```
+
+或者手动设置：
+
 ```bash
 export TELEGRAM_BOT_TOKEN=...
 export CHAINSTAFF_CHAIN=config/chain.json

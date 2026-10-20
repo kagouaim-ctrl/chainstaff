@@ -9,3 +9,4 @@ node_modules/
 config/policy.json
 data/
 config/chain.json
+config/mainnet.env
