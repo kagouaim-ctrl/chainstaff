@@ -20,7 +20,7 @@ from agent.rules.engine import day_bounds
 from agent.store import PENDING, PaymentRecord, Store
 
 from .parser import ParsedRequest, ParseError, parse
-from .reports import last_full_week, weekly_report
+from .reports import last_full_week, outcome_counts, weekly_report
 
 PolicySource = Callable[[], tuple[Policy, frozenset[str]]]
 
@@ -228,10 +228,7 @@ class FinanceOpsEmployee:
         lines = [f"📒 {day} 账本"]
         for r in rows:
             lines.append(f"{STATUS_LABEL.get(r.status, r.status)} {r.request.request_id} · {_fmt(r.request.amount)} {r.request.token} · {r.request.memo or '-'}")
-        counts = {o: sum(1 for r in rows if r.outcome is o) for o in Outcome}
-        lines.append(
-            f"共 {len(rows)} 笔：自动付 {counts[Outcome.AUTO_PAY]}，待签 {counts[Outcome.NEEDS_APPROVAL]}，拦截 {counts[Outcome.BLOCK]}"
-        )
+        lines.append(f"共 {len(rows)} 笔：" + outcome_counts(rows))
         return "\n".join(lines)
 
     def weekly_report_text(self, now: datetime | None = None) -> str:
