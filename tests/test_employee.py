@@ -193,6 +193,7 @@ def test_failed_payment_is_marked_and_does_not_use_budget():
     # A failed request isn't a duplicate source either.
     emp.executor = Ok()
     assert send(emp, "付 Alice 300 USDT 设计费", "r2").decision.outcome is Outcome.AUTO_PAY
+    assert "共 2 笔：自动付 1，失败 1，待签 0，拦截 0" in emp.today_text(NOW)
 
 
 def test_live_reply_links_explorer():

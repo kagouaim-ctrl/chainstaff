@@ -9,7 +9,7 @@ from typing import Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from agent.rules import Outcome
-from agent.store import APPROVED, EXECUTING, PAID, PaymentRecord
+from agent.store import APPROVED, EXECUTING, FAILED, PAID, PaymentRecord
 
 # Money that actually left (or was signed off to leave).
 _MOVED = (PAID, APPROVED, EXECUTING)
@@ -31,6 +31,18 @@ def _fmt(a: Decimal) -> str:
     return f"{a.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):,f}".rstrip("0").rstrip(".")
 
 
+def outcome_counts(records: Iterable[PaymentRecord], approval: str = "待签") -> str:
+    """"自动付 9，失败 1，待签 1，拦截 1": a failed auto-payment moved no money, so it isn't counted as paid."""
+    records = list(records)
+    count = {o: sum(1 for r in records if r.outcome is o) for o in Outcome}
+    failed = sum(1 for r in records if r.status == FAILED)
+    parts = [f"自动付 {count[Outcome.AUTO_PAY] - failed}"]
+    if failed:
+        parts.append(f"失败 {failed}")
+    parts += [f"{approval} {count[Outcome.NEEDS_APPROVAL]}", f"拦截 {count[Outcome.BLOCK]}"]
+    return "，".join(parts)
+
+
 def weekly_report(
     records: Iterable[PaymentRecord],
     start: datetime,
@@ -47,13 +59,12 @@ def weekly_report(
             out[r.request.token] += r.request.amount
             by_cat[(r.request.token, r.request.category or "其他")] += r.request.amount
 
-    count = {o: sum(1 for r in records if r.outcome is o) for o in Outcome}
     lines = [f"📊 周报 {start:%m-%d} 至 {(end - timedelta(days=1)):%m-%d}"]
     if not records:
         lines.append("本周没有付款请求。")
     else:
         lines.append(
-            f"付款请求 {len(records)} 笔：自动付 {count[Outcome.AUTO_PAY]}，老板审批 {count[Outcome.NEEDS_APPROVAL]}，拦截 {count[Outcome.BLOCK]}"
+            f"付款请求 {len(records)} 笔：" + outcome_counts(records, approval="老板审批")
         )
 
     if out:
