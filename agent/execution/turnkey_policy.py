@@ -40,3 +40,8 @@ def policy(chain_id: int, token_address: str, payees: Iterable[str], api_user_id
 
 def policy_json(chain_id: int, token_address: str, payees: Iterable[str], api_user_id: str) -> str:
     return json.dumps(policy(chain_id, token_address, payees, api_user_id), indent=2, ensure_ascii=False)
+
+
+def owner_bnb_condition(chain_id: int, owner_address: str) -> str:
+    """Second policy: lets the bot user send BNB back to the owner's own wallet, nowhere else."""
+    return f"eth.tx.chain_id == {chain_id} && eth.tx.to == '{owner_address.lower()}'"
