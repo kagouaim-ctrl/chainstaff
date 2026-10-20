@@ -9,6 +9,9 @@ dependencies = ["aiogram>=3.4,<4"]
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-cov"]
 
+[tool.setuptools.packages.find]
+include = ["agent*", "bot*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
