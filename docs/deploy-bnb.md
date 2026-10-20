@@ -24,7 +24,7 @@ python3 -m bot.main
 然后：
 
 ```bash
-pip install -e ".[chain]"                                # 装 bnbagent SDK
+pip install -e .                                         # 已包含 bnbagent SDK
 cp config/chain.example.json config/chain.json          # 填代币地址、Safe 地址、国库地址
 
 # 1) 注册链上工号（ERC-8004，测试网免 gas）
