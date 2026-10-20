@@ -89,9 +89,21 @@ class RpcSender:
             "gas": gas * 12 // 10,  # 20% headroom
         }
         signed = self.wallet.sign_transaction(tx)
-        raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None) or signed
-        raw_hex = raw if isinstance(raw, str) else "0x" + bytes(raw).hex()
+        raw_hex = _raw_hex(signed)
         return self.rpc.call("eth_sendRawTransaction", [raw_hex])
+
+
+def _raw_hex(signed: Any) -> str:
+    """bnbagent providers return a dict ({"rawTransaction": ...}); eth_account returns an object."""
+    if isinstance(signed, dict):
+        raw = signed.get("rawTransaction") or signed.get("raw_transaction")
+    else:
+        raw = getattr(signed, "raw_transaction", None) or getattr(signed, "rawTransaction", None)
+    if raw is None:
+        raise TypeError("wallet returned no signed transaction")
+    if isinstance(raw, str):
+        return raw if raw.startswith("0x") else "0x" + raw
+    return "0x" + bytes(raw).hex()
 
 
 @dataclass(frozen=True)

@@ -5,6 +5,7 @@ import pytest
 from eth_account.messages import encode_typed_data
 from eth_utils import keccak
 
+from agent.execution.executors import _raw_hex
 from agent.execution import (
     DraftSafeProposer,
     DryRunExecutor,
@@ -171,6 +172,46 @@ def test_rpc_sender_stops_when_simulation_reverts():
     with pytest.raises(RuntimeError, match="exceeds balance"):
         RpcSender(wallet, rpc, 97).send(USDT.address, 0, b"\x12")
     assert wallet.tx is None  # nothing was signed
+
+
+class BnbagentStyleWallet:
+    """Same shape as bnbagent's EVMWalletProvider: signs with eth_account, returns a dict."""
+
+    def __init__(self):
+        from eth_account import Account
+
+        self.account = Account.from_key("0x" + "11" * 32)
+        self.address = self.account.address
+
+    def sign_transaction(self, tx):
+        s = self.account.sign_transaction(tx)
+        return {"rawTransaction": s.raw_transaction, "hash": s.hash, "r": s.r, "s": s.s, "v": s.v}
+
+
+def test_rpc_sender_with_bnbagent_style_wallet_sends_real_signature():
+    from eth_account import Account
+
+    rpc, calls = make_rpc({"eth_estimateGas": hex(21000), "eth_getTransactionCount": "0x0", "eth_gasPrice": hex(10**9), "eth_sendRawTransaction": "0x" + "cd" * 32})
+    wallet = BnbagentStyleWallet()
+    RpcSender(wallet, rpc, 97).send(ALICE, 10**15, b"")
+    raw = calls[-1]["params"][0]
+    assert raw.startswith("0x") and Account.recover_transaction(raw) == wallet.address
+
+
+@pytest.mark.parametrize("signed, expected", [
+    ({"raw_transaction": b"\x01"}, "0x01"),
+    ({"rawTransaction": "0x02"}, "0x02"),
+    ({"rawTransaction": "03"}, "0x03"),
+])
+def test_raw_hex_shapes(signed, expected):
+    assert _raw_hex(signed) == expected
+
+
+def test_raw_hex_missing():
+    with pytest.raises(TypeError):
+        _raw_hex({"hash": b"x"})
+    with pytest.raises(TypeError):
+        _raw_hex(object())
 
 
 # ---------- read-only RPC ----------
