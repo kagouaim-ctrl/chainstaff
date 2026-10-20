@@ -1,0 +1,14 @@
+{
+  "network": "bsc-testnet",
+  "chain_id": 97,
+  "rpc_url": "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+  "explorer_tx_url": "https://testnet.bscscan.com/tx/",
+  "explorer_api_url": "https://api.etherscan.io/v2/api?chainid=97",
+  "tokens": {
+    "BNB": {"decimals": 18, "native": true},
+    "USDT": {"decimals": 18, "address": null, "note": "填测试网 USDT 合约地址；留空时该币种只能测试模式"}
+  },
+  "safe_address": null,
+  "treasury_addresses": [],
+  "alert_outflow_threshold": {"USDT": "10000", "BNB": "5"}
+}

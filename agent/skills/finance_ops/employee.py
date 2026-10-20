@@ -1,46 +1,28 @@
 """The AI finance ops employee, independent of any chat platform.
 
-Flow for every message: parse (suggestion) -> rule engine (decision) -> executor
-(only for AUTO_PAY) -> ledger -> reply text. The bot layer only forwards text in
-and replies out.
+Flow for every request: parse (suggestion) -> rule engine (decision) -> ledger
+row written -> executor (AUTO_PAY) or Safe proposer (NEEDS_APPROVAL) -> reply.
+The bot and the console only forward input and show output.
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
-from pathlib import Path
-from typing import Protocol
+from typing import Callable
 from zoneinfo import ZoneInfo
 
+from agent.config import load_policy  # noqa: F401  (re-exported for callers)
+from agent.execution import DryRunExecutor, Executor, SafeProposer
+from agent.rules import Decision, Outcome, PaymentRequest, Policy, Reason, evaluate
 from agent.rules.engine import day_bounds
-from agent.rules import (
-    Decision,
-    InMemoryLedger,
-    Outcome,
-    Payee,
-    PaymentRequest,
-    Policy,
-    evaluate,
-)
+from agent.store import PENDING, PaymentRecord, Store
 
 from .parser import ParsedRequest, ParseError, parse
+from .reports import last_full_week, weekly_report
 
-
-class Executor(Protocol):
-    def pay(self, req: PaymentRequest) -> str:
-        """Send the payment and return a transaction hash."""
-
-
-class DryRunExecutor:
-    """Stand-in until the wallet is wired up: moves no money, says so in every reply."""
-
-    live = False
-
-    def pay(self, req: PaymentRequest) -> str:
-        return f"dry-run:{req.request_id}"
+PolicySource = Callable[[], tuple[Policy, frozenset[str]]]
 
 
 @dataclass(frozen=True)
@@ -54,62 +36,83 @@ def _fmt(amount: Decimal) -> str:
     return f"{amount.normalize():,f}"
 
 
-def load_policy(path: str | Path) -> tuple[Policy, frozenset[str]]:
-    """Read a policy JSON file. Returns (policy, owner handles/ids)."""
-    cfg = json.loads(Path(path).read_text(encoding="utf-8"))
-    payees = [
-        Payee(p["address"], p["name"], tuple(p.get("aliases", ())), bool(p.get("needs_approval", False)))
-        for p in cfg["payees"]
-    ]
-    policy = Policy.build(
-        payees,
-        single_limit=cfg["single_limit"],
-        daily_limit=cfg["daily_limit"],
-        approval_categories=frozenset(cfg.get("approval_categories", ())),
-        risk_addresses=cfg.get("risk_addresses", ()),
-        duplicate_window=timedelta(days=cfg.get("duplicate_window_days", 30)),
-        timezone=cfg.get("timezone", "UTC"),
-        read_only=bool(cfg.get("read_only", False)),
-    )
-    owners = frozenset(str(o).lstrip("@").lower() for o in cfg.get("owners", ()))
-    return policy, owners
-
-
 class FinanceOpsEmployee:
     def __init__(
         self,
-        policy: Policy,
-        owners: frozenset[str],
-        ledger: InMemoryLedger | None = None,
+        policy_source: PolicySource,
+        store: Store | None = None,
         executor: Executor | None = None,
+        proposer: SafeProposer | None = None,
+        explorer_tx_url: str | None = None,
+        treasury_balance: Callable[[], dict[str, Decimal]] | None = None,
     ) -> None:
-        self.policy = policy
-        self.owners = owners
-        self.ledger = ledger or InMemoryLedger()
+        self._policy_source = policy_source
+        self.store = store or Store()
         self.executor = executor or DryRunExecutor()
-        self._requests: list[tuple[PaymentRequest, Decision, str | None]] = []
+        self.proposer = proposer
+        self.explorer_tx_url = explorer_tx_url
+        self.treasury_balance = treasury_balance
+
+    @classmethod
+    def fixed(cls, policy: Policy, owners: frozenset[str], **kw) -> "FinanceOpsEmployee":
+        return cls(lambda: (policy, owners), **kw)
+
+    # ---- policy ----
+
+    @property
+    def policy(self) -> Policy:
+        policy, _ = self._policy_source()
+        # The kill switch lives in the store, so /pause and the console button both work.
+        return replace(policy, paused=policy.paused or self.store.paused) if self.store.paused else policy
+
+    @property
+    def owners(self) -> frozenset[str]:
+        return self._policy_source()[1]
+
+    def is_owner(self, *identities: str | int | None) -> bool:
+        owners = self.owners
+        return any(i is not None and str(i).lstrip("@").lower() in owners for i in identities)
+
+    def _name(self, address: str) -> str:
+        p = self.policy.whitelist.get(address.lower())
+        return p.name if p else f"{address[:6]}…{address[-4:]}"
 
     # ---- payment requests ----
 
     def handle_request(self, text: str, requester: str, request_id: str, at: datetime | None = None) -> Reply:
         at = at or datetime.now(timezone.utc)
-        parsed = parse(text, self.policy.whitelist.values())
+        policy = self.policy
+        parsed = parse(text, policy.whitelist.values())
         if isinstance(parsed, ParseError):
             return Reply(parsed.question)
 
         req = parsed.to_payment_request(request_id, requester, at)
-        decision = evaluate(req, self.policy, self.ledger)
-        tx = None
-        if decision.outcome is Outcome.AUTO_PAY:
-            tx = self.executor.pay(req)
-        # Record after execution so a crash mid-payment can't leave an unpaid "paid" entry.
-        # Duplicate request ids are already BLOCKed by the engine and never re-recorded.
-        if not self.ledger.has_request(req.request_id):
-            self.ledger.record(req, decision)
-        self._requests.append((req, decision, tx))
-        return Reply(self._describe(parsed, req, decision, tx), decision, req)
+        decision = evaluate(req, policy, self.store)
+        if Reason.ALREADY_PROCESSED in decision.reasons:
+            # Redelivered message: never record or execute it again.
+            return Reply(f"{req.request_id} 已经处理过，不会重复付款。", decision, req)
+        try:
+            self.store.record(req, decision)  # written BEFORE any money moves
+        except ValueError:
+            return Reply(f"{req.request_id} 已经处理过，不会重复付款。", decision, req)
 
-    def _describe(self, parsed: ParsedRequest, req: PaymentRequest, d: Decision, tx: str | None) -> str:
+        tx = error = safe_hash = None
+        if decision.outcome is Outcome.AUTO_PAY:
+            try:
+                tx = self.executor.pay(req)
+                self.store.mark_paid(req.request_id, tx)
+            except Exception as e:  # noqa: BLE001 - any wallet/RPC failure ends this request
+                error = str(e) or type(e).__name__
+                self.store.mark_failed(req.request_id, error)
+        elif decision.outcome is Outcome.NEEDS_APPROVAL and self.proposer is not None:
+            try:
+                safe_hash = self.proposer.propose(req).safe_tx_hash
+                self.store.set_safe_tx_hash(req.request_id, safe_hash)
+            except Exception as e:  # noqa: BLE001
+                error = str(e) or type(e).__name__
+        return Reply(self._describe(parsed, req, decision, tx, safe_hash, error), decision, req)
+
+    def _describe(self, parsed: ParsedRequest, req: PaymentRequest, d: Decision, tx, safe_hash, error) -> str:
         who = parsed.payee_name or req.payee
         line = f"{who} · {_fmt(req.amount)} {req.token}"
         if req.memo:
@@ -119,37 +122,79 @@ class FinanceOpsEmployee:
             notes.append(f"没写币种，按 {req.token} 处理")
         reasons = "\n".join(f"• {m}" for m in d.messages)
 
-        if d.outcome is Outcome.AUTO_PAY:
+        if d.outcome is Outcome.AUTO_PAY and error:
+            body = f"❌ {req.request_id} 付款没有成功\n{line}\n错误：{error}\n这笔请求已作废，确认钱包状态后请重新发送。"
+        elif d.outcome is Outcome.AUTO_PAY:
             spent = self._spent_today(req.token, req.created_at)
             daily = self.policy.daily_limit.get(req.token, Decimal(0))
-            body = f"✅ {req.request_id} 已付款\n{line}\n交易：{tx}\n今日已自动付 {_fmt(spent)} / {_fmt(daily)} {req.token}"
-            if not getattr(self.executor, "live", True):
+            link = f"{self.explorer_tx_url}{tx}" if self.explorer_tx_url and self.executor.live else tx
+            body = f"✅ {req.request_id} 已付款\n{line}\n交易：{link}\n今日已自动付 {_fmt(spent)} / {_fmt(daily)} {req.token}"
+            if not self.executor.live:
                 notes.append("测试模式：没有真的上链")
         elif d.outcome is Outcome.NEEDS_APPROVAL:
             body = f"✍️ {req.request_id} 需要老板签字\n{line}\n原因：\n{reasons}"
-            notes.append("Safe 提案功能接入前，请老板手动付款")
+            if safe_hash:
+                body += f"\nSafe 交易哈希：{safe_hash}"
+                notes.append("提案草稿已生成，老板在 Safe 里签字执行后发 /approve " + req.request_id)
+            else:
+                if error:
+                    notes.append(f"Safe 提案生成失败：{error}")
+                notes.append(f"请老板手动付款后发 /approve {req.request_id}，不付就发 /reject {req.request_id}")
         else:
             body = f"🛑 {req.request_id} 已拦截，没有发出任何交易\n{line}\n原因：\n{reasons}"
         if notes:
             body += "\n（" + "；".join(notes) + "）"
         return body
 
-    # ---- owner commands ----
+    def _spent_today(self, token: str, at: datetime) -> Decimal:
+        start, end = day_bounds(at, self.policy.timezone)
+        return self.store.auto_paid_total(token, start, end)
 
-    def is_owner(self, *identities: str | int | None) -> bool:
-        return any(i is not None and str(i).lstrip("@").lower() in self.owners for i in identities)
+    # ---- owner commands ----
 
     def pause(self, *identities) -> str:
         if not self.is_owner(*identities):
             return "只有老板可以暂停付款。"
-        self.policy = replace(self.policy, paused=True)
+        self.store.set_paused(True)
         return "⏸ 已暂停所有付款。之后的请求都会被拦截，直到老板发 /resume。"
 
     def resume(self, *identities) -> str:
         if not self.is_owner(*identities):
             return "只有老板可以恢复付款。"
-        self.policy = replace(self.policy, paused=False)
+        self.store.set_paused(False)
         return "▶️ 已恢复付款，规则照旧生效。"
+
+    def approve(self, request_id: str, *identities) -> str:
+        if not self.is_owner(*identities):
+            return "只有老板可以确认审批。"
+        by = next((str(i) for i in identities if i is not None), "owner")
+        if self.store.approve(request_id, by):
+            return f"✅ {request_id} 已记为老板签字付款。"
+        return self._not_pending(request_id)
+
+    def reject(self, request_id: str, *identities) -> str:
+        if not self.is_owner(*identities):
+            return "只有老板可以驳回付款。"
+        by = next((str(i) for i in identities if i is not None), "owner")
+        if self.store.reject(request_id, by):
+            return f"🚫 {request_id} 已驳回，不会付款。"
+        return self._not_pending(request_id)
+
+    def _not_pending(self, request_id: str) -> str:
+        rec = self.store.get(request_id)
+        if rec is None:
+            return f"找不到 {request_id}。发 /pending 看待签字的付款。"
+        return f"{request_id} 当前状态是「{STATUS_LABEL.get(rec.status, rec.status)}」，不在待签字列表里。"
+
+    def pending_text(self) -> str:
+        rows = self.store.pending()
+        if not rows:
+            return "没有等待签字的付款。"
+        lines = ["✍️ 等待老板签字"]
+        for r in rows:
+            lines.append(f"• {r.request.request_id} {self._name(r.request.payee)} {_fmt(r.request.amount)} {r.request.token} · {r.request.memo or '-'}")
+        lines.append("签完发 /approve 编号，不付发 /reject 编号")
+        return "\n".join(lines)
 
     def rules_text(self) -> str:
         p = self.policy
@@ -169,25 +214,48 @@ class FinanceOpsEmployee:
         for payee in p.whitelist.values():
             flag = "（需审批）" if payee.needs_approval else ""
             lines.append(f"• {payee.name}{flag} {payee.address[:6]}…{payee.address[-4:]}")
+        if not self.executor.live:
+            lines.append("当前是测试模式：绿灯付款不会真的上链")
         return "\n".join(lines)
 
     def today_text(self, at: datetime | None = None) -> str:
         at = at or datetime.now(timezone.utc)
-        tz = ZoneInfo(self.policy.timezone)
-        day = at.astimezone(tz).date()
-        rows = [(r, d) for r, d, _ in self._requests if r.created_at.astimezone(tz).date() == day]
+        start, end = day_bounds(at, self.policy.timezone)
+        rows = self.store.between(start, end)
+        day = at.astimezone(ZoneInfo(self.policy.timezone)).date()
         if not rows:
             return f"📒 {day} 还没有付款请求。"
-        label = {Outcome.AUTO_PAY: "✅ 已付", Outcome.NEEDS_APPROVAL: "✍️ 待签", Outcome.BLOCK: "🛑 拦截"}
         lines = [f"📒 {day} 账本"]
-        for r, d in rows:
-            lines.append(f"{label[d.outcome]} {r.request_id} · {_fmt(r.amount)} {r.token} · {r.memo or '-'}")
-        counts = {o: sum(1 for _, d in rows if d.outcome is o) for o in Outcome}
+        for r in rows:
+            lines.append(f"{STATUS_LABEL.get(r.status, r.status)} {r.request.request_id} · {_fmt(r.request.amount)} {r.request.token} · {r.request.memo or '-'}")
+        counts = {o: sum(1 for r in rows if r.outcome is o) for o in Outcome}
         lines.append(
             f"共 {len(rows)} 笔：自动付 {counts[Outcome.AUTO_PAY]}，待签 {counts[Outcome.NEEDS_APPROVAL]}，拦截 {counts[Outcome.BLOCK]}"
         )
         return "\n".join(lines)
 
-    def _spent_today(self, token: str, at: datetime) -> Decimal:
-        start, end = day_bounds(at, self.policy.timezone)
-        return self.ledger.auto_paid_total(token, start, end)
+    def weekly_report_text(self, now: datetime | None = None) -> str:
+        now = now or datetime.now(timezone.utc)
+        start, end = last_full_week(now, self.policy.timezone)
+        balance = None
+        if self.treasury_balance:
+            try:
+                balance = self.treasury_balance()
+            except Exception:  # noqa: BLE001 - a report without balance beats no report
+                balance = None
+        names = {addr: p.name for addr, p in self.policy.whitelist.items()}
+        return weekly_report(self.store.between(start, end), start, end, names, balance)
+
+    def records(self, limit: int = 100) -> list[PaymentRecord]:
+        return self.store.latest(limit)
+
+
+STATUS_LABEL = {
+    "executing": "⏳ 执行中",
+    "paid": "✅ 已付",
+    "failed": "❌ 失败",
+    PENDING: "✍️ 待签",
+    "approved": "🖊 老板已签",
+    "rejected": "🚫 已驳回",
+    "blocked": "🛑 拦截",
+}
