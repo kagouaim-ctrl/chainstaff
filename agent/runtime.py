@@ -27,12 +27,13 @@ def policy_path() -> Path:
     return p if p.exists() else Path("config/policy.example.json")
 
 
-def make_wallet(kind: str):  # pragma: no cover - needs bnbagent and a configured wallet
+def make_wallet(kind: str, chain_id: int | None = None):  # pragma: no cover - needs bnbagent and a configured wallet
     if kind == "turnkey":
         # Production choice: key stays in Turnkey's enclave; limits live in Turnkey policies.
+        # Pinned to the configured chain, so it never signs for another network.
         from bnbagent.wallets import TurnkeyWalletProvider
 
-        return TurnkeyWalletProvider.from_env()
+        return TurnkeyWalletProvider.from_env(expected_chain_id=chain_id)
     if kind == "evm":
         # Testnet only: encrypted local keystore (~/.bnbagent/wallets).
         from bnbagent.wallets import create_wallet_provider
@@ -62,7 +63,8 @@ def build_employee(env: dict[str, str] | None = None, wallet_factory=None, rpc_f
                 raise RuntimeError("拒绝在 BSC 主网实盘运行：需要老板明确同意后设置 CHAINSTAFF_ALLOW_MAINNET=yes")
             if chain.chain_id == MAINNET_CHAIN_ID and env.get("CHAINSTAFF_WALLET") == "evm":
                 raise RuntimeError("主网不允许用本地私钥钱包，请用 turnkey 并在 Turnkey 策略里配置白名单和限额")
-            wallet = (wallet_factory or make_wallet)(env.get("CHAINSTAFF_WALLET", ""))
+            kind = env.get("CHAINSTAFF_WALLET", "")
+            wallet = wallet_factory(kind) if wallet_factory else make_wallet(kind, chain.chain_id)
             executor = WalletExecutor(RpcSender(wallet, rpc, chain.chain_id), chain.tokens)
         if chain.safe_address:
             # Draft uses the Safe's current on-chain nonce; owners may need to re-queue if others are pending.
