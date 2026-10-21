@@ -128,13 +128,14 @@ def test_telegram_settings_roundtrip_and_validation():
 
 def test_due_messages_once(emp):
     tz = emp.policy.timezone
+    now = datetime(2026, 10, 21, 2, tzinfo=timezone.utc)  # fixed: the digest is once per local day
     from zoneinfo import ZoneInfo
     TelegramSettings.validate({"daily_digest": True, "digest_hour": 0, "pending_reminder_hours": 2, "report_hour": 0,
-                               "report_weekday": NOW.astimezone(ZoneInfo(tz)).weekday()}).save(emp.store)
-    kinds = [k for k, _ in due_messages(emp, NOW)]
+                               "report_weekday": now.astimezone(ZoneInfo(tz)).weekday()}).save(emp.store)
+    kinds = [k for k, _ in due_messages(emp, now)]
     assert kinds == ["weekly_report", "daily_digest", "pending_reminder"]
-    assert due_messages(emp, NOW + timedelta(minutes=1)) == []
-    assert [k for k, _ in due_messages(emp, NOW + timedelta(hours=2))] == ["pending_reminder"]
+    assert due_messages(emp, now + timedelta(minutes=1)) == []
+    assert [k for k, _ in due_messages(emp, now + timedelta(hours=2))] == ["pending_reminder"]
 
 
 def test_due_messages_off_by_default_until_monday(emp):
