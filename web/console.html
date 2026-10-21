@@ -3,142 +3,674 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>链工控制台</title>
+<title>KAGOU 控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#10202b;--paper:#f3f6f5;--sheet:#fff;--line:#d5dedb;--muted:#5b6b70;--accent:#0f7a6c;--go:#178a4a;--hold:#a86a00;--stop:#c0392b;
-  --mono:ui-monospace,Menlo,Consolas,monospace}
-@media (prefers-color-scheme:dark){:root{--ink:#e4ecea;--paper:#0d1619;--sheet:#142126;--line:#25363c;--muted:#93a5a9;--accent:#3cc2ad;--go:#4fd08a;--hold:#f0b54a;--stop:#ff7a6b;color-scheme:dark}}
+:root{
+  --bg:#0b0b0c;--surface:#121214;--raise:#18181b;--line:#26262a;--line2:#33333a;--text:#ededed;--muted:#8a8a8f;
+  --signal:#f0b90b;--ok:#3ddc84;--review:#f0b90b;--block:#ff4d4d;--info:#7aa7ff;
+  --sans:"IBM Plex Sans","Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
+  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{
+  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
+  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
-main{max-width:1080px;margin:0 auto;padding:20px 16px 60px;display:grid;gap:20px}
-h1{font-size:20px;margin:0} h2{font-size:16px;margin:0 0 10px}
-.card{background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+.mono,code,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .ok{color:var(--ok)} .review{color:var(--review)} .block{color:var(--block)} .info{color:var(--info)}
+.label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
+h1{font-size:20px} h2{font-size:15px} h3{font-size:13px}
+
+/* buttons and inputs: radius 2px max, hairlines, no shadows */
+.btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:2px;padding:6px 12px;cursor:pointer;font-size:13px;line-height:1.4;text-decoration:none}
+.btn:hover{border-color:var(--muted)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav a:focus-visible,summary:focus-visible{outline:1px solid var(--signal);outline-offset:1px}
+.btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn.signal{background:var(--signal);color:#0b0b0c;border-color:var(--signal);font-weight:600}
+.btn.danger{border-color:var(--block);color:var(--block)}
+.btn.ok{border-color:var(--ok);color:var(--ok)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input,select,textarea{background:var(--bg);border:1px solid var(--line2);border-radius:2px;padding:6px 8px;min-width:0;width:100%}
+textarea{resize:vertical;min-height:72px}
+input[type=checkbox]{width:auto;accent-color:var(--signal)}
+label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.switch{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)}
+
+/* layout */
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.side{border-right:1px solid var(--line);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+.brand{display:flex;align-items:baseline;gap:8px;padding:18px 18px 14px;border-bottom:1px solid var(--line)}
+.brand b{font:700 17px/1 var(--sans);letter-spacing:.02em;font-stretch:125%}
+.nav{display:flex;flex-direction:column;padding:8px 0;overflow:auto;flex:1}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 18px;text-decoration:none;color:var(--muted);font-size:13px;border-left:2px solid transparent}
+.nav a .n{font:500 11px var(--mono);color:var(--muted);width:22px}
+.nav a:hover{color:var(--text)}
+.nav a[aria-current="page"]{color:var(--text);border-left-color:var(--signal);background:var(--surface)}
+.nav a .badge{margin-left:auto}
+.side-foot{border-top:1px solid var(--line);padding:12px 18px;display:grid;gap:6px;font-size:12px}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 24px;flex-wrap:wrap}
+.top h1{margin-right:auto}
+.page{padding:20px 24px 80px;display:grid;gap:16px;max-width:1280px;width:100%}
+.grid{display:grid;gap:16px}
+.grid > *,.stack > *{min-width:0}
+#simEx .btn,.sug .btn{white-space:normal;text-align:left}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.span2{grid-column:span 2}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:2px;min-width:0}
+.card > .hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.card > .hd h2{margin-right:auto}
+.card > .bd{padding:14px 16px}
+.card > .bd.flush{padding:0}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.grow{flex:1}
-button{white-space:nowrap;font:inherit;border:1px solid var(--ink);background:var(--sheet);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
-button.primary{background:var(--ink);color:var(--paper)}
-button.danger{border-color:var(--stop);color:var(--stop)}
-input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--paper);color:var(--ink);min-width:0}
-.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid currentColor}
-.go{color:var(--go)} .hold{color:var(--hold)} .stop{color:var(--stop)} .muted{color:var(--muted)}
+.grow{flex:1;min-width:0}
+.stack{display:grid;gap:10px}
+.kpi{padding:14px 16px;display:grid;gap:6px;align-content:start}
+.kpi .v{font:500 24px/1.15 var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;word-break:break-all}
+.kpi .s{font-size:12px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font:500 11px/1 var(--mono);letter-spacing:.04em;padding:4px 7px;border:1px solid currentColor;border-radius:2px;white-space:nowrap}
+.pill.muted{color:var(--muted)}
+.dot{width:6px;height:6px;display:inline-block;background:currentColor}
+.badge{font:500 11px/1 var(--mono);padding:3px 6px;background:var(--signal);color:#0b0b0c;border-radius:2px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line2);border-radius:2px;white-space:nowrap}
+.chip.block{border-color:var(--block)} .chip.review{border-color:var(--review)} .chip.ok{border-color:var(--ok)}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 2px}
 .scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:14px}
-th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:6px 8px;white-space:nowrap}
-td{border-bottom:1px dashed var(--line);padding:6px 8px;vertical-align:top}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
-pre{white-space:pre-wrap;margin:0;font:14px/1.6 inherit}
-#msg{min-height:1.5em}
-#app:not([hidden]){display:grid;gap:20px}
+#limits input{min-width:90px}
+.msg,.report{overflow-wrap:anywhere}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding:8px 12px;white-space:nowrap;background:var(--surface);position:sticky;top:0}
+td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--raise)}
+td.r,th.r{text-align:right}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.bar{height:6px;background:var(--line);position:relative}
+.bar > i{position:absolute;inset:0 auto 0 0;background:var(--text)}
+.bar.warn > i{background:var(--review)} .bar.over > i{background:var(--block)}
+.addr{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px}
+.copy{border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font:11px var(--mono)}
+.copy:hover{color:var(--text)}
+.kv{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 14px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;min-width:0;word-break:break-all}
+.feed{display:grid}
+.feed .it{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;align-items:start}
+.feed .it:last-child{border-bottom:0}
+.feed .it > div{min-width:0;overflow-wrap:anywhere}
+.feed .k{font:500 10px/1.8 var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:0 6px;border:1px solid var(--line2);color:var(--muted)}
+.feed .k.alert{color:var(--block);border-color:var(--block)} .feed .k.audit{color:var(--text)} .feed .k.system{color:var(--info);border-color:var(--info)}
+.feed .k.telegram_in,.feed .k.telegram_out{color:var(--signal);border-color:var(--signal)}
+.feed .t{font:11px var(--mono);color:var(--muted);white-space:nowrap}
+pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:var(--bg);border:1px solid var(--line);padding:14px;border-radius:2px}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:8px 12px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-size:13px}
+.tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--signal)}
+.note{border:1px solid var(--line2);border-left:2px solid var(--review);padding:10px 12px;font-size:13px;background:var(--bg)}
+.note.block{border-left-color:var(--block)} .note.ok{border-left-color:var(--ok)} .note.info{border-left-color:var(--info)}
+.steps{counter-reset:s;display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;font-size:13px}
+.steps li::before{content:counter(s,decimal-leading-zero);font:500 11px/1.9 var(--mono);color:var(--muted)}
+.steps li.done::before{content:"✓";color:var(--ok)}
+
+/* chat (Telegram simulator and log) */
+.chat{display:flex;flex-direction:column;gap:8px;padding:14px;background:var(--bg);height:420px;overflow-y:auto}
+.msg{max-width:86%;padding:8px 10px;border:1px solid var(--line2);border-radius:2px;white-space:pre-wrap;font-size:13px;line-height:1.55;word-break:break-word}
+.msg.me{align-self:flex-end;background:var(--raise)}
+.msg.bot{align-self:flex-start;background:var(--surface)}
+.msg .who{display:block;font:500 10px/1.6 var(--mono);color:var(--muted);letter-spacing:.04em}
+.chatbar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.sug{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--line)}
+
+/* chart */
+.chart svg{display:block;width:100%;height:180px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:8px;height:8px;margin-right:6px}
+
+/* drawer, modal, toast */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface);border-left:1px solid var(--line);z-index:41;display:flex;flex-direction:column}
+.drawer .hd{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.drawer .bd{padding:16px;overflow:auto;display:grid;gap:16px;align-content:start}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line2);z-index:42;display:grid}
+.modal .bd{padding:16px;display:grid;gap:12px}
+.modal .ft{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--line)}
+.toasts{position:fixed;right:16px;bottom:16px;z-index:50;display:grid;gap:8px;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:var(--surface);border:1px solid var(--line2);border-left:2px solid var(--ok);padding:10px 12px;font-size:13px}
+.toast.bad{border-left-color:var(--block)}
+
+/* login */
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login .card{width:min(420px,100%)}
+
+.demo{background:var(--signal);color:#0b0b0c;font-size:12px;padding:6px 24px;display:flex;gap:8px;flex-wrap:wrap}
+
+@media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:sticky;top:0;height:auto;z-index:30;border-right:0;border-bottom:1px solid var(--line)}
+  .brand{padding:12px 16px}
+  .nav{flex-direction:row;padding:0;overflow-x:auto;scrollbar-width:none}
+  .nav a{border-left:0;border-bottom:2px solid transparent;padding:10px 12px;white-space:nowrap}
+  .nav a .n{display:none}
+  .nav a[aria-current="page"]{border-bottom-color:var(--signal);background:none}
+  .side-foot{display:none}
+  .top{position:static;padding:12px 16px}
+  .page{padding:16px 16px 80px}
+  .g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kpi{padding:12px}
+  .kpi .v{font-size:20px}
+  .span2{grid-column:auto}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dt{margin-top:4px}
+  .hide-sm{display:none}
+  .demo{padding:6px 16px}
+}
+@media (prefers-reduced-motion:no-preference){.toast{animation:in .18s ease-out}@keyframes in{from{opacity:0;transform:translateY(4px)}}}
 </style>
 </head>
 <body>
-<main>
-  <div class="row"><h1 class="grow">链工 · AI 财务运营员控制台</h1><span id="mode" class="pill muted">未连接</span><span id="pausedPill" class="pill" hidden></span></div>
+<div id="demoBar" class="demo" hidden></div>
 
-  <div class="card row" id="login">
-    <label class="grow">控制台令牌<input id="token" type="password" autocomplete="off" placeholder="CHAINSTAFF_CONSOLE_TOKEN"></label>
-    <button class="primary" id="connect">连接</button>
+<section class="login" id="login">
+  <div class="card">
+    <div class="hd"><h2>KAGOU 控制台</h2><span class="label">OWNER CONSOLE</span></div>
+    <div class="bd stack">
+      <p class="muted" style="margin:0">输入部署时设置的控制台令牌（<code>CHAINSTAFF_CONSOLE_TOKEN</code>）。令牌只存在这个浏览器标签页里，关掉就失效。</p>
+      <label class="f"><span>令牌</span><input id="token" type="password" autocomplete="off" spellcheck="false"></label>
+      <div class="row"><button class="btn primary" id="connect">进入控制台</button><span id="loginMsg" class="block"></span></div>
+    </div>
   </div>
-  <div id="msg" class="muted"></div>
+</section>
 
-  <div id="app" hidden>
-    <div class="card row">
-      <div class="grow"><h2 style="margin:0">一键暂停</h2><span class="muted">暂停后所有付款请求都会被拦截。</span></div>
-      <button class="danger" id="pause">暂停所有付款</button>
-      <button id="resume">恢复付款</button>
+<div class="app" id="app" hidden>
+  <aside class="side">
+    <div class="brand"><b>KAGOU</b><span class="label">控制台</span></div>
+    <nav class="nav" id="nav" aria-label="页面"></nav>
+    <div class="side-foot">
+      <span class="muted" id="footMode"></span>
+      <span class="muted">更新于 <span class="mono" id="footTime">—</span></span>
     </div>
-
-    <div class="card">
-      <h2>等老板签字</h2>
-      <div class="scroll"><table><thead><tr><th>编号</th><th>收款方</th><th>金额</th><th>用途</th><th>原因</th><th></th></tr></thead><tbody id="pending"></tbody></table></div>
-    </div>
-
-    <div class="card">
-      <div class="row"><h2 class="grow">账本</h2><button id="refresh">刷新</button></div>
-      <div class="scroll"><table><thead><tr><th>时间</th><th>编号</th><th>收款方</th><th>金额</th><th>用途</th><th>状态</th><th>交易</th></tr></thead><tbody id="ledger"></tbody></table></div>
-    </div>
-
-    <div class="card">
-      <h2>规则</h2>
-      <div class="grid2" id="limits"></div>
-      <div class="grid2" style="margin-top:10px">
-        <label>需审批类别（逗号分隔）<input id="cats"></label>
-        <label>老板 Telegram 用户名（逗号分隔）<input id="owners"></label>
-        <label>重复检测天数<input id="dupdays" type="number" min="1"></label>
-        <label>时区<input id="tz"></label>
-        <label><span><input type="checkbox" id="readonly"> 试用期只读（所有付款都要老板确认）</span></label>
-      </div>
-      <h2 style="margin-top:16px">白名单</h2>
-      <div class="scroll"><table><thead><tr><th>名称</th><th>别名</th><th>地址</th><th>需审批</th><th></th></tr></thead><tbody id="wl"></tbody></table></div>
-      <div class="row" style="margin-top:10px"><button id="addPayee">添加收款方</button><span class="grow"></span><button class="primary" id="save">保存规则</button></div>
-    </div>
-
-    <div class="card"><div class="row"><h2 class="grow">上周周报</h2><button id="loadReport">生成</button></div><pre id="report" class="muted">点「生成」查看。</pre></div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <h1 id="title">总览</h1>
+      <span id="pills" class="row"></span>
+      <button class="btn sm" id="refresh" title="刷新（R）">刷新</button>
+      <button class="btn sm danger" id="kill"></button>
+    </header>
+    <main class="page" id="page"></main>
   </div>
-</main>
+</div>
+
+<div id="overlay"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
 <script>
 (function(){
-  const $=id=>document.getElementById(id);
-  let token='', rules=null;
-  try{token=sessionStorage.getItem('cs-token')||''}catch(e){}
-  $('token').value=token;
-  const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  async function api(path,opt={}){
-    const r=await fetch(path,{...opt,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
-    const body=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(body.detail||('请求失败 '+r.status));
-    return body;
-  }
-  const say=(t,bad)=>{$('msg').textContent=t;$('msg').className=bad?'stop':'muted'};
-  const STATUS={executing:['执行中','hold'],paid:['已付','go'],failed:['失败','stop'],pending_approval:['待签','hold'],approved:['老板已签','go'],rejected:['已驳回','muted'],blocked:['拦截','stop']};
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let token='';try{token=sessionStorage.getItem('cs-token')||''}catch(e){}
 
-  async function load(){
-    const s=await api('/api/status');
-    $('mode').textContent=s.live?'实盘':'测试模式';$('mode').className='pill '+(s.live?'stop':'muted');
-    $('pausedPill').hidden=!s.paused;$('pausedPill').textContent='已暂停';$('pausedPill').className='pill stop';
-    const rows=await api('/api/payments?limit=200');
-    const name=r=>esc(r.payee_name||r.payee.slice(0,6)+'…'+r.payee.slice(-4));
-    $('pending').innerHTML=rows.filter(r=>r.status==='pending_approval').map(r=>`<tr><td class="mono">${esc(r.request_id)}</td><td>${name(r)}</td><td class="mono">${esc(r.amount)} ${esc(r.token)}</td><td>${esc(r.memo)}</td><td>${r.messages.map(esc).join('<br>')}</td><td class="row"><button data-act="approve" data-id="${esc(r.request_id)}">已签字</button><button data-act="reject" data-id="${esc(r.request_id)}">驳回</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">没有待签字的付款。</td></tr>';
-    $('ledger').innerHTML=rows.map(r=>{const [l,c]=STATUS[r.status]||[r.status,'muted'];return `<tr><td class="mono">${esc(r.created_at.slice(0,16).replace('T',' '))}</td><td class="mono">${esc(r.request_id)}</td><td>${name(r)}</td><td class="mono">${esc(r.amount)} ${esc(r.token)}</td><td>${esc(r.memo)}</td><td class="${c}">${l}</td><td class="mono">${esc(r.tx_hash||r.safe_tx_hash||'')}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">还没有付款记录。</td></tr>';
-    rules=await api('/api/rules'); renderRules();
-  }
-  function renderRules(){
-    const tokens=[...new Set([...Object.keys(rules.single_limit||{}),...Object.keys(rules.daily_limit||{})])];
-    $('limits').innerHTML=tokens.map(t=>`<label>${esc(t)} 单笔上限<input data-lim="single_limit" data-tok="${esc(t)}" value="${esc(rules.single_limit[t]??0)}" inputmode="decimal"></label><label>${esc(t)} 每日上限<input data-lim="daily_limit" data-tok="${esc(t)}" value="${esc(rules.daily_limit[t]??0)}" inputmode="decimal"></label>`).join('');
-    $('cats').value=(rules.approval_categories||[]).join(', ');
-    $('owners').value=(rules.owners||[]).join(', ');
-    $('dupdays').value=rules.duplicate_window_days||30;
-    $('tz').value=rules.timezone||'UTC';
-    $('readonly').checked=!!rules.read_only;
-    $('wl').innerHTML=(rules.payees||[]).map((p,i)=>`<tr data-i="${i}"><td><input data-f="name" value="${esc(p.name)}"></td><td><input data-f="aliases" value="${esc((p.aliases||[]).join(', '))}"></td><td><input class="mono" data-f="address" value="${esc(p.address)}" size="44"></td><td><input type="checkbox" data-f="needs_approval" ${p.needs_approval?'checked':''}></td><td><button data-del="${i}">删除</button></td></tr>`).join('');
-  }
-  function collect(){
-    const list=s=>s.split(/[,，]/).map(x=>x.trim()).filter(Boolean);
-    document.querySelectorAll('[data-lim]').forEach(i=>rules[i.dataset.lim][i.dataset.tok]=i.value.trim());
-    rules.approval_categories=list($('cats').value);
-    rules.owners=list($('owners').value);
-    rules.duplicate_window_days=parseInt($('dupdays').value,10)||30;
-    rules.timezone=$('tz').value.trim()||'UTC';
-    rules.read_only=$('readonly').checked;
-    rules.payees=[...$('wl').querySelectorAll('tr')].map(tr=>{const g=f=>tr.querySelector(`[data-f="${f}"]`);return{name:g('name').value.trim(),aliases:list(g('aliases').value),address:g('address').value.trim(),needs_approval:g('needs_approval').checked}});
-    return rules;
-  }
-  async function run(fn,ok){try{const r=await fn();say(ok||r.message||'已完成');await load()}catch(e){say(e.message,true)}}
+// ---------- API ----------
+async function api(path,opt={}){
+  const r=await fetch(path,{...opt,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json',...(opt.headers||{})}});
+  if(r.status===401){logout('令牌不对或已失效');throw new Error('令牌不对')}
+  const ct=r.headers.get('content-type')||'';
+  const body=ct.includes('json')?await r.json().catch(()=>({})):await r.text();
+  if(!r.ok) throw new Error((body&&body.detail)||('请求失败 '+r.status));
+  return body;
+}
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b||{})});
+const put=(p,b)=>api(p,{method:'PUT',body:JSON.stringify(b)});
 
-  $('connect').onclick=async()=>{token=$('token').value.trim();try{sessionStorage.setItem('cs-token',token)}catch(e){}
-    try{await load();$('app').hidden=false;$('login').hidden=true;say('已连接')}catch(e){say(e.message,true)}};
-  $('refresh').onclick=()=>run(async()=>({}),'已刷新');
-  $('pause').onclick=()=>run(()=>api('/api/pause',{method:'POST'}));
-  $('resume').onclick=()=>run(()=>api('/api/resume',{method:'POST'}));
-  $('pending').onclick=e=>{const b=e.target.closest('button[data-act]');if(b)run(()=>api(`/api/payments/${encodeURIComponent(b.dataset.id)}/${b.dataset.act}`,{method:'POST'}))};
-  $('wl').onclick=e=>{const b=e.target.closest('button[data-del]');if(b){collect();rules.payees.splice(+b.dataset.del,1);renderRules()}};
-  $('addPayee').onclick=()=>{collect();rules.payees.push({name:'',aliases:[],address:'0x',needs_approval:false});renderRules()};
-  $('save').onclick=()=>run(()=>api('/api/rules',{method:'PUT',body:JSON.stringify(collect())}),'规则已保存，机器人下一条消息起生效');
-  $('loadReport').onclick=async()=>{try{$('report').textContent=(await api('/api/report/weekly')).text;$('report').className=''}catch(e){say(e.message,true)}};
-  if(token) $('connect').click();
+// ---------- formatting ----------
+let TZ='Asia/Shanghai';
+const fmtNum=v=>{const n=Number(v);if(!isFinite(n))return esc(v);return n.toLocaleString('en-US',{maximumFractionDigits:6})};
+const fmtAmt=(v,t)=>`<span class="num">${fmtNum(v)}</span> <span class="muted">${esc(t)}</span>`;
+const fmtMoved=m=>{const e=Object.entries(m||{});return e.length?e.map(([t,v])=>fmtAmt(v,t)).join('<br>'):'<span class="muted">0</span>'};
+function fmtTime(iso,withDate=true){if(!iso)return '—';const d=new Date(iso);if(isNaN(d))return esc(iso);
+  try{return d.toLocaleString('zh-CN',{timeZone:TZ,hour12:false,...(withDate?{month:'2-digit',day:'2-digit'}:{}),hour:'2-digit',minute:'2-digit'})}catch(e){return d.toISOString().slice(0,16).replace('T',' ')}}
+function ago(iso){if(!iso)return '从未';const s=(Date.now()-new Date(iso))/1000;if(s<60)return '刚刚';if(s<3600)return Math.floor(s/60)+' 分钟前';if(s<86400)return Math.floor(s/3600)+' 小时前';return Math.floor(s/86400)+' 天前'}
+const short=a=>a&&a.length>14?a.slice(0,6)+'…'+a.slice(-4):(a||'');
+const addr=(a,url)=>a?`<span class="addr"><span title="${esc(a)}">${esc(short(a))}</span><button class="copy" data-copy="${esc(a)}" title="复制">复制</button>${url?`<a class="copy" href="${esc(url)}" target="_blank" rel="noreferrer">浏览器</a>`:''}</span>`:'<span class="muted">—</span>';
+const STATUS={executing:['执行中','review'],paid:['已自动付','ok'],failed:['失败','block'],pending_approval:['待签字','review'],approved:['老板已签','ok'],rejected:['已驳回','muted'],blocked:['已拦截','block']};
+const OUTCOME={AUTO_PAY:['自动付','ok'],NEEDS_APPROVAL:['需签字','review'],BLOCK:['拦截','block']};
+const st=s=>{const [l,c]=STATUS[s]||[s,'muted'];return `<span class="pill ${c}"><span class="dot"></span>${l}</span>`};
+const KIND={audit:'操作',alert:'预警',telegram_in:'收到',telegram_out:'发出',system:'系统'};
+const WEEK=['周一','周二','周三','周四','周五','周六','周日'];
+
+// ---------- UI helpers ----------
+function toast(t,bad){const el=document.createElement('div');el.className='toast'+(bad?' bad':'');el.textContent=t;$('#toasts').append(el);setTimeout(()=>el.remove(),bad?6000:3200)}
+function confirmBox(title,body,okText='确认',danger=false){return new Promise(res=>{
+  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="bd"><h2 id="mt">${esc(title)}</h2><div class="muted">${body}</div></div><div class="ft"><button class="btn" data-x>取消</button><button class="btn ${danger?'danger':'primary'}" data-ok>${esc(okText)}</button></div></div>`;
+  const close=v=>{$('#overlay').innerHTML='';res(v)};
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(false));
+  $('#overlay').querySelector('[data-ok]').onclick=()=>close(true);
+  $('#overlay').querySelector('[data-ok]').focus();
+})}
+function drawer(title,html){$('#overlay').innerHTML=`<div class="scrim" data-x></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="hd"><h2 class="grow">${esc(title)}</h2><button class="btn sm" data-x>关闭</button></div><div class="bd">${html}</div></aside>`;
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{$('#overlay').innerHTML=''});}
+async function act(fn,ok){try{const r=await fn();toast(ok||r?.message||'已完成');await refresh();return r}catch(e){toast(e.message,true)}}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-copy]');if(!b)return;e.stopPropagation();
+  (navigator.clipboard?navigator.clipboard.writeText(b.dataset.copy):Promise.reject()).then(()=>toast('已复制'),()=>toast('复制失败，请手动选择',true))});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').innerHTML='';
+  if(e.target.matches('input,textarea,select'))return;
+  if(e.key==='r'&&!e.metaKey&&!e.ctrlKey)refresh();});
+function card(title,body,{right='',flush=false,id='',cls=''}={}){return `<section class="card ${cls}" ${id?`id="${id}"`:''}><div class="hd"><h2>${title}</h2>${right}</div><div class="bd${flush?' flush':''}">${body}</div></section>`}
+
+// ---------- state & routing ----------
+const PAGES=[
+  ['overview','总览','01'],['approvals','审批','02'],['ledger','账本','03'],['payees','收款人','04'],['rules','规则与试算','05'],
+  ['treasury','国库与预警','06'],['employee','员工档案','07'],['telegram','Telegram','08'],['reports','报告','09'],['audit','审计日志','10'],['settings','设置','11']];
+const S={status:null,route:'overview',ledger:{limit:100,f:{}},audit:{kind:'',items:[]},tgChat:[],dirtyRules:false};
+function route(){const r=(location.hash||'#overview').slice(1).split('?')[0];return PAGES.some(p=>p[0]===r)?r:'overview'}
+function renderNav(){const pend=S.status?.pending||0;
+  $('#nav').innerHTML=PAGES.map(([k,l,n])=>`<a href="#${k}" ${S.route===k?'aria-current="page"':''}><span class="n">${n}</span>${l}${k==='approvals'&&pend?`<span class="badge">${pend}</span>`:''}</a>`).join('')}
+function renderTop(){const s=S.status||{};
+  $('#title').textContent=PAGES.find(p=>p[0]===S.route)[1];
+  const pills=[s.live?'<span class="pill block"><span class="dot"></span>实盘</span>':'<span class="pill muted"><span class="dot"></span>测试模式</span>'];
+  if(s.read_only)pills.push('<span class="pill review">试用只读</span>');
+  if(s.paused)pills.push('<span class="pill block">已暂停</span>');
+  $('#pills').innerHTML=pills.join('');
+  $('#kill').textContent=s.paused?'恢复付款':'一键暂停';$('#kill').className='btn sm '+(s.paused?'ok':'danger');
+  $('#footMode').textContent=s.live?'实盘：绿灯付款会真的上链':'测试模式：不会真的上链';
+  $('#footTime').textContent=fmtTime(new Date().toISOString(),false);
+  renderNav();}
+$('#kill').onclick=async()=>{const p=S.status?.paused;
+  if(!p&&!await confirmBox('暂停所有付款？','暂停后员工收到的每一笔付款请求都会被拦截，直到你恢复。已经在链上的交易不受影响。','暂停',true))return;
+  act(()=>post(p?'/api/resume':'/api/pause'))};
+$('#refresh').onclick=()=>refresh(true);
+
+async function refresh(say){
+  try{
+    const [s,r]=await Promise.all([api('/api/status'),api('/api/rules')]);
+    S.status={...s,read_only:!!r.read_only};S.rules=r;TZ=r.timezone||TZ;
+    renderTop();await render();if(say)toast('已刷新');
+  }catch(e){toast(e.message,true)}
+}
+window.addEventListener('hashchange',()=>{if(S.dirtyRules&&S.route==='rules'&&!confirm('规则还没保存，确定离开？')){history.replaceState(null,'','#rules');return}S.dirtyRules=false;S.route=route();renderTop();render();window.scrollTo(0,0)});
+
+async function render(){
+  const page=$('#page');
+  try{page.innerHTML=await VIEWS[S.route]();BIND[S.route]&&BIND[S.route]()}
+  catch(e){page.innerHTML=`<div class="note block">这一页没加载出来：${esc(e.message)}</div>`}
+}
+
+// ---------- 01 overview ----------
+function chart(series){
+  const W=720,H=180,P=24,n=series.length,bw=(W-P)/n;
+  const max=Math.max(1,...series.map(d=>d.auto+d.approval+d.block));
+  let bars='',labels='';
+  series.forEach((d,i)=>{let y=H-20;const x=P+i*bw+2,w=Math.max(2,bw-5);
+    for(const [k,c] of [['auto','var(--ok)'],['approval','var(--review)'],['block','var(--block)']]){const h=d[k]/max*(H-36);if(h>0){y-=h;bars+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"><title>${d.date} ${k==='auto'?'自动付':k==='approval'?'需签字':'拦截'} ${d[k]}</title></rect>`}}
+    if(i%Math.ceil(n/7)===0||i===n-1)labels+=`<text x="${x+w/2}" y="${H-4}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--mono)">${d.date.slice(5)}</text>`});
+  const grid=[0,.5,1].map(f=>{const y=H-20-f*(H-36);return `<line x1="${P}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="0" y="${y+3}" font-size="10" fill="var(--muted)" font-family="var(--mono)">${Math.round(max*f)}</text>`}).join('');
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="近 ${n} 天付款请求">${grid}${bars}${labels}</svg></div>
+  <div class="legend"><span><i style="background:var(--ok)"></i>自动付</span><span><i style="background:var(--review)"></i>需签字</span><span><i style="background:var(--block)"></i>拦截</span></div>`}
+function budgetBars(b){return b.length?b.map(x=>{const p=Number(x.limit)>0?Math.min(100,Number(x.spent)/Number(x.limit)*100):0;
+  return `<div class="stack" style="gap:4px"><div class="row"><span class="grow">${esc(x.token)}</span><span class="num">${fmtNum(x.spent)} / ${fmtNum(x.limit)}</span></div><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></div>`}).join(''):'<p class="muted">还没设每日上限。</p>'}
+function feed(items,empty='暂无记录'){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="k ${esc(e.kind)}">${KIND[e.kind]||esc(e.kind)}</span><div>${esc(e.text).replace(/\n/g,'<br>')}${e.actor?`<div class="muted" style="font-size:12px">${esc(e.actor)}</div>`:''}</div><span class="t">${fmtTime(e.at)}</span></div>`).join('')}</div>`:`<div class="empty">${empty}</div>`}
+const VIEWS={},BIND={};
+VIEWS.overview=async()=>{
+  const o=await api('/api/overview');const m=o.month,c=m.counts;
+  const rate=m.automation_rate==null?'—':Math.round(m.automation_rate*100)+'%';
+  const blocked=c.blocked||0;
+  return `
+  ${o.status.paused?'<div class="note block"><b>付款已暂停。</b> 所有新请求都会被拦截。点右上角「恢复付款」恢复。</div>':''}
+  ${o.status.read_only?'<div class="note">试用只读模式：员工只记账、出报表和预警，所有付款都要老板确认。到 <a href="#rules">规则</a> 里关闭。</div>':''}
+  <div class="grid g4">
+    <section class="card kpi"><span class="label">本月经手资金</span><span class="v">${fmtMoved(m.moved)}</span><span class="s">自动付 + 老板签字 · ${esc(m.start)} 起</span></section>
+    <section class="card kpi"><span class="label">自动处理率</span><span class="v">${rate}</span><span class="s">没被拦截的请求里，员工自己办完的占比</span></section>
+    <section class="card kpi"><span class="label">等你签字</span><span class="v ${o.pending?'review':''}">${o.pending}</span><span class="s">${o.pending?'<a href="#approvals">去审批 →</a>':'没有待签字的付款'}</span></section>
+    <section class="card kpi"><span class="label">本月拦截</span><span class="v ${blocked?'block':''}">${blocked}</span><span class="s">涉及 ${Object.entries(m.blocked_value).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></section>
+  </div>
+  <div class="grid g3">
+    ${card('近 14 天请求',chart(o.series),{cls:'span2',right:`<span class="label">共 ${o.series.reduce((a,d)=>a+d.auto+d.approval+d.block,0)} 笔</span>`})}
+    ${card('今日自动付额度',`<div class="stack">${budgetBars(o.today.budget)}<p class="muted" style="margin:0;font-size:12px">只算员工自己付的，老板签字的不占额度。今天 ${o.today.requests} 笔请求。</p></div>`)}
+  </div>
+  <div class="grid g2">
+    ${card('本月收款方 Top 5',o.top_payees.length?`<div class="scroll"><table><thead><tr><th>收款方</th><th class="r">经手</th><th class="r">笔数</th></tr></thead><tbody>${o.top_payees.map(p=>`<tr class="click" data-payee="${esc(p.payee)}"><td>${p.payee_name?esc(p.payee_name):'<span class="block">白名单外</span>'}<div class="muted mono" style="font-size:11px">${esc(short(p.payee))}</div></td><td class="r">${fmtMoved(p.moved)}</td><td class="r num">${p.requests}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">本月还没有付款请求</div>',{flush:true,right:'<a class="btn sm" href="#payees">全部收款人</a>'})}
+    ${card('最近动态',feed(o.recent,'还没有操作或预警'),{flush:true,right:'<a class="btn sm" href="#audit">审计日志</a>'})}
+  </div>
+  <div class="grid g4">
+    ${[['自动付',c.paid,'ok'],['老板已签',c.approved,'ok'],['已驳回',c.rejected,'muted'],['失败',c.failed,c.failed?'block':'muted']].map(([l,v,k])=>`<section class="card kpi"><span class="label">本月 · ${l}</span><span class="v ${k}">${v||0}</span></section>`).join('')}
+  </div>`};
+BIND.overview=()=>{document.querySelectorAll('[data-payee]').forEach(tr=>tr.onclick=()=>{S.ledger.f={payee:tr.dataset.payee};location.hash='#ledger'})};
+
+// ---------- 02 approvals ----------
+VIEWS.approvals=async()=>{
+  const rows=await api('/api/payments?status=pending_approval&limit=500');
+  const recent=await api('/api/payments?status=approved,rejected&limit=10');
+  return `
+  <div class="note info">员工不能自己签多签。老板在 Safe 里签字执行后，点「已签字」把这笔记进账本；不付就点「驳回」。Telegram 群里发 <code>/approve 编号</code> 效果一样。</div>
+  ${rows.length?rows.map(r=>`<section class="card"><div class="hd"><span class="mono">${esc(r.request_id)}</span>${st(r.status)}<span class="grow"></span><span class="muted" style="font-size:12px">${fmtTime(r.created_at)} · ${esc(r.requester)}</span></div>
+    <div class="bd grid g2">
+      <dl class="kv"><dt>收款方</dt><dd>${r.payee_name?`<b>${esc(r.payee_name)}</b> `:''}${addr(r.payee)}</dd><dt>金额</dt><dd style="font-size:18px">${fmtAmt(r.amount,r.token)}</dd><dt>用途</dt><dd>${esc(r.memo||'—')} ${r.category?`<span class="chip">${esc(r.category)}</span>`:''}</dd>${r.safe_tx_hash?`<dt>Safe 交易哈希</dt><dd>${addr(r.safe_tx_hash)}</dd>`:''}</dl>
+      <div class="stack"><span class="label">为什么要你签字</span><div class="row">${r.messages.map(m=>`<span class="chip review">${esc(m)}</span>`).join('')}</div>
+      <div class="row" style="margin-top:auto"><button class="btn ok" data-ap="${esc(r.request_id)}">已签字</button><button class="btn danger" data-rj="${esc(r.request_id)}">驳回</button><button class="btn ghost" data-detail="${esc(r.request_id)}">详情</button></div></div>
+    </div></section>`).join(''):`<section class="card"><div class="empty">没有等你签字的付款。员工遇到超额、需审批类别或需审批收款人时会出现在这里。</div></section>`}
+  ${card('最近处理',recent.length?`<div class="scroll"><table><thead><tr><th>编号</th><th>收款方</th><th class="r">金额</th><th>结果</th><th>处理人</th><th>时间</th></tr></thead><tbody>${recent.map(r=>`<tr class="click" data-detail="${esc(r.request_id)}"><td class="mono">${esc(r.request_id)}</td><td>${esc(r.payee_name||short(r.payee))}</td><td class="r">${fmtAmt(r.amount,r.token)}</td><td>${st(r.status)}</td><td>${esc(r.decided_by||'—')}</td><td class="mono">${fmtTime(r.updated_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">还没有处理记录</div>',{flush:true})}`};
+BIND.approvals=()=>{
+  document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=async()=>{if(await confirmBox('确认已签字？',`确认你已经在 Safe 里签字并执行了 <b class="mono">${esc(b.dataset.ap)}</b>。控制台只记账，不会再付一次。`,'已签字'))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.ap)}/approve`))});
+  document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=async()=>{if(await confirmBox('驳回这笔付款？',`<b class="mono">${esc(b.dataset.rj)}</b> 会标记为已驳回，不会付款。之后可以让团队重新发请求。`,'驳回',true))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.rj)}/reject`))});
+  bindDetail()};
+function bindDetail(){document.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.detail))}
+async function showDetail(id){
+  try{const d=await api('/api/payments/'+encodeURIComponent(id));const [ol,oc]=OUTCOME[d.outcome]||[d.outcome,'muted'];
+  drawer(id,`<div class="row">${st(d.status)}<span class="pill ${oc}">规则判断：${ol}</span></div>
+    <dl class="kv">
+      <dt>收款方</dt><dd>${d.payee_name?esc(d.payee_name)+'<br>':''}${addr(d.payee,d.payee_url)}</dd>
+      <dt>金额</dt><dd>${fmtAmt(d.amount,d.token)}</dd>
+      <dt>用途</dt><dd>${esc(d.memo||'—')}</dd><dt>类别</dt><dd>${esc(d.category||'—')}</dd>
+      <dt>谁发的</dt><dd>${esc(d.requester)}</dd>
+      <dt>收到时间</dt><dd class="mono">${fmtTime(d.created_at)}</dd><dt>最后更新</dt><dd class="mono">${fmtTime(d.updated_at)}</dd>
+      ${d.tx_hash?`<dt>交易</dt><dd>${d.tx_url?`<a href="${esc(d.tx_url)}" target="_blank" rel="noreferrer" class="mono">${esc(short(d.tx_hash))}</a> `:`<span class="mono">${esc(d.tx_hash)}</span>`} <button class="copy" data-copy="${esc(d.tx_hash)}">复制</button></dd>`:''}
+      ${d.safe_tx_hash?`<dt>Safe 交易哈希</dt><dd>${addr(d.safe_tx_hash)}</dd>`:''}
+      ${d.decided_by?`<dt>处理人</dt><dd>${esc(d.decided_by)}</dd>`:''}
+      ${d.error?`<dt>错误</dt><dd class="block">${esc(d.error)}</dd>`:''}
+    </dl>
+    <div class="stack"><span class="label">规则命中</span><div class="row">${d.messages.length?d.messages.map(m=>`<span class="chip ${oc}">${esc(m)}</span>`).join(''):'<span class="muted">全部规则通过</span>'}</div></div>
+    <div class="stack"><span class="label">经过</span><ol class="steps">
+      <li class="done">${fmtTime(d.created_at)} 收到请求，规则判断为「${ol}」，先记账</li>
+      ${d.status==='paid'?`<li class="done">员工在限额内自动付款${d.tx_url?'，已上链':''}</li>`:''}
+      ${d.status==='failed'?`<li>付款失败，请求作废</li>`:''}
+      ${d.history.slice().reverse().map(h=>`<li class="done">${fmtTime(h.at)} ${esc(h.text)}（${esc(h.actor)}）</li>`).join('')}
+      ${d.status==='pending_approval'?'<li>等老板签字</li>':''}
+    </ol></div>
+    ${d.status==='pending_approval'?`<div class="row"><button class="btn ok" data-ap2>已签字</button><button class="btn danger" data-rj2>驳回</button></div>`:''}`);
+  const ap=$('#overlay [data-ap2]'),rj=$('#overlay [data-rj2]');
+  if(ap)ap.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/approve`))};
+  if(rj)rj.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/reject`))};
+  }catch(e){toast(e.message,true)}}
+
+// ---------- 03 ledger ----------
+function ledgerQuery(extra){const f=S.ledger.f,q=new URLSearchParams();for(const k of ['status','token','payee','q','start','end'])if(f[k])q.set(k,f[k]);if(extra)for(const[k,v]of Object.entries(extra))q.set(k,v);return q.toString()}
+VIEWS.ledger=async()=>{
+  const f=S.ledger.f,tokens=[...new Set([...Object.keys(S.rules.single_limit||{}),...Object.keys(S.rules.daily_limit||{})])];
+  const rows=await api('/api/payments?'+ledgerQuery({limit:S.ledger.limit}));
+  const sum={};rows.forEach(r=>{if(r.status==='paid'||r.status==='approved')sum[r.token]=(sum[r.token]||0)+Number(r.amount)});
+  return `
+  <section class="card"><div class="bd"><div class="grid g4" style="gap:10px">
+    <label class="f"><span>状态</span><select id="fStatus"><option value="">全部</option>${Object.entries(STATUS).map(([k,[l]])=>`<option value="${k}" ${f.status===k?'selected':''}>${l}</option>`).join('')}<option value="paid,approved" ${f.status==='paid,approved'?'selected':''}>已付出（自动 + 签字）</option></select></label>
+    <label class="f"><span>币种</span><select id="fToken"><option value="">全部</option>${tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+    <label class="f"><span>从</span><input type="date" id="fStart" value="${esc((f.start||'').slice(0,10))}"></label>
+    <label class="f"><span>到（含）</span><input type="date" id="fEnd" value="${esc(f.endDay||'')}"></label>
+  </div>
+  <div class="row" style="margin-top:10px"><input id="fQ" class="grow" style="width:auto" placeholder="搜索编号、用途、类别、发起人、地址" value="${esc(f.q||'')}">
+    ${f.payee?`<span class="chip">收款方 ${esc(short(f.payee))}<button data-clearpayee aria-label="清除">×</button></span>`:''}
+    <button class="btn" id="fApply">筛选</button><button class="btn ghost" id="fReset">清空</button><button class="btn" id="csv">导出 CSV</button></div></div></section>
+  <section class="card"><div class="hd"><h2>${rows.length} 笔${rows.length>=S.ledger.limit?'（只显示最近 '+S.ledger.limit+' 笔）':''}</h2><span class="muted" style="font-size:12px">已付出：${Object.entries(sum).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></div>
+  <div class="bd flush scroll">${rows.length?`<table><thead><tr><th>时间</th><th>编号</th><th>收款方</th><th class="r">金额</th><th class="hide-sm">用途</th><th>状态</th><th class="hide-sm">原因 / 交易</th></tr></thead><tbody>${rows.map(r=>`<tr class="click" data-detail="${esc(r.request_id)}"><td class="mono" style="white-space:nowrap">${fmtTime(r.created_at)}</td><td class="mono">${esc(r.request_id)}</td><td>${r.payee_name?esc(r.payee_name):`<span class="mono">${esc(short(r.payee))}</span>`}</td><td class="r" style="white-space:nowrap">${fmtAmt(r.amount,r.token)}</td><td class="hide-sm">${esc(r.memo||'—')}</td><td>${st(r.status)}</td><td class="hide-sm muted" style="font-size:12px">${r.messages.length?esc(r.messages.join('；')):(r.tx_hash?`<span class="mono">${esc(short(r.tx_hash))}</span>`:'')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">没有符合条件的记录</div>'}</div>
+  ${rows.length>=S.ledger.limit?`<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="more">再加载 ${S.ledger.limit} 笔</button></div>`:''}</section>`};
+BIND.ledger=()=>{
+  const apply=()=>{const end=$('#fEnd').value;S.ledger.f={...S.ledger.f,status:$('#fStatus').value,token:$('#fToken').value,q:$('#fQ').value.trim(),start:$('#fStart').value,endDay:end,end:end?new Date(new Date(end+'T00:00:00Z').getTime()+864e5).toISOString().slice(0,10):''};S.ledger.limit=100;render()};
+  $('#fApply').onclick=apply;$('#fQ').onkeydown=e=>{if(e.key==='Enter')apply()};
+  ['#fStatus','#fToken','#fStart','#fEnd'].forEach(s=>$(s).onchange=apply);
+  $('#fReset').onclick=()=>{S.ledger.f={};render()};
+  const cp=document.querySelector('[data-clearpayee]');if(cp)cp.onclick=()=>{delete S.ledger.f.payee;render()};
+  const more=$('#more');if(more)more.onclick=()=>{S.ledger.limit+=100;render()};
+  $('#csv').onclick=async()=>{if(window.CONSOLE_DEMO)return toast('演示版不能下载文件。正式版点这里会下载当前筛选结果的 CSV。');try{const t=await api('/api/payments.csv?'+ledgerQuery());const url=URL.createObjectURL(new Blob([t],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='ledger-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出')}catch(e){toast(e.message,true)}};
+  bindDetail()};
+
+// ---------- 04 payees ----------
+const ADDR=/^0x[0-9a-fA-F]{40}$/;
+VIEWS.payees=async()=>{
+  const p=await api('/api/payees');S.payees=p;
+  return `
+  ${card(`白名单 · ${p.whitelist.length} 个`,p.whitelist.length?`<table><thead><tr><th>名称</th><th>地址</th><th class="hide-sm">别名</th><th class="r">累计付出</th><th class="r hide-sm">笔数</th><th class="hide-sm">最近</th><th></th></tr></thead><tbody>${p.whitelist.map((w,i)=>`<tr><td><b>${esc(w.name)}</b>${w.needs_approval?' <span class="chip review">每笔需签字</span>':''}${w.risk?' <span class="chip block">在风险名单</span>':''}</td><td>${addr(w.address,w.url)}</td><td class="hide-sm muted">${esc(w.aliases.join('、')||'—')}</td><td class="r">${fmtMoved(w.moved)}</td><td class="r num hide-sm">${w.requests}${w.blocked?` <span class="block">(${w.blocked} 拦)</span>`:''}</td><td class="hide-sm mono muted">${w.last_at?fmtTime(w.last_at):'—'}</td><td class="r" style="white-space:nowrap"><button class="btn sm" data-led="${esc(w.address)}">账本</button> <button class="btn sm" data-edit="${i}">编辑</button> <button class="btn sm danger" data-del="${i}">删除</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">白名单是空的。员工只会给白名单里的地址付款。</div>',{flush:true,cls:'scroll',right:'<button class="btn signal sm" id="addPayee">添加收款方</button>'})}
+  ${card(`白名单外出现过的地址 · ${p.unknown.length}`,p.unknown.length?`<table><thead><tr><th>地址</th><th class="r">请求</th><th class="r">被拦截</th><th>最近</th><th></th></tr></thead><tbody>${p.unknown.map(u=>`<tr><td>${addr(u.payee,u.url)}${u.risk?' <span class="chip block">风险</span>':''}</td><td class="r num">${u.requests}</td><td class="r num block">${u.blocked}</td><td class="mono muted">${fmtTime(u.last_at)}</td><td class="r" style="white-space:nowrap"><button class="btn sm" data-trust="${esc(u.payee)}">加入白名单</button> ${u.risk?'':`<button class="btn sm danger" data-risk="${esc(u.payee)}">标为风险</button>`}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">没有陌生地址的付款请求</div>',{flush:true,cls:'scroll'})}
+  ${card('风险地址',`<div class="stack"><p class="muted" style="margin:0">发往这些地址的请求一律拦截，就算它在白名单里。</p><div class="row" id="riskList">${p.risk_addresses.map(a=>`<span class="chip block mono">${esc(short(a))}<button data-unrisk="${esc(a)}" aria-label="移除">×</button></span>`).join('')||'<span class="muted">暂无</span>'}</div>
+    <div class="row"><input id="riskNew" class="grow mono" style="width:auto" placeholder="0x…"><button class="btn danger" id="riskAdd">加入风险名单</button></div></div>`)}`};
+function payeeForm(pv={name:'',aliases:[],address:'',needs_approval:false},title='添加收款方'){return new Promise(res=>{
+  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true"><div class="bd"><h2>${title}</h2>
+  <label class="f"><span>名称</span><input id="pfName" value="${esc(pv.name)}" placeholder="Alice"></label>
+  <label class="f"><span>钱包地址</span><input id="pfAddr" class="mono" value="${esc(pv.address)}" placeholder="0x 开头的 42 位地址"></label>
+  <label class="f"><span>别名（逗号分隔，群里写哪个都能认出）</span><input id="pfAlias" value="${esc(pv.aliases.join(', '))}" placeholder="alice, 爱丽丝"></label>
+  <label class="switch"><input type="checkbox" id="pfNeed" ${pv.needs_approval?'checked':''}> 给这个人的每一笔都要老板签字</label>
+  <div class="note">核对地址时请对照对方亲自发来的地址，看完整的 42 位，不要只看首尾几位。地址投毒常用首尾相同的假地址。</div>
+  <span id="pfErr" class="block"></span></div>
+  <div class="ft"><button class="btn" data-x>取消</button><button class="btn primary" id="pfOk">保存到白名单</button></div></div>`;
+  const close=v=>{$('#overlay').innerHTML='';res(v)};
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(null));
+  $('#pfOk').onclick=()=>{const v={name:$('#pfName').value.trim(),address:$('#pfAddr').value.trim(),aliases:$('#pfAlias').value.split(/[,，]/).map(x=>x.trim()).filter(Boolean),needs_approval:$('#pfNeed').checked};
+    if(!v.name)return $('#pfErr').textContent='请填名称';if(!ADDR.test(v.address))return $('#pfErr').textContent='地址格式不对：要 0x 开头加 40 位十六进制';close(v)};
+  $('#pfName').focus();})}
+async function saveRules(mut,ok){const cfg=JSON.parse(JSON.stringify(S.rules));mut(cfg);
+  try{const r=await put('/api/rules',cfg);toast(r.changes&&r.changes.length?'已保存：'+r.changes.join('；'):(ok||'没有改动'));await refresh()}catch(e){toast(e.message,true)}}
+BIND.payees=()=>{
+  $('#addPayee').onclick=async()=>{const v=await payeeForm();if(v)saveRules(c=>c.payees.push(v))};
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async()=>{const i=+b.dataset.edit,cur=S.rules.payees[i];const v=await payeeForm({aliases:[],...cur},'编辑收款方');if(v)saveRules(c=>c.payees[i]=v)});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const i=+b.dataset.del,cur=S.rules.payees[i];if(await confirmBox('从白名单删除？',`删除 <b>${esc(cur.name)}</b> 后，发给 TA 的请求会被拦截。历史账本不受影响。`,'删除',true))saveRules(c=>c.payees.splice(i,1))});
+  document.querySelectorAll('[data-led]').forEach(b=>b.onclick=()=>{S.ledger.f={payee:b.dataset.led};location.hash='#ledger'});
+  document.querySelectorAll('[data-trust]').forEach(b=>b.onclick=async()=>{const v=await payeeForm({name:'',aliases:[],address:b.dataset.trust,needs_approval:true},'加入白名单');if(v)saveRules(c=>c.payees.push(v))});
+  const addRisk=a=>saveRules(c=>{c.risk_addresses=[...new Set([...(c.risk_addresses||[]),a])]});
+  document.querySelectorAll('[data-risk]').forEach(b=>b.onclick=()=>addRisk(b.dataset.risk));
+  document.querySelectorAll('[data-unrisk]').forEach(b=>b.onclick=()=>saveRules(c=>{c.risk_addresses=(c.risk_addresses||[]).filter(x=>x.toLowerCase()!==b.dataset.unrisk)}));
+  $('#riskAdd').onclick=()=>{const a=$('#riskNew').value.trim();if(!ADDR.test(a))return toast('地址格式不对',true);addRisk(a)}};
+
+// ---------- 05 rules + simulator ----------
+const TZS=['Asia/Shanghai','Asia/Hong_Kong','Asia/Singapore','Asia/Tokyo','Asia/Seoul','Asia/Dubai','Europe/London','Europe/Berlin','America/New_York','America/Los_Angeles','UTC'];
+VIEWS.rules=async()=>{const r=S.rules,tokens=[...new Set([...Object.keys(r.single_limit||{}),...Object.keys(r.daily_limit||{})])];
+  return `
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('限额',`<div class="scroll"><table id="limits"><thead><tr><th>币种</th><th>单笔上限</th><th>每日自动付上限</th><th></th></tr></thead><tbody>${tokens.map(t=>`<tr data-tok="${esc(t)}"><td class="mono">${esc(t)}</td><td><input class="mono" data-s value="${esc(r.single_limit[t]??'0')}" inputmode="decimal"></td><td><input class="mono" data-d value="${esc(r.daily_limit[t]??'0')}" inputmode="decimal"></td><td><button class="btn sm ghost" data-rmtok>移除</button></td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="padding:10px 12px;border-top:1px solid var(--line)"><input id="newTok" class="mono" style="width:120px" placeholder="币种，如 USDC"><button class="btn sm" id="addTok">添加币种</button><span class="muted" style="font-size:12px">超过单笔上限要老板签字；当天自动付累计超过每日上限也要签字。</span></div>`,{flush:true})}
+  ${card('审批与检测',`<div class="stack">
+    <label class="f"><span>需审批类别（逗号分隔）</span><input id="cats" value="${esc((r.approval_categories||[]).join(', '))}" placeholder="KOL, 空投"></label>
+    <label class="f"><span>重复付款检测（天）</span><input id="dup" type="number" min="1" max="365" value="${esc(r.duplicate_window_days||30)}"></label>
+    <label class="f"><span>时区（"每日"按这个时区算）</span><select id="tz">${[...new Set([r.timezone,...TZS])].map(z=>`<option ${z===r.timezone?'selected':''}>${esc(z)}</option>`).join('')}</select></label>
+    <label class="f"><span>老板 Telegram 用户名（逗号分隔，只有他们能审批和暂停）</span><input id="owners" value="${esc((r.owners||[]).join(', '))}"></label>
+    <label class="switch"><input type="checkbox" id="ro" ${r.read_only?'checked':''}> 试用只读：员工不自动付任何钱，全部要老板确认</label>
+  </div>`)}
+  <div class="row"><button class="btn primary" id="saveRules">保存规则</button><button class="btn ghost" id="resetRules">撤销修改</button><span id="dirty" class="review" hidden>有未保存的修改</span></div>
+  <p class="muted" style="margin:0;font-size:12px">白名单和风险地址在 <a href="#payees">收款人</a> 页管理。保存后机器人从下一条消息起按新规则执行，修改会记进审计日志。</p>
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('规则试算',`<div class="stack">
+    <p class="muted" style="margin:0">输入一句群里会出现的付款请求，看员工会怎么处理。只是试算：不记账、不付款、不发到群里。按的是<b>已保存</b>的规则。</p>
+    <div class="row"><input id="simText" class="grow" style="width:auto" placeholder="付 Alice 300 USDT 设计费"><button class="btn signal" id="simGo">试算</button></div>
+    <div class="row" id="simEx">${['付 Alice 300 USDT 设计费','付 Alice 800 USDT 视频','付 Mia 200 USDT KOL 推广','付 0x9f3c000000000000000000000000000000004a21 50 USDT','给 bob 0.1 BNB gas'].map(x=>`<button class="btn sm ghost" data-ex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div id="simOut"></div></div>`)}
+  ${card('当前生效的规则',`<pre class="report" id="rulesText">加载中…</pre>`)}
+  </div></div>`};
+BIND.rules=async()=>{
+  const mark=()=>{S.dirtyRules=true;$('#dirty').hidden=false};
+  document.querySelectorAll('#page input,#page select').forEach(i=>{if(!['simText','newTok'].includes(i.id))i.addEventListener('input',mark)});
+  const collect=()=>{const c=JSON.parse(JSON.stringify(S.rules)),list=s=>s.split(/[,，]/).map(x=>x.trim()).filter(Boolean);
+    c.single_limit={};c.daily_limit={};document.querySelectorAll('#limits tbody tr').forEach(tr=>{c.single_limit[tr.dataset.tok]=tr.querySelector('[data-s]').value.trim();c.daily_limit[tr.dataset.tok]=tr.querySelector('[data-d]').value.trim()});
+    c.approval_categories=list($('#cats').value);c.duplicate_window_days=parseInt($('#dup').value,10)||30;c.timezone=$('#tz').value;c.owners=list($('#owners').value);c.read_only=$('#ro').checked;return c};
+  $('#saveRules').onclick=async()=>{const c=collect();try{const r=await put('/api/rules',c);S.dirtyRules=false;toast(r.changes.length?'已保存：'+r.changes.join('；'):'没有改动');await refresh()}catch(e){toast(e.message,true)}};
+  $('#resetRules').onclick=()=>{S.dirtyRules=false;render()};
+  $('#addTok').onclick=()=>{const t=$('#newTok').value.trim().toUpperCase();if(!/^[A-Z0-9]{2,10}$/.test(t))return toast('币种代码 2–10 位字母或数字',true);
+    if(document.querySelector(`#limits tr[data-tok="${t}"]`))return toast('已经有 '+t,true);
+    $('#limits tbody').insertAdjacentHTML('beforeend',`<tr data-tok="${esc(t)}"><td class="mono">${esc(t)}</td><td><input class="mono" data-s value="0"></td><td><input class="mono" data-d value="0"></td><td><button class="btn sm ghost" data-rmtok>移除</button></td></tr>`);$('#newTok').value='';mark()};
+  $('#limits').onclick=e=>{const b=e.target.closest('[data-rmtok]');if(b){b.closest('tr').remove();mark()}};
+  const sim=async()=>{const text=$('#simText').value.trim();if(!text)return;try{const r=await post('/api/simulate',{text});
+    if(!r.parsed){$('#simOut').innerHTML=`<div class="note">员工没看懂这句话，会在群里追问：<br>${esc(r.reply)}</div>`;return}
+    const [l,c]=OUTCOME[r.outcome];
+    $('#simOut').innerHTML=`<div class="stack"><div class="row"><span class="pill ${c}"><span class="dot"></span>${l}</span><span>${r.payee_name?esc(r.payee_name):`<span class="mono">${esc(short(r.payee))}</span>`} · ${fmtAmt(r.amount,r.token)}</span>${r.category?`<span class="chip">${esc(r.category)}</span>`:''}</div>
+      ${r.messages.length?`<div class="row">${r.messages.map(m=>`<span class="chip ${c}">${esc(m)}</span>`).join('')}</div>`:'<span class="muted">所有规则都通过</span>'}
+      <span class="label">员工在群里会这样回</span><div class="chat" style="height:auto;max-height:260px"><div class="msg me"><span class="who">你</span>${esc(text)}</div><div class="msg bot"><span class="who">KAGOU 员工</span>${esc(r.reply)}</div></div></div>`}catch(e){toast(e.message,true)}};
+  $('#simGo').onclick=sim;$('#simText').onkeydown=e=>{if(e.key==='Enter')sim()};
+  document.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{$('#simText').value=b.dataset.ex;sim()});
+  try{$('#rulesText').textContent=(await api('/api/preview/rules')).text}catch(e){$('#rulesText').textContent=e.message}};
+
+// ---------- 06 treasury ----------
+VIEWS.treasury=async()=>{const t=await api('/api/treasury'),tg=await api('/api/telegram');
+  return `
+  <div class="grid g3">
+    <section class="card kpi"><span class="label">国库余额</span><span class="v">${t.balance?fmtMoved(t.balance):'—'}</span><span class="s">${t.error?`<span class="block">读取失败：${esc(t.error)}</span>`:t.balance?'所有国库地址合计，实时读链':'部署时没配置国库地址或代币'}</span></section>
+    <section class="card kpi"><span class="label">实时监控</span><span class="v ${t.monitoring?'ok':'muted'}">${t.monitoring?'开启':'未开启'}</span><span class="s">${t.monitoring?'每 5 分钟检查一次国库转账':'需要国库地址、浏览器 API 和 ETHERSCAN_API_KEY'}</span></section>
+    <section class="card kpi"><span class="label">发到群里</span><span class="v ${t.alerts_enabled?'':'muted'}">${t.alerts_enabled?'开':'关'}</span><span class="s"><label class="switch"><input type="checkbox" id="alertsOn" ${t.alerts_enabled?'checked':''}> 预警发到 Telegram 群</label></span></section>
+  </div>
+  <div class="grid g2">
+    ${card('国库地址',t.addresses.length?`<div class="stack">${t.addresses.map(a=>addr(a.address,a.url)).join('')}</div>`:'<p class="muted" style="margin:0">还没配置。在部署的 <code>config/chain.json</code> 里填 <code>treasury_addresses</code>（一般是你们的 Safe 地址）。</p>')}
+    ${card('预警规则',`<ul style="margin:0;padding-left:18px;display:grid;gap:6px">
+      <li>大额转出：${Object.keys(t.thresholds).length?Object.entries(t.thresholds).map(([k,v])=>`单笔超过 <b class="num">${fmtNum(v)}</b> ${esc(k)}`).join('，'):'未设置阈值'}</li>
+      <li>转给白名单外的陌生地址</li>
+      <li>地址投毒：收到首尾和常用地址相同的小额转账</li></ul><p class="muted" style="margin:8px 0 0;font-size:12px">同一笔交易只提醒一次，重启也不会重复。</p>`)}
+  </div>
+  ${card(`预警记录 · ${t.alerts.length}`,feed(t.alerts,'还没有预警。国库有大额转出、陌生地址或投毒时会出现在这里。'),{flush:true})}`};
+BIND.treasury=()=>{$('#alertsOn').onchange=async e=>{try{const tg=await api('/api/telegram');await put('/api/telegram/settings',{...tg.settings,treasury_alerts:e.target.checked});toast(e.target.checked?'预警会发到群里':'预警只记在控制台，不发群');render()}catch(err){toast(err.message,true)}}};
+
+// ---------- 07 employee ----------
+const WALLET={turnkey:'Turnkey（限额写在签名层）',evm:'本地密钥（只用于测试网）',test:'测试模式（不签名）'};
+VIEWS.employee=async()=>{const e=await api('/api/employee');
+  const checks=[
+    [e.live,'实盘已开启','测试模式：绿灯付款不会真的上链'],
+    [e.wallet_kind==='turnkey'||!e.live,e.live?'签名层有限额（Turnkey 策略）':'测试模式不需要签名','实盘没用 Turnkey，限额只在代码里'],
+    [!!e.safe_address,'国库在 Safe 多签里，员工只能提提案','没配置 Safe：超额付款只能靠老板手动转'],
+    [!!e.agent_id,'有 ERC-8004 链上工号','还没注册 ERC-8004 工号'],
+    [!e.paused,'付款正常','付款已暂停'],
+  ];
+  return `
+  <div class="grid g2" style="align-items:start">
+  ${card('员工档案',`<dl class="kv">
+    <dt>岗位</dt><dd>${esc(e.role)}</dd>
+    <dt>ERC-8004 工号</dt><dd>${e.agent_id?`<span class="num">#${esc(e.agent_id)}</span>`:'<span class="muted">未注册（运行 scripts/register_agent.py）</span>'}</dd>
+    <dt>员工钱包</dt><dd>${addr(e.wallet,e.wallet_url)}</dd>
+    <dt>签名方式</dt><dd>${esc(WALLET[e.wallet_kind]||e.wallet_kind||'—')}</dd>
+    <dt>网络</dt><dd>${e.network?`${esc(e.network)} <span class="muted mono">chain ${esc(e.chain_id)}</span>`:'<span class="muted">未配置链（全部测试模式）</span>'}</dd>
+    <dt>Safe 多签</dt><dd>${addr(e.safe_address,e.safe_url)}</dd>
+    <dt>支持币种</dt><dd>${e.tokens.map(t=>`<span class="chip">${esc(t)}</span>`).join(' ')}</dd>
+    <dt>控制台启动</dt><dd class="mono">${fmtTime(e.console_started_at)}</dd></dl>`)}
+  ${card('安全状态',`<ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${checks.map(([ok,y,n])=>`<li class="row"><span class="pill ${ok?'ok':'review'}">${ok?'OK':'注意'}</span><span>${esc(ok?y:n)}</span></li>`).join('')}</ul>
+    <p class="muted" style="margin:12px 0 0;font-size:12px">私钥只在钱包服务商的签名层，控制台、机器人和数据库里都没有。放款判断只在规则引擎里，AI 模型的输出只是建议。</p>`)}
+  </div>
+  ${card('今日额度',`<table><thead><tr><th>币种</th><th class="r">单笔上限</th><th class="r">每日上限</th><th class="r">今日已自动付</th><th style="width:30%">使用</th></tr></thead><tbody>${e.limits.map(l=>{const p=Number(l.daily)>0?Math.min(100,Number(l.spent_today)/Number(l.daily)*100):0;return `<tr><td class="mono">${esc(l.token)}</td><td class="r num">${fmtNum(l.single)}</td><td class="r num">${fmtNum(l.daily)}</td><td class="r num">${fmtNum(l.spent_today)}</td><td><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></td></tr>`}).join('')}</tbody></table>`,{flush:true,cls:'scroll',right:'<a class="btn sm" href="#rules">改限额</a>'})}`};
+
+// ---------- 08 telegram ----------
+VIEWS.telegram=async()=>{const t=await api('/api/telegram');S.tg=t;const s=t.settings;
+  const steps=[
+    [!!t.bot,'在 @BotFather 新建机器人，把 token 设成服务器的 TELEGRAM_BOT_TOKEN，启动机器人'],
+    [t.bot&&t.bot.reads_all_group_messages,'在 @BotFather 发 /setprivacy 选 Disable，机器人才能看到群里的付款请求'],
+    [!!t.chat,'把机器人拉进财务群，在下面填群 ID'],
+    [t.owners.length>0,'在规则里填老板的 Telegram 用户名（只有他们能审批和暂停）'],
+    [t.online,'机器人在线，群里发 /help 测试'],
+  ];
+  return `
+  <div class="grid g4">
+    <section class="card kpi"><span class="label">机器人</span><span class="v" style="font-size:18px">${t.bot?'@'+esc(t.bot.username):'未连接'}</span><span class="s">${t.bot?esc(t.bot.name||''):'还没启动过机器人'}</span></section>
+    <section class="card kpi"><span class="label">状态</span><span class="v ${t.online?'ok':'block'}" style="font-size:18px">${t.online?'在线':'离线'}</span><span class="s">最后心跳 ${ago(t.heartbeat)}</span></section>
+    <section class="card kpi"><span class="label">通知群</span><span class="v mono" style="font-size:16px">${esc(t.chat||'未设置')}</span><span class="s">${t.chat_source==='console'?'在控制台设置':t.chat_source==='env'?'部署时设置':'周报、预警发到这里'}</span></section>
+    <section class="card kpi"><span class="label">群消息权限</span><span class="v ${t.bot?(t.bot.reads_all_group_messages?'ok':'block'):'muted'}" style="font-size:18px">${t.bot?(t.bot.reads_all_group_messages?'能看全部消息':'只能看命令'):'—'}</span><span class="s">${t.bot&&!t.bot.reads_all_group_messages?'去 @BotFather /setprivacy 选 Disable':'隐私模式要关掉'}</span></section>
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('接入步骤',`<ol class="steps">${steps.map(([ok,txt])=>`<li class="${ok?'done':''}">${esc(txt)}</li>`).join('')}</ol>`)}
+  ${card('通知群和审批人',`<div class="stack">
+    <label class="f"><span>群 ID</span><div class="row"><input id="chatId" class="mono grow" style="width:auto" value="${esc(t.chat||'')}" placeholder="-1001234567890"><button class="btn" id="saveChat">保存</button></div></label>
+    <p class="muted" style="margin:0;font-size:12px">怎么拿群 ID：把 @RawDataBot 拉进群，它会回一串以 -100 开头的数字，拿到后把它踢掉。</p>
+    <div><span class="label">审批人（老板）</span><div class="row" style="margin-top:6px">${t.owners.map(o=>`<span class="chip">@${esc(o)}</span>`).join('')||'<span class="block">还没设置，任何人都不能审批</span>'}<a class="btn sm" href="#rules">修改</a></div></div></div>`)}
+  ${card('自动通知',`<div class="stack">
+    <div class="row"><label class="switch grow"><input type="checkbox" id="sWeekly" ${s.weekly_report?'checked':''}> 每周周报</label><select id="sWeekday" style="width:auto">${WEEK.map((w,i)=>`<option value="${i}" ${s.report_weekday===i?'selected':''}>${w}</option>`).join('')}</select><select id="sHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.report_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
+    <div class="row"><label class="switch grow"><input type="checkbox" id="sDigest" ${s.daily_digest?'checked':''}> 每日账本</label><select id="sDigestHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.digest_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
+    <div class="row"><label class="switch grow"><input type="checkbox" id="sRemind" ${s.pending_reminder_hours?'checked':''}> 有付款没签字时提醒老板，每隔</label><select id="sRemindH" style="width:auto">${[1,2,4,8,12,24].map(h=>`<option value="${h}" ${(s.pending_reminder_hours||4)===h?'selected':''}>${h} 小时</option>`).join('')}</select></div>
+    <label class="switch"><input type="checkbox" id="sAlerts" ${s.treasury_alerts?'checked':''}> 国库预警发到群里</label>
+    <label class="switch"><input type="checkbox" id="sQuiet" ${s.quiet_auto_pay?'checked':''}> 自动付款只回一行（群里消息多时更清爽）</label>
+    <div class="row"><button class="btn primary" id="saveNotify">保存通知设置</button><span class="muted" style="font-size:12px">时间按规则里的时区（${esc(S.rules.timezone)}）</span></div></div>`)}
+  ${card('现在发到群里',`<div class="stack">
+    <div class="row">${[['report','上周周报'],['today','今日账本'],['pending','待签字列表'],['rules','当前规则']].map(([k,l])=>`<button class="btn sm" data-send="${k}">${l}</button>`).join('')}</div>
+    <textarea id="customMsg" placeholder="自定义消息，例如：本周五前把发票发到群里"></textarea>
+    <div class="row"><button class="btn signal" id="sendCustom">发送</button><span class="muted" style="font-size:12px">消息先排队，机器人几秒内发出</span></div>
+    ${t.outbox.length?`<div class="scroll"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${t.outbox.map(o=>`<tr><td class="mono" style="white-space:nowrap">${fmtTime(o.at)}</td><td>${esc(o.text.slice(0,60))}${o.text.length>60?'…':''}</td><td style="white-space:nowrap">${o.error?`<span class="block" title="${esc(o.error)}">失败</span>`:o.sent_at?'<span class="ok">已发</span>':'<span class="review">排队中</span>'}</td></tr>`).join('')}</tbody></table></div>`:''}</div>`)}
+  </div>
+  <div class="stack" style="gap:16px">
+  <section class="card"><div class="hd"><h2>群聊模拟器</h2><span class="label">不记账 · 不发群</span></div>
+    <div class="chat" id="chat" aria-live="polite">${S.tgChat.length?S.tgChat.map(m=>`<div class="msg ${m.me?'me':'bot'}"><span class="who">${m.me?'你':'KAGOU 员工'}</span>${esc(m.text)}</div>`).join(''):'<div class="muted" style="margin:auto;text-align:center;font-size:13px">像在群里一样发消息，看员工怎么回。<br>付款请求只试算，不会真的记账或付款。</div>'}</div>
+    <div class="sug">${['付 Alice 300 USDT 设计费','付 Mia 200 USDT KOL','/rules','/today','/pending','/report','/help'].map(x=>`<button class="btn sm ghost" data-say="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div class="chatbar"><input id="say" class="grow" placeholder="付 Bob 120 USDT 翻译费 或 /help"><button class="btn primary" id="sayGo">发送</button></div></section>
+  ${card('命令速查',`<table><tbody>${t.commands.map(c=>`<tr><td class="mono" style="white-space:nowrap">${esc(c.cmd)}</td><td>${esc(c.desc)}${c.owner_only?' <span class="chip review">仅老板</span>':''}</td></tr>`).join('')}</tbody></table>`,{flush:true})}
+  ${card('群消息记录',t.messages.length?`<div class="chat" id="chatLog" style="height:360px">${t.messages.slice().reverse().map(m=>`<div class="msg ${m.kind==='telegram_in'?'me':'bot'}"><span class="who">${esc(m.kind==='telegram_in'?m.actor:'KAGOU 员工')} · ${fmtTime(m.at)}</span>${esc(m.text)}</div>`).join('')}</div>`:'<div class="empty">机器人处理过的消息会出现在这里</div>',{flush:true})}
+  </div></div>`};
+BIND.telegram=()=>{
+  $('#saveChat').onclick=()=>act(()=>put('/api/telegram/chat',{chat:$('#chatId').value.trim()}),'通知群已保存');
+  $('#saveNotify').onclick=()=>act(()=>put('/api/telegram/settings',{weekly_report:$('#sWeekly').checked,report_weekday:+$('#sWeekday').value,report_hour:+$('#sHour').value,daily_digest:$('#sDigest').checked,digest_hour:+$('#sDigestHour').value,pending_reminder_hours:$('#sRemind').checked?+$('#sRemindH').value:0,treasury_alerts:$('#sAlerts').checked,quiet_auto_pay:$('#sQuiet').checked}),'通知设置已保存，机器人立即生效');
+  document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.send})));
+  $('#sendCustom').onclick=async()=>{const text=$('#customMsg').value.trim();if(!text)return toast('消息不能为空',true);if(await confirmBox('发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
+  for(const el of [$('#chat'),$('#chatLog')])if(el)el.scrollTop=el.scrollHeight;
+  const say=async text=>{text=text.trim();if(!text)return;S.tgChat.push({me:true,text});let reply;
+    try{const cmd=text.match(/^\/(\w+)/);
+      if(cmd){const c=cmd[1].toLowerCase();
+        if(['approve','reject','pause','resume'].includes(c))reply=`/${c} 是老板命令，会真的改变付款状态，模拟器里不执行。到「审批」页或右上角按钮操作。`;
+        else if(c==='start')reply=(await api('/api/preview/help')).text;
+        else reply=(await api('/api/preview/'+c)).text}
+      else{const r=await post('/api/simulate',{text});reply=r.reply}}
+    catch(e){reply=e.message}
+    S.tgChat.push({me:false,text:reply});S.tgChat=S.tgChat.slice(-40);render()};
+  $('#sayGo').onclick=()=>say($('#say').value);$('#say').onkeydown=e=>{if(e.key==='Enter')say($('#say').value)};
+  document.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>say(b.dataset.say));
+  setTimeout(()=>{const i=$('#say');if(i&&S.tgChat.length)i.focus()},0)};
+
+// ---------- 09 reports ----------
+S.week=0;
+VIEWS.reports=async()=>{const [w,d]=await Promise.all([api('/api/report/weekly?weeks_ago='+S.week),api('/api/report/today')]);
+  return `<div class="grid g2" style="align-items:start">
+  ${card('周报',`<div class="stack"><div class="row"><select id="week" style="width:auto">${[...Array(13).keys()].map(i=>`<option value="${i}" ${S.week===i?'selected':''}>${i===0?'上周':i+1+' 周前'}</option>`).join('')}</select><button class="btn sm" data-copy="${esc(w.text)}">复制</button><button class="btn sm" data-sendr="report">发到群里</button></div><pre class="report">${esc(w.text)}</pre></div>`)}
+  ${card('今日账本',`<div class="stack"><div class="row"><button class="btn sm" data-copy="${esc(d.text)}">复制</button><button class="btn sm" data-sendr="today">发到群里</button></div><pre class="report">${esc(d.text)}</pre></div>`)}
+  </div>
+  ${card('导出',`<div class="row"><span class="grow muted">完整账本（含所有字段）导出成 CSV，Excel 可以直接打开。</span><a class="btn" href="#ledger">去账本导出</a></div>`)}`};
+BIND.reports=()=>{$('#week').onchange=e=>{S.week=+e.target.value;render()};
+  document.querySelectorAll('[data-sendr]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.sendr})))};
+
+// ---------- 10 audit ----------
+VIEWS.audit=async()=>{const k=S.audit.kind;const items=await api('/api/events?limit=100'+(k?'&kind='+k:''));S.audit.items=items;
+  const tabs=[['','全部'],['audit','操作'],['alert','预警'],['telegram_in,telegram_out','Telegram'],['system','系统']];
+  return `<section class="card"><div class="tabs" role="tablist">${tabs.map(([v,l])=>`<button role="tab" aria-selected="${k===v}" data-kind="${v}">${l}</button>`).join('')}</div>
+  <div id="auditFeed">${feed(items,'没有记录')}</div>
+  ${items.length>=100?'<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="auditMore">加载更早的</button></div>':''}</section>
+  <p class="muted" style="font-size:12px;margin:0">审计日志只增不删：暂停、恢复、签字、驳回、修改规则、发群消息、非老板的越权尝试都会记下来。</p>`};
+BIND.audit=()=>{document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{S.audit.kind=b.dataset.kind;render()});
+  const m=$('#auditMore');if(m)m.onclick=async()=>{const last=S.audit.items[S.audit.items.length-1];const more=await api(`/api/events?limit=100&before=${last.id}`+(S.audit.kind?'&kind='+S.audit.kind:''));S.audit.items=S.audit.items.concat(more);$('#auditFeed').innerHTML=feed(S.audit.items);if(more.length<100)m.remove()}};
+
+// ---------- 11 settings ----------
+VIEWS.settings=async()=>`
+  <div class="grid g2" style="align-items:start">
+  ${card('外观',`<div class="stack"><label class="f"><span>主题</span><select id="theme">${[['dark','深色'],['light','浅色'],['auto','跟随系统']].map(([v,l])=>`<option value="${v}" ${store.get('cs-theme','dark')===v?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label class="f"><span>自动刷新</span><select id="auto">${[['0','关'],['15','每 15 秒'],['60','每分钟']].map(([v,l])=>`<option value="${v}" ${store.get('cs-auto','60')===v?'selected':''}>${l}</option>`).join('')}</select></label></div>`)}
+  ${card('登录',`<div class="stack"><p class="muted" style="margin:0">令牌只保存在这个标签页。换令牌要在服务器上改 <code>CHAINSTAFF_CONSOLE_TOKEN</code> 并重启控制台，旧令牌立即失效。</p><div><button class="btn" id="logout">退出登录</button></div></div>`)}
+  ${card('紧急操作',`<div class="stack"><p class="muted" style="margin:0">发现异常时先暂停：之后所有付款请求都会被拦截，直到恢复。Telegram 群里老板发 /pause 效果一样。</p><div><button class="btn danger" id="kill2">${S.status.paused?'恢复付款':'一键暂停所有付款'}</button></div></div>`)}
+  ${card('快捷键',`<table><tbody><tr><td class="mono">R</td><td>刷新数据</td></tr><tr><td class="mono">Esc</td><td>关闭弹窗和详情</td></tr></tbody></table>`,{flush:true})}
+  </div>`;
+BIND.settings=()=>{$('#theme').onchange=e=>{store.set('cs-theme',e.target.value);applyTheme()};
+  $('#auto').onchange=e=>{store.set('cs-auto',e.target.value);startAuto();toast('已保存')};
+  $('#logout').onclick=()=>logout('已退出');$('#kill2').onclick=()=>$('#kill').click()};
+
+// ---------- boot ----------
+function applyTheme(){const t=store.get('cs-theme','dark'),r=document.documentElement;r.removeAttribute('data-auto');
+  if(t==='auto'){r.removeAttribute('data-theme');r.setAttribute('data-auto','1')}else r.setAttribute('data-theme',t)}
+let timer;function startAuto(){clearInterval(timer);const s=+store.get('cs-auto','60');if(s)timer=setInterval(()=>{if(document.visibilityState==='visible'&&!$('#overlay').innerHTML&&!S.dirtyRules&&!(document.activeElement&&document.activeElement.matches('input,textarea,select')))refresh()},s*1000)}
+function logout(msg){token='';try{sessionStorage.removeItem('cs-token')}catch(e){}$('#app').hidden=true;$('#login').hidden=false;$('#loginMsg').textContent=msg||'';clearInterval(timer)}
+async function connect(){token=$('#token').value.trim()||token;if(!token)return;
+  try{await api('/api/status');try{sessionStorage.setItem('cs-token',token)}catch(e){}$('#login').hidden=true;$('#app').hidden=false;S.route=route();await refresh();startAuto()}
+  catch(e){$('#loginMsg').textContent=e.message}}
+$('#connect').onclick=connect;$('#token').onkeydown=e=>{if(e.key==='Enter')connect()};
+applyTheme();
+if(window.CONSOLE_DEMO){$('#demoBar').hidden=false;$('#demoBar').innerHTML=window.CONSOLE_DEMO}
+if(token)connect();
 })();
 </script>
 </body>

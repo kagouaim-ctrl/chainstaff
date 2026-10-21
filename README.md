@@ -13,10 +13,10 @@
 | `agent/execution/` | ERC-20 / BNB 转账、发送前模拟、Safe 提案和 EIP-712 哈希、只读 RPC |
 | `agent/store.py` | SQLite 账本：先记账后付款，重启不丢，同一请求不会付两次 |
 | `bot/` | Telegram 机器人：付款请求、`/rules` `/today` `/pending` `/report` `/approve` `/reject` `/pause` `/resume`，定时周报和预警 |
-| `backend/` + `web/` | 老板控制台：改规则、看账本、审批、一键暂停、周报 |
+| `backend/` + `web/` | 老板控制台：总览、审批、账本筛选和 CSV、收款人、规则和试算、国库预警、员工档案、Telegram 管理（通知群、自动通知、发消息、群聊模拟器、消息记录）、报告、审计日志、一键暂停 |
 | `scripts/register_agent.py` | 用 bnbagent SDK 注册 ERC-8004 链上工号（测试网免 gas） |
 | `scripts/stage0_gate.py` | 读阶段 0 访谈记录表，算漏斗、中位数和关卡 A 是否通过 |
-| `tests/` | 210 个用例，覆盖率 99.9%；CI 跑测试、pip-audit、Semgrep |
+| `tests/` | 233 个用例，覆盖率 99.7%；CI 跑测试、pip-audit、Semgrep |
 
 没配置钱包时一切都在测试模式，不碰链。
 
@@ -39,6 +39,8 @@ python3 -m bot.main
 export CHAINSTAFF_CONSOLE_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(24))")
 uvicorn backend.app:app --port 8000      # 打开 http://localhost:8000，粘贴令牌
 ```
+
+控制台和机器人共用同一个账本文件（`CHAINSTAFF_DB`），所以在控制台改的通知群、自动通知、要发到群里的消息，机器人几秒内就会执行。员工档案页另外读 `CHAINSTAFF_AGENT_ID`（ERC-8004 工号）和 `CHAINSTAFF_WALLET_ADDRESS`（测试模式下显示的钱包地址）。
 
 上测试网和主网：见 [docs/deploy-bnb.md](docs/deploy-bnb.md)。上线前对照 [安全清单](docs/security-checklist.md)。
 

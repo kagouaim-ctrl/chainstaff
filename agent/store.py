@@ -53,6 +53,25 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS payments_payee ON payments(payee, token, created_at);
 CREATE INDEX IF NOT EXISTS payments_created ON payments(created_at);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+-- Append-only log for the console: owner actions, rule changes, alerts, Telegram traffic.
+CREATE TABLE IF NOT EXISTS events (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    at     TEXT NOT NULL,
+    kind   TEXT NOT NULL,             -- audit | alert | telegram_in | telegram_out | system
+    actor  TEXT NOT NULL DEFAULT '',
+    text   TEXT NOT NULL,
+    data   TEXT                       -- optional JSON
+);
+CREATE INDEX IF NOT EXISTS events_kind ON events(kind, id);
+-- Messages the console asks the bot to send; the bot drains it.
+CREATE TABLE IF NOT EXISTS outbox (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    at       TEXT NOT NULL,
+    chat     TEXT NOT NULL,
+    text     TEXT NOT NULL,
+    sent_at  TEXT,
+    error    TEXT
+);
 """
 
 
@@ -101,11 +120,41 @@ class PaymentRecord:
         }
 
 
+class _Result:
+    def __init__(self, rows: list, rowcount: int, lastrowid: int | None) -> None:
+        self._rows, self.rowcount, self.lastrowid = rows, rowcount, lastrowid
+
+    def fetchall(self) -> list:
+        return self._rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+
+class _SerializedConnection:
+    """One sqlite3 connection shared by the bot and the console's worker threads.
+    Every statement runs and is fully fetched under one lock, so concurrent requests
+    never interleave on the connection."""
+
+    def __init__(self, conn: sqlite3.Connection, lock: threading.RLock) -> None:
+        self._conn, self._lock = conn, lock
+
+    def execute(self, sql: str, args=()) -> _Result:
+        with self._lock:
+            cur = self._conn.execute(sql, args)
+            return _Result(cur.fetchall(), cur.rowcount, cur.lastrowid)
+
+    def executescript(self, sql: str) -> None:
+        with self._lock:
+            self._conn.executescript(sql)
+
+
 class Store:
     def __init__(self, path: str | Path = ":memory:") -> None:
-        self._lock = threading.Lock()
-        self._db = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
-        self._db.row_factory = sqlite3.Row
+        self._lock = threading.RLock()
+        conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
+        conn.row_factory = sqlite3.Row
+        self._db = _SerializedConnection(conn, self._lock)
         self._db.execute("PRAGMA journal_mode=WAL") if str(path) != ":memory:" else None
         self._db.executescript(SCHEMA)
 
@@ -182,6 +231,47 @@ class Store:
     def set_paused(self, paused: bool) -> None:
         self.set_setting("paused", "1" if paused else "0")
 
+    # ---- events and outbox ----
+
+    def log_event(self, kind: str, text: str, actor: str = "", data: dict | None = None, at: datetime | None = None) -> int:
+        with self._lock:
+            cur = self._db.execute(
+                "INSERT INTO events (at, kind, actor, text, data) VALUES (?, ?, ?, ?, ?)",
+                (_iso(at) if at else _now(), kind, actor or "", text[:4000], json.dumps(data, ensure_ascii=False) if data is not None else None),
+            )
+        return int(cur.lastrowid)
+
+    def events(self, kinds: tuple[str, ...] = (), limit: int = 200, before_id: int | None = None) -> list[dict]:
+        where, args = [], []
+        if kinds:
+            where.append(f"kind IN ({','.join('?' * len(kinds))})")
+            args += list(kinds)
+        if before_id:
+            where.append("id < ?")
+            args.append(before_id)
+        sql = "SELECT * FROM events" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY id DESC LIMIT ?"
+        rows = self._db.execute(sql, (*args, limit)).fetchall()
+        return [
+            {"id": r["id"], "at": r["at"], "kind": r["kind"], "actor": r["actor"], "text": r["text"], "data": json.loads(r["data"]) if r["data"] else None}
+            for r in rows
+        ]
+
+    def enqueue(self, chat: str, text: str) -> int:
+        with self._lock:
+            cur = self._db.execute("INSERT INTO outbox (at, chat, text) VALUES (?, ?, ?)", (_now(), str(chat), text[:4000]))
+        return int(cur.lastrowid)
+
+    def outbox(self, unsent_only: bool = True, limit: int = 50) -> list[dict]:
+        sql = "SELECT * FROM outbox" + (" WHERE sent_at IS NULL AND error IS NULL" if unsent_only else "") + " ORDER BY id" + ("" if unsent_only else " DESC") + " LIMIT ?"
+        return [dict(r) for r in self._db.execute(sql, (limit,)).fetchall()]
+
+    def mark_sent(self, outbox_id: int, error: str | None = None) -> None:
+        with self._lock:
+            if error:
+                self._db.execute("UPDATE outbox SET error = ? WHERE id = ?", (error[:500], outbox_id))
+            else:
+                self._db.execute("UPDATE outbox SET sent_at = ? WHERE id = ?", (_now(), outbox_id))
+
     # ---- reads (LedgerView) ----
 
     def has_request(self, request_id: str) -> bool:
@@ -219,6 +309,38 @@ class Store:
     def latest(self, limit: int = 100) -> list[PaymentRecord]:
         rows = self._db.execute("SELECT * FROM payments ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         return [self._row(r) for r in rows]
+
+    def search(
+        self,
+        status: str | None = None,
+        token: str | None = None,
+        payee: str | None = None,
+        q: str | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        limit: int = 500,
+    ) -> list[PaymentRecord]:
+        where, args = [], []
+        if status:
+            where.append(f"status IN ({','.join('?' * len(status.split(',')))})")
+            args += status.split(",")
+        if token:
+            where.append("token = ?")
+            args.append(token.upper())
+        if payee:
+            where.append("payee = ?")
+            args.append(normalize_address(payee))
+        if q:
+            where.append("(request_id LIKE ? OR memo LIKE ? OR category LIKE ? OR requester LIKE ? OR payee LIKE ?)")
+            args += [f"%{q}%"] * 5
+        if start:
+            where.append("created_at >= ?")
+            args.append(_iso(start))
+        if end:
+            where.append("created_at < ?")
+            args.append(_iso(end))
+        sql = "SELECT * FROM payments" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY created_at DESC LIMIT ?"
+        return [self._row(r) for r in self._db.execute(sql, (*args, limit)).fetchall()]
 
     def pending(self) -> list[PaymentRecord]:
         rows = self._db.execute("SELECT * FROM payments WHERE status = ? ORDER BY created_at", (PENDING,)).fetchall()

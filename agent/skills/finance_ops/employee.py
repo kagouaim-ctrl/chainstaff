@@ -7,6 +7,7 @@ The bot and the console only forward input and show output.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -19,6 +20,7 @@ from agent.rules import Decision, Outcome, PaymentRequest, Policy, Reason, evalu
 from agent.rules.engine import day_bounds
 from agent.store import PENDING, PaymentRecord, Store
 
+from .insights import TelegramSettings
 from .parser import ParsedRequest, ParseError, parse
 from .reports import last_full_week, outcome_counts, weekly_report
 
@@ -112,6 +114,33 @@ class FinanceOpsEmployee:
                 error = str(e) or type(e).__name__
         return Reply(self._describe(parsed, req, decision, tx, safe_hash, error), decision, req)
 
+    def simulate(self, text: str, requester: str = "console", at: datetime | None = None) -> dict:
+        """Run a request through the parser and the rules without recording or paying anything."""
+        at = at or datetime.now(timezone.utc)
+        parsed = parse(text, self.policy.whitelist.values())
+        if isinstance(parsed, ParseError):
+            return {"parsed": False, "reply": parsed.question}
+        req = parsed.to_payment_request(f"sim-{uuid.uuid4().hex[:8]}", requester, at)
+        d = evaluate(req, self.policy, self.store)
+        preview = "（试算，不会付款）" if d.outcome is Outcome.AUTO_PAY else None
+        return {
+            "parsed": True,
+            "outcome": d.outcome.value,
+            "reasons": [r.value for r in d.reasons],
+            "messages": list(d.messages),
+            "payee": req.payee,
+            "payee_name": parsed.payee_name,
+            "amount": _fmt(req.amount),
+            "token": req.token,
+            "category": req.category,
+            "memo": req.memo,
+            "token_assumed": parsed.token_assumed,
+            "reply": self._describe(parsed, req, d, preview, None, None),
+        }
+
+    def quiet_auto_pay(self) -> bool:
+        return TelegramSettings.load(self.store).quiet_auto_pay
+
     def _describe(self, parsed: ParsedRequest, req: PaymentRequest, d: Decision, tx, safe_hash, error) -> str:
         who = parsed.payee_name or req.payee
         line = f"{who} · {_fmt(req.amount)} {req.token}"
@@ -124,6 +153,8 @@ class FinanceOpsEmployee:
 
         if d.outcome is Outcome.AUTO_PAY and error:
             body = f"❌ {req.request_id} 付款没有成功\n{line}\n错误：{error}\n这笔请求已作废，确认钱包状态后请重新发送。"
+        elif d.outcome is Outcome.AUTO_PAY and self.quiet_auto_pay():
+            return f"✅ {req.request_id} 已付 {line}"
         elif d.outcome is Outcome.AUTO_PAY:
             spent = self._spent_today(req.token, req.created_at)
             daily = self.policy.daily_limit.get(req.token, Decimal(0))
@@ -152,31 +183,42 @@ class FinanceOpsEmployee:
 
     # ---- owner commands ----
 
+    def _actor(self, identities) -> str:
+        return next((str(i) for i in identities if i is not None), "owner")
+
+    def _denied(self, action: str, identities) -> str:
+        self.store.log_event("audit", f"非老板尝试{action}，已拒绝", self._actor(identities))
+        return f"只有老板可以{action}。"
+
     def pause(self, *identities) -> str:
         if not self.is_owner(*identities):
-            return "只有老板可以暂停付款。"
+            return self._denied("暂停付款", identities)
         self.store.set_paused(True)
+        self.store.log_event("audit", "暂停所有付款", self._actor(identities))
         return "⏸ 已暂停所有付款。之后的请求都会被拦截，直到老板发 /resume。"
 
     def resume(self, *identities) -> str:
         if not self.is_owner(*identities):
-            return "只有老板可以恢复付款。"
+            return self._denied("恢复付款", identities)
         self.store.set_paused(False)
+        self.store.log_event("audit", "恢复付款", self._actor(identities))
         return "▶️ 已恢复付款，规则照旧生效。"
 
     def approve(self, request_id: str, *identities) -> str:
         if not self.is_owner(*identities):
-            return "只有老板可以确认审批。"
-        by = next((str(i) for i in identities if i is not None), "owner")
+            return self._denied("确认审批", identities)
+        by = self._actor(identities)
         if self.store.approve(request_id, by):
+            self.store.log_event("audit", f"签字确认 {request_id}", by, {"request_id": request_id})
             return f"✅ {request_id} 已记为老板签字付款。"
         return self._not_pending(request_id)
 
     def reject(self, request_id: str, *identities) -> str:
         if not self.is_owner(*identities):
-            return "只有老板可以驳回付款。"
-        by = next((str(i) for i in identities if i is not None), "owner")
+            return self._denied("驳回付款", identities)
+        by = self._actor(identities)
         if self.store.reject(request_id, by):
+            self.store.log_event("audit", f"驳回 {request_id}", by, {"request_id": request_id})
             return f"🚫 {request_id} 已驳回，不会付款。"
         return self._not_pending(request_id)
 
