@@ -123,7 +123,9 @@ def test_bot_dispatcher_builds(emp):
     pytest.importorskip("aiogram")
     from bot.main import PAYMENT_PREFIX, build_dispatcher
 
-    assert build_dispatcher(emp) is not None
+    from agent.front_desk import FrontDesk
+
+    assert build_dispatcher(FrontDesk(emp)) is not None
     assert PAYMENT_PREFIX.match("付 Alice 300 USDT")
     assert PAYMENT_PREFIX.match("pay Bob 1 BNB")
     assert not PAYMENT_PREFIX.match("今天开会吗")

@@ -3,142 +3,1079 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>链工控制台</title>
+<title>KAGOU 控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#10202b;--paper:#f3f6f5;--sheet:#fff;--line:#d5dedb;--muted:#5b6b70;--accent:#0f7a6c;--go:#178a4a;--hold:#a86a00;--stop:#c0392b;
-  --mono:ui-monospace,Menlo,Consolas,monospace}
-@media (prefers-color-scheme:dark){:root{--ink:#e4ecea;--paper:#0d1619;--sheet:#142126;--line:#25363c;--muted:#93a5a9;--accent:#3cc2ad;--go:#4fd08a;--hold:#f0b54a;--stop:#ff7a6b;color-scheme:dark}}
+:root{
+  --bg:#0b0b0c;--surface:#121214;--raise:#18181b;--line:#26262a;--line2:#33333a;--text:#ededed;--muted:#8a8a8f;
+  --signal:#f0b90b;--ok:#3ddc84;--review:#f0b90b;--block:#ff4d4d;--info:#7aa7ff;
+  --sans:"IBM Plex Sans","Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
+  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{
+  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
+  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
-main{max-width:1080px;margin:0 auto;padding:20px 16px 60px;display:grid;gap:20px}
-h1{font-size:20px;margin:0} h2{font-size:16px;margin:0 0 10px}
-.card{background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+.mono,code,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .ok{color:var(--ok)} .review{color:var(--review)} .block{color:var(--block)} .info{color:var(--info)}
+.label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
+h1{font-size:20px} h2{font-size:15px} h3{font-size:13px}
+
+/* buttons and inputs: radius 2px max, hairlines, no shadows */
+.btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:2px;padding:6px 12px;cursor:pointer;font-size:13px;line-height:1.4;text-decoration:none}
+.btn:hover{border-color:var(--muted)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav a:focus-visible,summary:focus-visible{outline:1px solid var(--signal);outline-offset:1px}
+.btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn.signal{background:var(--signal);color:#0b0b0c;border-color:var(--signal);font-weight:600}
+.btn.danger{border-color:var(--block);color:var(--block)}
+.btn.ok{border-color:var(--ok);color:var(--ok)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input,select,textarea{background:var(--bg);border:1px solid var(--line2);border-radius:2px;padding:6px 8px;min-width:0;width:100%}
+textarea{resize:vertical;min-height:72px}
+input[type=checkbox]{width:auto;accent-color:var(--signal)}
+label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.switch{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)}
+
+/* layout */
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.side{border-right:1px solid var(--line);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+.brand{display:flex;align-items:baseline;gap:8px;padding:18px 18px 14px;border-bottom:1px solid var(--line)}
+.brand b{font:700 17px/1 var(--sans);letter-spacing:.02em;font-stretch:125%}
+.nav{display:flex;flex-direction:column;padding:8px 0;overflow:auto;flex:1}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 18px;text-decoration:none;color:var(--muted);font-size:13px;border-left:2px solid transparent}
+.nav a .n{font:500 11px var(--mono);color:var(--muted);width:22px}
+.nav a:hover{color:var(--text)}
+.nav a[aria-current="page"]{color:var(--text);border-left-color:var(--signal);background:var(--surface)}
+.nav a .badge{margin-left:auto}
+.side-foot{border-top:1px solid var(--line);padding:12px 18px;display:grid;gap:6px;font-size:12px}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 24px;flex-wrap:wrap}
+.top h1{margin-right:auto}
+.page{padding:20px 24px 80px;display:grid;gap:16px;max-width:1280px;width:100%}
+.grid{display:grid;gap:16px}
+.grid > *,.stack > *{min-width:0}
+#simEx .btn,.sug .btn{white-space:normal;text-align:left}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.span2{grid-column:span 2}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:2px;min-width:0}
+.card > .hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.card > .hd h2{margin-right:auto}
+.card > .bd{padding:14px 16px}
+.card > .bd.flush{padding:0}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.grow{flex:1}
-button{white-space:nowrap;font:inherit;border:1px solid var(--ink);background:var(--sheet);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
-button.primary{background:var(--ink);color:var(--paper)}
-button.danger{border-color:var(--stop);color:var(--stop)}
-input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--paper);color:var(--ink);min-width:0}
-.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid currentColor}
-.go{color:var(--go)} .hold{color:var(--hold)} .stop{color:var(--stop)} .muted{color:var(--muted)}
+.grow{flex:1;min-width:0}
+.stack{display:grid;gap:10px}
+.kpi{padding:14px 16px;display:grid;gap:6px;align-content:start}
+.kpi .v{font:500 24px/1.15 var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;word-break:break-all}
+.kpi .s{font-size:12px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font:500 11px/1 var(--mono);letter-spacing:.04em;padding:4px 7px;border:1px solid currentColor;border-radius:2px;white-space:nowrap}
+.pill.muted{color:var(--muted)}
+.dot{width:6px;height:6px;display:inline-block;background:currentColor}
+.badge{font:500 11px/1 var(--mono);padding:3px 6px;background:var(--signal);color:#0b0b0c;border-radius:2px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line2);border-radius:2px;white-space:nowrap}
+.chip.block{border-color:var(--block)} .chip.review{border-color:var(--review)} .chip.ok{border-color:var(--ok)}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 2px}
 .scroll{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:14px}
-th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:6px 8px;white-space:nowrap}
-td{border-bottom:1px dashed var(--line);padding:6px 8px;vertical-align:top}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
-label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
-pre{white-space:pre-wrap;margin:0;font:14px/1.6 inherit}
-#msg{min-height:1.5em}
-#app:not([hidden]){display:grid;gap:20px}
+#limits input{min-width:90px}
+.msg,.report{overflow-wrap:anywhere}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding:8px 12px;white-space:nowrap;background:var(--surface);position:sticky;top:0}
+td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--raise)}
+td.r,th.r{text-align:right}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.bar{height:6px;background:var(--line);position:relative}
+.bar > i{position:absolute;inset:0 auto 0 0;background:var(--text)}
+.bar.warn > i{background:var(--review)} .bar.over > i{background:var(--block)}
+.addr{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px}
+.copy{border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font:11px var(--mono)}
+.copy:hover{color:var(--text)}
+.kv{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 14px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;min-width:0;word-break:break-all}
+.feed{display:grid}
+.feed .it{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px;align-items:start}
+.feed .it:last-child{border-bottom:0}
+.feed .it > div{min-width:0;overflow-wrap:anywhere}
+.feed .k{font:500 10px/1.8 var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:0 6px;border:1px solid var(--line2);color:var(--muted)}
+.feed .k.alert{color:var(--block);border-color:var(--block)} .feed .k.audit{color:var(--text)} .feed .k.system{color:var(--info);border-color:var(--info)}
+.feed .k.telegram_in,.feed .k.telegram_out{color:var(--signal);border-color:var(--signal)}
+.feed .t{font:11px var(--mono);color:var(--muted);white-space:nowrap}
+pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:var(--bg);border:1px solid var(--line);padding:14px;border-radius:2px}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:8px 12px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-size:13px}
+.tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--signal)}
+.note{border:1px solid var(--line2);border-left:2px solid var(--review);padding:10px 12px;font-size:13px;background:var(--bg)}
+.note.block{border-left-color:var(--block)} .note.ok{border-left-color:var(--ok)} .note.info{border-left-color:var(--info)}
+.steps{counter-reset:s;display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;font-size:13px}
+.steps li::before{content:counter(s,decimal-leading-zero);font:500 11px/1.9 var(--mono);color:var(--muted)}
+.steps li.done::before{content:"✓";color:var(--ok)}
+
+/* chat (Telegram simulator and log) */
+.chat{display:flex;flex-direction:column;gap:8px;padding:14px;background:var(--bg);height:420px;overflow-y:auto}
+.msg{max-width:86%;padding:8px 10px;border:1px solid var(--line2);border-radius:2px;white-space:pre-wrap;font-size:13px;line-height:1.55;word-break:break-word}
+.msg.me{align-self:flex-end;background:var(--raise)}
+.msg.bot{align-self:flex-start;background:var(--surface)}
+.msg .who{display:block;font:500 10px/1.6 var(--mono);color:var(--muted);letter-spacing:.04em}
+.chatbar{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.sug{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--line)}
+
+/* chart */
+.chart svg{display:block;width:100%;height:180px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:8px;height:8px;margin-right:6px}
+
+/* drawer, modal, toast */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface);border-left:1px solid var(--line);z-index:41;display:flex;flex-direction:column}
+.drawer .hd{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.drawer .bd{padding:16px;overflow:auto;display:grid;gap:16px;align-content:start}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(460px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line2);z-index:42;display:grid}
+.modal .bd{padding:16px;display:grid;gap:12px}
+.modal .ft{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--line)}
+.toasts{position:fixed;right:16px;bottom:16px;z-index:50;display:grid;gap:8px;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:var(--surface);border:1px solid var(--line2);border-left:2px solid var(--ok);padding:10px 12px;font-size:13px}
+.toast.bad{border-left-color:var(--block)}
+
+/* login */
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login .card{width:min(420px,100%)}
+
+.demo{background:var(--signal);color:#0b0b0c;font-size:12px;padding:6px 24px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* team */
+.nav .ng{display:flex;align-items:center;gap:6px;padding:14px 18px 4px;font:500 10px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.nav .ng:first-child{padding-top:6px}
+.nav .ng em{font-style:normal;margin-left:auto;border:1px solid var(--line2);padding:0 4px;letter-spacing:.02em}
+.nav .ng em.off{color:var(--block);border-color:var(--block)}
+.av{width:34px;height:34px;flex:none;display:grid;place-items:center;border:1px solid var(--line2);font-weight:600;font-size:15px;background:var(--bg)}
+.av.on{border-color:var(--signal);color:var(--signal)}
+.emp .bd{display:grid;gap:12px}
+.emp .grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mini{display:grid;gap:2px;padding:8px 10px;border:1px solid var(--line);background:var(--bg);min-width:0}
+.mini .num{font-size:18px;word-break:break-all}
+.mini a{text-decoration:none}
+.duties{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:2px}
+.stack > [data-addrow]{justify-self:start}
+.er{display:grid;gap:8px;align-items:start;margin-bottom:8px}
+.er.c2{grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto}
+.er.c3{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+.er.faq{grid-template-columns:minmax(0,1fr) auto;padding:10px;border:1px solid var(--line);background:var(--bg)}
+.er.faq > .stack{gap:6px}
+.sev{font:500 10px/1.8 var(--mono);letter-spacing:.06em;padding:0 6px;border:1px solid currentColor;white-space:nowrap}
+.feed .k.support{color:var(--ok);border-color:var(--ok)} .feed .k.translate{color:var(--info);border-color:var(--info)}
+.who-tag{font:500 10px/1.6 var(--mono);color:var(--muted);border:1px solid var(--line2);padding:0 4px;margin-left:6px;white-space:nowrap}
+.result{border:1px solid var(--line2);padding:12px;display:grid;gap:8px;background:var(--bg)}
+details > summary{cursor:pointer;color:var(--muted);font-size:12px}
+.spin{display:inline-block;width:10px;height:10px;border:1px solid currentColor;border-right-color:transparent;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+@media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:sticky;top:0;height:auto;z-index:30;border-right:0;border-bottom:1px solid var(--line)}
+  .brand{padding:12px 16px}
+  .nav{flex-direction:row;padding:0;overflow-x:auto;scrollbar-width:none}
+  .nav a{border-left:0;border-bottom:2px solid transparent;padding:10px 12px;white-space:nowrap}
+  .nav a .n,.nav .ng{display:none}
+  .er.c2,.er.c3{grid-template-columns:minmax(0,1fr)}
+  .nav a[aria-current="page"]{border-bottom-color:var(--signal);background:none}
+  .side-foot{display:none}
+  .top{position:static;padding:12px 16px}
+  .page{padding:16px 16px 80px}
+  .g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kpi{padding:12px}
+  .kpi .v{font-size:20px}
+  .span2{grid-column:auto}
+  .kv{grid-template-columns:minmax(0,1fr)}
+  .kv dt{margin-top:4px}
+  .hide-sm{display:none}
+  .demo{padding:6px 16px}
+}
+@media (prefers-reduced-motion:no-preference){.toast{animation:in .18s ease-out}@keyframes in{from{opacity:0;transform:translateY(4px)}}}
 </style>
 </head>
 <body>
-<main>
-  <div class="row"><h1 class="grow">链工 · AI 财务运营员控制台</h1><span id="mode" class="pill muted">未连接</span><span id="pausedPill" class="pill" hidden></span></div>
+<div id="demoBar" class="demo" hidden></div>
 
-  <div class="card row" id="login">
-    <label class="grow">控制台令牌<input id="token" type="password" autocomplete="off" placeholder="CHAINSTAFF_CONSOLE_TOKEN"></label>
-    <button class="primary" id="connect">连接</button>
+<section class="login" id="login">
+  <div class="card">
+    <div class="hd"><h2>KAGOU 控制台</h2><span class="label">OWNER CONSOLE</span></div>
+    <div class="bd stack">
+      <p class="muted" style="margin:0">输入部署时设置的控制台令牌（<code>CHAINSTAFF_CONSOLE_TOKEN</code>）。令牌只存在这个浏览器标签页里，关掉就失效。</p>
+      <label class="f"><span>令牌</span><input id="token" type="password" autocomplete="off" spellcheck="false"></label>
+      <div class="row"><button class="btn primary" id="connect">进入控制台</button><span id="loginMsg" class="block"></span></div>
+    </div>
   </div>
-  <div id="msg" class="muted"></div>
+</section>
 
-  <div id="app" hidden>
-    <div class="card row">
-      <div class="grow"><h2 style="margin:0">一键暂停</h2><span class="muted">暂停后所有付款请求都会被拦截。</span></div>
-      <button class="danger" id="pause">暂停所有付款</button>
-      <button id="resume">恢复付款</button>
+<div class="app" id="app" hidden>
+  <aside class="side">
+    <div class="brand"><b>KAGOU</b><span class="label">控制台</span></div>
+    <nav class="nav" id="nav" aria-label="页面"></nav>
+    <div class="side-foot">
+      <span class="muted" id="footMode"></span>
+      <span class="muted">更新于 <span class="mono" id="footTime">—</span></span>
     </div>
-
-    <div class="card">
-      <h2>等老板签字</h2>
-      <div class="scroll"><table><thead><tr><th>编号</th><th>收款方</th><th>金额</th><th>用途</th><th>原因</th><th></th></tr></thead><tbody id="pending"></tbody></table></div>
-    </div>
-
-    <div class="card">
-      <div class="row"><h2 class="grow">账本</h2><button id="refresh">刷新</button></div>
-      <div class="scroll"><table><thead><tr><th>时间</th><th>编号</th><th>收款方</th><th>金额</th><th>用途</th><th>状态</th><th>交易</th></tr></thead><tbody id="ledger"></tbody></table></div>
-    </div>
-
-    <div class="card">
-      <h2>规则</h2>
-      <div class="grid2" id="limits"></div>
-      <div class="grid2" style="margin-top:10px">
-        <label>需审批类别（逗号分隔）<input id="cats"></label>
-        <label>老板 Telegram 用户名（逗号分隔）<input id="owners"></label>
-        <label>重复检测天数<input id="dupdays" type="number" min="1"></label>
-        <label>时区<input id="tz"></label>
-        <label><span><input type="checkbox" id="readonly"> 试用期只读（所有付款都要老板确认）</span></label>
-      </div>
-      <h2 style="margin-top:16px">白名单</h2>
-      <div class="scroll"><table><thead><tr><th>名称</th><th>别名</th><th>地址</th><th>需审批</th><th></th></tr></thead><tbody id="wl"></tbody></table></div>
-      <div class="row" style="margin-top:10px"><button id="addPayee">添加收款方</button><span class="grow"></span><button class="primary" id="save">保存规则</button></div>
-    </div>
-
-    <div class="card"><div class="row"><h2 class="grow">上周周报</h2><button id="loadReport">生成</button></div><pre id="report" class="muted">点「生成」查看。</pre></div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <h1 id="title">总览</h1>
+      <span id="pills" class="row"></span>
+      <button class="btn sm" id="refresh" title="刷新（R）">刷新</button>
+      <button class="btn sm danger" id="kill"></button>
+    </header>
+    <main class="page" id="page"></main>
   </div>
-</main>
+</div>
+
+<div id="overlay"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
 <script>
 (function(){
-  const $=id=>document.getElementById(id);
-  let token='', rules=null;
-  try{token=sessionStorage.getItem('cs-token')||''}catch(e){}
-  $('token').value=token;
-  const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  async function api(path,opt={}){
-    const r=await fetch(path,{...opt,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
-    const body=await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(body.detail||('请求失败 '+r.status));
-    return body;
-  }
-  const say=(t,bad)=>{$('msg').textContent=t;$('msg').className=bad?'stop':'muted'};
-  const STATUS={executing:['执行中','hold'],paid:['已付','go'],failed:['失败','stop'],pending_approval:['待签','hold'],approved:['老板已签','go'],rejected:['已驳回','muted'],blocked:['拦截','stop']};
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let token='';try{token=sessionStorage.getItem('cs-token')||''}catch(e){}
 
-  async function load(){
-    const s=await api('/api/status');
-    $('mode').textContent=s.live?'实盘':'测试模式';$('mode').className='pill '+(s.live?'stop':'muted');
-    $('pausedPill').hidden=!s.paused;$('pausedPill').textContent='已暂停';$('pausedPill').className='pill stop';
-    const rows=await api('/api/payments?limit=200');
-    const name=r=>esc(r.payee_name||r.payee.slice(0,6)+'…'+r.payee.slice(-4));
-    $('pending').innerHTML=rows.filter(r=>r.status==='pending_approval').map(r=>`<tr><td class="mono">${esc(r.request_id)}</td><td>${name(r)}</td><td class="mono">${esc(r.amount)} ${esc(r.token)}</td><td>${esc(r.memo)}</td><td>${r.messages.map(esc).join('<br>')}</td><td class="row"><button data-act="approve" data-id="${esc(r.request_id)}">已签字</button><button data-act="reject" data-id="${esc(r.request_id)}">驳回</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">没有待签字的付款。</td></tr>';
-    $('ledger').innerHTML=rows.map(r=>{const [l,c]=STATUS[r.status]||[r.status,'muted'];return `<tr><td class="mono">${esc(r.created_at.slice(0,16).replace('T',' '))}</td><td class="mono">${esc(r.request_id)}</td><td>${name(r)}</td><td class="mono">${esc(r.amount)} ${esc(r.token)}</td><td>${esc(r.memo)}</td><td class="${c}">${l}</td><td class="mono">${esc(r.tx_hash||r.safe_tx_hash||'')}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">还没有付款记录。</td></tr>';
-    rules=await api('/api/rules'); renderRules();
-  }
-  function renderRules(){
-    const tokens=[...new Set([...Object.keys(rules.single_limit||{}),...Object.keys(rules.daily_limit||{})])];
-    $('limits').innerHTML=tokens.map(t=>`<label>${esc(t)} 单笔上限<input data-lim="single_limit" data-tok="${esc(t)}" value="${esc(rules.single_limit[t]??0)}" inputmode="decimal"></label><label>${esc(t)} 每日上限<input data-lim="daily_limit" data-tok="${esc(t)}" value="${esc(rules.daily_limit[t]??0)}" inputmode="decimal"></label>`).join('');
-    $('cats').value=(rules.approval_categories||[]).join(', ');
-    $('owners').value=(rules.owners||[]).join(', ');
-    $('dupdays').value=rules.duplicate_window_days||30;
-    $('tz').value=rules.timezone||'UTC';
-    $('readonly').checked=!!rules.read_only;
-    $('wl').innerHTML=(rules.payees||[]).map((p,i)=>`<tr data-i="${i}"><td><input data-f="name" value="${esc(p.name)}"></td><td><input data-f="aliases" value="${esc((p.aliases||[]).join(', '))}"></td><td><input class="mono" data-f="address" value="${esc(p.address)}" size="44"></td><td><input type="checkbox" data-f="needs_approval" ${p.needs_approval?'checked':''}></td><td><button data-del="${i}">删除</button></td></tr>`).join('');
-  }
-  function collect(){
-    const list=s=>s.split(/[,，]/).map(x=>x.trim()).filter(Boolean);
-    document.querySelectorAll('[data-lim]').forEach(i=>rules[i.dataset.lim][i.dataset.tok]=i.value.trim());
-    rules.approval_categories=list($('cats').value);
-    rules.owners=list($('owners').value);
-    rules.duplicate_window_days=parseInt($('dupdays').value,10)||30;
-    rules.timezone=$('tz').value.trim()||'UTC';
-    rules.read_only=$('readonly').checked;
-    rules.payees=[...$('wl').querySelectorAll('tr')].map(tr=>{const g=f=>tr.querySelector(`[data-f="${f}"]`);return{name:g('name').value.trim(),aliases:list(g('aliases').value),address:g('address').value.trim(),needs_approval:g('needs_approval').checked}});
-    return rules;
-  }
-  async function run(fn,ok){try{const r=await fn();say(ok||r.message||'已完成');await load()}catch(e){say(e.message,true)}}
+// ---------- API ----------
+async function api(path,opt={}){
+  const r=await fetch(path,{...opt,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json',...(opt.headers||{})}});
+  if(r.status===401){logout('令牌不对或已失效');throw new Error('令牌不对')}
+  const ct=r.headers.get('content-type')||'';
+  const body=ct.includes('json')?await r.json().catch(()=>({})):await r.text();
+  if(!r.ok) throw new Error((body&&body.detail)||('请求失败 '+r.status));
+  return body;
+}
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b||{})});
+const put=(p,b)=>api(p,{method:'PUT',body:JSON.stringify(b)});
 
-  $('connect').onclick=async()=>{token=$('token').value.trim();try{sessionStorage.setItem('cs-token',token)}catch(e){}
-    try{await load();$('app').hidden=false;$('login').hidden=true;say('已连接')}catch(e){say(e.message,true)}};
-  $('refresh').onclick=()=>run(async()=>({}),'已刷新');
-  $('pause').onclick=()=>run(()=>api('/api/pause',{method:'POST'}));
-  $('resume').onclick=()=>run(()=>api('/api/resume',{method:'POST'}));
-  $('pending').onclick=e=>{const b=e.target.closest('button[data-act]');if(b)run(()=>api(`/api/payments/${encodeURIComponent(b.dataset.id)}/${b.dataset.act}`,{method:'POST'}))};
-  $('wl').onclick=e=>{const b=e.target.closest('button[data-del]');if(b){collect();rules.payees.splice(+b.dataset.del,1);renderRules()}};
-  $('addPayee').onclick=()=>{collect();rules.payees.push({name:'',aliases:[],address:'0x',needs_approval:false});renderRules()};
-  $('save').onclick=()=>run(()=>api('/api/rules',{method:'PUT',body:JSON.stringify(collect())}),'规则已保存，机器人下一条消息起生效');
-  $('loadReport').onclick=async()=>{try{$('report').textContent=(await api('/api/report/weekly')).text;$('report').className=''}catch(e){say(e.message,true)}};
-  if(token) $('connect').click();
+// ---------- formatting ----------
+let TZ='Asia/Shanghai';
+const fmtNum=v=>{const n=Number(v);if(!isFinite(n))return esc(v);return n.toLocaleString('en-US',{maximumFractionDigits:6})};
+const fmtAmt=(v,t)=>`<span class="num">${fmtNum(v)}</span> <span class="muted">${esc(t)}</span>`;
+const fmtMoved=m=>{const e=Object.entries(m||{});return e.length?e.map(([t,v])=>fmtAmt(v,t)).join('<br>'):'<span class="muted">0</span>'};
+function fmtTime(iso,withDate=true){if(!iso)return '—';const d=new Date(iso);if(isNaN(d))return esc(iso);
+  try{return d.toLocaleString('zh-CN',{timeZone:TZ,hour12:false,...(withDate?{month:'2-digit',day:'2-digit'}:{}),hour:'2-digit',minute:'2-digit'})}catch(e){return d.toISOString().slice(0,16).replace('T',' ')}}
+function ago(iso){if(!iso)return '从未';const s=(Date.now()-new Date(iso))/1000;if(s<60)return '刚刚';if(s<3600)return Math.floor(s/60)+' 分钟前';if(s<86400)return Math.floor(s/3600)+' 小时前';return Math.floor(s/86400)+' 天前'}
+const short=a=>a&&a.length>14?a.slice(0,6)+'…'+a.slice(-4):(a||'');
+const addr=(a,url)=>a?`<span class="addr"><span title="${esc(a)}">${esc(short(a))}</span><button class="copy" data-copy="${esc(a)}" title="复制">复制</button>${url?`<a class="copy" href="${esc(url)}" target="_blank" rel="noreferrer">浏览器</a>`:''}</span>`:'<span class="muted">—</span>';
+const STATUS={executing:['执行中','review'],paid:['已自动付','ok'],failed:['失败','block'],pending_approval:['待签字','review'],approved:['老板已签','ok'],rejected:['已驳回','muted'],blocked:['已拦截','block']};
+const OUTCOME={AUTO_PAY:['自动付','ok'],NEEDS_APPROVAL:['需签字','review'],BLOCK:['拦截','block']};
+const st=s=>{const [l,c]=STATUS[s]||[s,'muted'];return `<span class="pill ${c}"><span class="dot"></span>${l}</span>`};
+const KIND={audit:'操作',alert:'预警',telegram_in:'收到',telegram_out:'发出',system:'系统',support:'客服',translate:'翻译'};
+const WEEK=['周一','周二','周三','周四','周五','周六','周日'];
+
+// ---------- UI helpers ----------
+function toast(t,bad){const el=document.createElement('div');el.className='toast'+(bad?' bad':'');el.textContent=t;$('#toasts').append(el);setTimeout(()=>el.remove(),bad?6000:3200)}
+function confirmBox(title,body,okText='确认',danger=false){return new Promise(res=>{
+  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="bd"><h2 id="mt">${esc(title)}</h2><div class="muted">${body}</div></div><div class="ft"><button class="btn" data-x>取消</button><button class="btn ${danger?'danger':'primary'}" data-ok>${esc(okText)}</button></div></div>`;
+  const close=v=>{$('#overlay').innerHTML='';res(v)};
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(false));
+  $('#overlay').querySelector('[data-ok]').onclick=()=>close(true);
+  $('#overlay').querySelector('[data-ok]').focus();
+})}
+function drawer(title,html){$('#overlay').innerHTML=`<div class="scrim" data-x></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="hd"><h2 class="grow">${esc(title)}</h2><button class="btn sm" data-x>关闭</button></div><div class="bd">${html}</div></aside>`;
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{$('#overlay').innerHTML=''});}
+async function act(fn,ok){try{const r=await fn();toast(ok||r?.message||'已完成');await refresh();return r}catch(e){toast(e.message,true)}}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-copy]');if(!b)return;e.stopPropagation();
+  (navigator.clipboard?navigator.clipboard.writeText(b.dataset.copy):Promise.reject()).then(()=>toast('已复制'),()=>toast('复制失败，请手动选择',true))});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').innerHTML='';
+  if(e.target.matches('input,textarea,select'))return;
+  if(e.key==='r'&&!e.metaKey&&!e.ctrlKey)refresh();});
+function card(title,body,{right='',flush=false,id='',cls=''}={}){return `<section class="card ${cls}" ${id?`id="${id}"`:''}><div class="hd"><h2>${title}</h2>${right}</div><div class="bd${flush?' flush':''}">${body}</div></section>`}
+
+// ---------- state & routing ----------
+// [route, label, group, role that owns the page]
+const PAGES=[
+  ['team','团队总览','团队',''],
+  ['overview','财务总览','财务运营员','finance_ops'],['approvals','审批','财务运营员','finance_ops'],['ledger','账本','财务运营员','finance_ops'],
+  ['payees','收款人','财务运营员','finance_ops'],['rules','规则与试算','财务运营员','finance_ops'],['treasury','国库','财务运营员','finance_ops'],
+  ['reports','报告','财务运营员','finance_ops'],['employee','员工档案','财务运营员','finance_ops'],
+  ['support','社区客服','社区客服','community_support'],
+  ['monitor','链上监控','链上监控员','chain_monitor'],
+  ['translator','公告翻译','公告翻译员','announcement_translator'],
+  ['payouts','营销结算','营销结算员','campaign_payouts'],
+  ['sybil','空投反女巫','空投反女巫','airdrop_sybil'],
+  ['telegram','Telegram','通用',''],['audit','审计日志','通用',''],['settings','设置','通用','']];
+const EMP_PAGES=['support','monitor','translator','payouts','sybil'];
+const S={status:null,route:'team',team:null,ledger:{limit:100,f:{}},audit:{kind:'',items:[]},tgChat:[],dirtyRules:false};
+function route(){const r=(location.hash||'#team').slice(1).split('?')[0];return PAGES.some(p=>p[0]===r)?r:'team'}
+const member=role=>(S.team?.members||[]).find(m=>m.role===role);
+const roleName=role=>member(role)?.name||(S.team?.roles||[]).find(r=>r.id===role)?.name||role;
+function renderNav(){const pend=S.status?.pending||0;let g='',out='';
+  const todo=Object.fromEntries((S.team?.members||[]).map(m=>[m.role,m.todo?.value||0]));
+  for(const [k,l,grp,role] of PAGES){
+    if(grp!==g){g=grp;const m=role&&member(role);
+      out+=`<div class="ng">${esc(role&&m?m.name:grp)}${role?(m?(m.enabled?'':'<em class="off">停用</em>'):'<em>未雇佣</em>'):''}</div>`}
+    const badge=k==='approvals'?pend:(EMP_PAGES.includes(k)&&member(role)?todo[role]:0);
+    out+=`<a href="#${k}" ${S.route===k?'aria-current="page"':''}>${l}${badge?`<span class="badge">${badge}</span>`:''}</a>`}
+  $('#nav').innerHTML=out}
+function renderTop(){const s=S.status||{};
+  const pg=PAGES.find(p=>p[0]===S.route);
+  $('#title').textContent=EMP_PAGES.includes(pg[0])&&member(pg[3])?member(pg[3]).name:pg[1];
+  const pills=[s.live?'<span class="pill block"><span class="dot"></span>实盘</span>':'<span class="pill muted"><span class="dot"></span>测试模式</span>'];
+  if(s.read_only)pills.push('<span class="pill review">试用只读</span>');
+  if(s.paused)pills.push('<span class="pill block">已暂停</span>');
+  $('#pills').innerHTML=pills.join('');
+  $('#kill').textContent=s.paused?'恢复付款':'一键暂停';$('#kill').className='btn sm '+(s.paused?'ok':'danger');
+  $('#footMode').textContent=s.live?'实盘：绿灯付款会真的上链':'测试模式：不会真的上链';
+  $('#footTime').textContent=fmtTime(new Date().toISOString(),false);
+  renderNav();}
+$('#kill').onclick=async()=>{const p=S.status?.paused;
+  if(!p&&!await confirmBox('暂停所有付款？','暂停后员工收到的每一笔付款请求都会被拦截，直到你恢复。已经在链上的交易不受影响。','暂停',true))return;
+  act(()=>post(p?'/api/resume':'/api/pause'))};
+$('#refresh').onclick=()=>refresh(true);
+
+async function refresh(say){
+  try{
+    const [s,r,t]=await Promise.all([api('/api/status'),api('/api/rules'),api('/api/team')]);
+    S.status={...s,read_only:!!r.read_only};S.rules=r;S.team=t;TZ=r.timezone||TZ;
+    renderTop();await render();if(say)toast('已刷新');
+  }catch(e){toast(e.message,true)}
+}
+window.addEventListener('hashchange',()=>{if(S.dirtyRules&&S.route==='rules'&&!confirm('规则还没保存，确定离开？')){history.replaceState(null,'','#rules');return}S.dirtyRules=false;S.route=route();renderTop();render();window.scrollTo(0,0)});
+
+async function render(){
+  const page=$('#page');
+  try{page.innerHTML=await VIEWS[S.route]();BIND[S.route]&&BIND[S.route]()}
+  catch(e){page.innerHTML=`<div class="note block">这一页没加载出来：${esc(e.message)}</div>`}
+}
+
+// ---------- 01 overview ----------
+function chart(series){
+  const W=720,H=180,P=24,n=series.length,bw=(W-P)/n;
+  const max=Math.max(1,...series.map(d=>d.auto+d.approval+d.block));
+  let bars='',labels='';
+  series.forEach((d,i)=>{let y=H-20;const x=P+i*bw+2,w=Math.max(2,bw-5);
+    for(const [k,c] of [['auto','var(--ok)'],['approval','var(--review)'],['block','var(--block)']]){const h=d[k]/max*(H-36);if(h>0){y-=h;bars+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"><title>${d.date} ${k==='auto'?'自动付':k==='approval'?'需签字':'拦截'} ${d[k]}</title></rect>`}}
+    if(i%Math.ceil(n/7)===0||i===n-1)labels+=`<text x="${x+w/2}" y="${H-4}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--mono)">${d.date.slice(5)}</text>`});
+  const grid=[0,.5,1].map(f=>{const y=H-20-f*(H-36);return `<line x1="${P}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="0" y="${y+3}" font-size="10" fill="var(--muted)" font-family="var(--mono)">${Math.round(max*f)}</text>`}).join('');
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="近 ${n} 天付款请求">${grid}${bars}${labels}</svg></div>
+  <div class="legend"><span><i style="background:var(--ok)"></i>自动付</span><span><i style="background:var(--review)"></i>需签字</span><span><i style="background:var(--block)"></i>拦截</span></div>`}
+function budgetBars(b){return b.length?b.map(x=>{const p=Number(x.limit)>0?Math.min(100,Number(x.spent)/Number(x.limit)*100):0;
+  return `<div class="stack" style="gap:4px"><div class="row"><span class="grow">${esc(x.token)}</span><span class="num">${fmtNum(x.spent)} / ${fmtNum(x.limit)}</span></div><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></div>`}).join(''):'<p class="muted">还没设每日上限。</p>'}
+function feed(items,empty='暂无记录',who=true){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="k ${esc(e.kind)}">${KIND[e.kind]||esc(e.kind)}</span><div>${esc(e.text).replace(/\n/g,'<br>')}${(e.actor&&e.actor!==e.employee)||(who&&e.employee)?`<div class="muted" style="font-size:12px">${esc(e.actor&&e.actor!==e.employee?e.actor:'')}${who&&e.employee?`<span class="who-tag">${esc(roleName(e.employee))}</span>`:''}</div>`:''}</div><span class="t">${fmtTime(e.at)}</span></div>`).join('')}</div>`:`<div class="empty">${empty}</div>`}
+const VIEWS={},BIND={};
+VIEWS.overview=async()=>{
+  const o=await api('/api/overview');const m=o.month,c=m.counts;
+  const rate=m.automation_rate==null?'—':Math.round(m.automation_rate*100)+'%';
+  const blocked=c.blocked||0;
+  return `
+  ${o.status.paused?'<div class="note block"><b>付款已暂停。</b> 所有新请求都会被拦截。点右上角「恢复付款」恢复。</div>':''}
+  ${o.status.read_only?'<div class="note">试用只读模式：员工只记账、出报表和预警，所有付款都要老板确认。到 <a href="#rules">规则</a> 里关闭。</div>':''}
+  <div class="grid g4">
+    <section class="card kpi"><span class="label">本月经手资金</span><span class="v">${fmtMoved(m.moved)}</span><span class="s">自动付 + 老板签字 · ${esc(m.start)} 起</span></section>
+    <section class="card kpi"><span class="label">自动处理率</span><span class="v">${rate}</span><span class="s">没被拦截的请求里，员工自己办完的占比</span></section>
+    <section class="card kpi"><span class="label">等你签字</span><span class="v ${o.pending?'review':''}">${o.pending}</span><span class="s">${o.pending?'<a href="#approvals">去审批 →</a>':'没有待签字的付款'}</span></section>
+    <section class="card kpi"><span class="label">本月拦截</span><span class="v ${blocked?'block':''}">${blocked}</span><span class="s">涉及 ${Object.entries(m.blocked_value).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></section>
+  </div>
+  <div class="grid g3">
+    ${card('近 14 天请求',chart(o.series),{cls:'span2',right:`<span class="label">共 ${o.series.reduce((a,d)=>a+d.auto+d.approval+d.block,0)} 笔</span>`})}
+    ${card('今日自动付额度',`<div class="stack">${budgetBars(o.today.budget)}<p class="muted" style="margin:0;font-size:12px">只算员工自己付的，老板签字的不占额度。今天 ${o.today.requests} 笔请求。</p></div>`)}
+  </div>
+  <div class="grid g2">
+    ${card('本月收款方 Top 5',o.top_payees.length?`<div class="scroll"><table><thead><tr><th>收款方</th><th class="r">经手</th><th class="r">笔数</th></tr></thead><tbody>${o.top_payees.map(p=>`<tr class="click" data-payee="${esc(p.payee)}"><td>${p.payee_name?esc(p.payee_name):'<span class="block">白名单外</span>'}<div class="muted mono" style="font-size:11px">${esc(short(p.payee))}</div></td><td class="r">${fmtMoved(p.moved)}</td><td class="r num">${p.requests}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">本月还没有付款请求</div>',{flush:true,right:'<a class="btn sm" href="#payees">全部收款人</a>'})}
+    ${card('最近动态',feed(o.recent,'还没有操作或预警'),{flush:true,right:'<a class="btn sm" href="#audit">审计日志</a>'})}
+  </div>
+  <div class="grid g4">
+    ${[['自动付',c.paid,'ok'],['老板已签',c.approved,'ok'],['已驳回',c.rejected,'muted'],['失败',c.failed,c.failed?'block':'muted']].map(([l,v,k])=>`<section class="card kpi"><span class="label">本月 · ${l}</span><span class="v ${k}">${v||0}</span></section>`).join('')}
+  </div>`};
+BIND.overview=()=>{document.querySelectorAll('[data-payee]').forEach(tr=>tr.onclick=()=>{S.ledger.f={payee:tr.dataset.payee};location.hash='#ledger'})};
+
+// ---------- 02 approvals ----------
+VIEWS.approvals=async()=>{
+  const rows=await api('/api/payments?status=pending_approval&limit=500');
+  const recent=await api('/api/payments?status=approved,rejected&limit=10');
+  return `
+  <div class="note info">员工不能自己签多签。老板在 Safe 里签字执行后，点「已签字」把这笔记进账本；不付就点「驳回」。Telegram 群里发 <code>/approve 编号</code> 效果一样。</div>
+  ${rows.length?rows.map(r=>`<section class="card"><div class="hd"><span class="mono">${esc(r.request_id)}</span>${st(r.status)}<span class="grow"></span><span class="muted" style="font-size:12px">${fmtTime(r.created_at)} · ${esc(r.requester)}</span></div>
+    <div class="bd grid g2">
+      <dl class="kv"><dt>收款方</dt><dd>${r.payee_name?`<b>${esc(r.payee_name)}</b> `:''}${addr(r.payee)}</dd><dt>金额</dt><dd style="font-size:18px">${fmtAmt(r.amount,r.token)}</dd><dt>用途</dt><dd>${esc(r.memo||'—')} ${r.category?`<span class="chip">${esc(r.category)}</span>`:''}</dd>${r.safe_tx_hash?`<dt>Safe 交易哈希</dt><dd>${addr(r.safe_tx_hash)}</dd>`:''}</dl>
+      <div class="stack"><span class="label">为什么要你签字</span><div class="row">${r.messages.map(m=>`<span class="chip review">${esc(m)}</span>`).join('')}</div>
+      <div class="row" style="margin-top:auto"><button class="btn ok" data-ap="${esc(r.request_id)}">已签字</button><button class="btn danger" data-rj="${esc(r.request_id)}">驳回</button><button class="btn ghost" data-detail="${esc(r.request_id)}">详情</button></div></div>
+    </div></section>`).join(''):`<section class="card"><div class="empty">没有等你签字的付款。员工遇到超额、需审批类别或需审批收款人时会出现在这里。</div></section>`}
+  ${card('最近处理',recent.length?`<div class="scroll"><table><thead><tr><th>编号</th><th>收款方</th><th class="r">金额</th><th>结果</th><th>处理人</th><th>时间</th></tr></thead><tbody>${recent.map(r=>`<tr class="click" data-detail="${esc(r.request_id)}"><td class="mono">${esc(r.request_id)}</td><td>${esc(r.payee_name||short(r.payee))}</td><td class="r">${fmtAmt(r.amount,r.token)}</td><td>${st(r.status)}</td><td>${esc(r.decided_by||'—')}</td><td class="mono">${fmtTime(r.updated_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">还没有处理记录</div>',{flush:true})}`};
+BIND.approvals=()=>{
+  document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=async()=>{if(await confirmBox('确认已签字？',`确认你已经在 Safe 里签字并执行了 <b class="mono">${esc(b.dataset.ap)}</b>。控制台只记账，不会再付一次。`,'已签字'))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.ap)}/approve`))});
+  document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=async()=>{if(await confirmBox('驳回这笔付款？',`<b class="mono">${esc(b.dataset.rj)}</b> 会标记为已驳回，不会付款。之后可以让团队重新发请求。`,'驳回',true))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.rj)}/reject`))});
+  bindDetail()};
+function bindDetail(){document.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.detail))}
+async function showDetail(id){
+  try{const d=await api('/api/payments/'+encodeURIComponent(id));const [ol,oc]=OUTCOME[d.outcome]||[d.outcome,'muted'];
+  drawer(id,`<div class="row">${st(d.status)}<span class="pill ${oc}">规则判断：${ol}</span></div>
+    <dl class="kv">
+      <dt>收款方</dt><dd>${d.payee_name?esc(d.payee_name)+'<br>':''}${addr(d.payee,d.payee_url)}</dd>
+      <dt>金额</dt><dd>${fmtAmt(d.amount,d.token)}</dd>
+      <dt>用途</dt><dd>${esc(d.memo||'—')}</dd><dt>类别</dt><dd>${esc(d.category||'—')}</dd>
+      <dt>谁发的</dt><dd>${esc(d.requester)}</dd>
+      <dt>收到时间</dt><dd class="mono">${fmtTime(d.created_at)}</dd><dt>最后更新</dt><dd class="mono">${fmtTime(d.updated_at)}</dd>
+      ${d.tx_hash?`<dt>交易</dt><dd>${d.tx_url?`<a href="${esc(d.tx_url)}" target="_blank" rel="noreferrer" class="mono">${esc(short(d.tx_hash))}</a> `:`<span class="mono">${esc(d.tx_hash)}</span>`} <button class="copy" data-copy="${esc(d.tx_hash)}">复制</button></dd>`:''}
+      ${d.safe_tx_hash?`<dt>Safe 交易哈希</dt><dd>${addr(d.safe_tx_hash)}</dd>`:''}
+      ${d.decided_by?`<dt>处理人</dt><dd>${esc(d.decided_by)}</dd>`:''}
+      ${d.error?`<dt>错误</dt><dd class="block">${esc(d.error)}</dd>`:''}
+    </dl>
+    <div class="stack"><span class="label">规则命中</span><div class="row">${d.messages.length?d.messages.map(m=>`<span class="chip ${oc}">${esc(m)}</span>`).join(''):'<span class="muted">全部规则通过</span>'}</div></div>
+    <div class="stack"><span class="label">经过</span><ol class="steps">
+      <li class="done">${fmtTime(d.created_at)} 收到请求，规则判断为「${ol}」，先记账</li>
+      ${d.status==='paid'?`<li class="done">员工在限额内自动付款${d.tx_url?'，已上链':''}</li>`:''}
+      ${d.status==='failed'?`<li>付款失败，请求作废</li>`:''}
+      ${d.history.slice().reverse().map(h=>`<li class="done">${fmtTime(h.at)} ${esc(h.text)}（${esc(h.actor)}）</li>`).join('')}
+      ${d.status==='pending_approval'?'<li>等老板签字</li>':''}
+    </ol></div>
+    ${d.status==='pending_approval'?`<div class="row"><button class="btn ok" data-ap2>已签字</button><button class="btn danger" data-rj2>驳回</button></div>`:''}`);
+  const ap=$('#overlay [data-ap2]'),rj=$('#overlay [data-rj2]');
+  if(ap)ap.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/approve`))};
+  if(rj)rj.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/reject`))};
+  }catch(e){toast(e.message,true)}}
+
+// ---------- 03 ledger ----------
+function ledgerQuery(extra){const f=S.ledger.f,q=new URLSearchParams();for(const k of ['status','token','payee','q','start','end'])if(f[k])q.set(k,f[k]);if(extra)for(const[k,v]of Object.entries(extra))q.set(k,v);return q.toString()}
+VIEWS.ledger=async()=>{
+  const f=S.ledger.f,tokens=[...new Set([...Object.keys(S.rules.single_limit||{}),...Object.keys(S.rules.daily_limit||{})])];
+  const rows=await api('/api/payments?'+ledgerQuery({limit:S.ledger.limit}));
+  const sum={};rows.forEach(r=>{if(r.status==='paid'||r.status==='approved')sum[r.token]=(sum[r.token]||0)+Number(r.amount)});
+  return `
+  <section class="card"><div class="bd"><div class="grid g4" style="gap:10px">
+    <label class="f"><span>状态</span><select id="fStatus"><option value="">全部</option>${Object.entries(STATUS).map(([k,[l]])=>`<option value="${k}" ${f.status===k?'selected':''}>${l}</option>`).join('')}<option value="paid,approved" ${f.status==='paid,approved'?'selected':''}>已付出（自动 + 签字）</option></select></label>
+    <label class="f"><span>币种</span><select id="fToken"><option value="">全部</option>${tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+    <label class="f"><span>从</span><input type="date" id="fStart" value="${esc((f.start||'').slice(0,10))}"></label>
+    <label class="f"><span>到（含）</span><input type="date" id="fEnd" value="${esc(f.endDay||'')}"></label>
+  </div>
+  <div class="row" style="margin-top:10px"><input id="fQ" class="grow" style="width:auto" placeholder="搜索编号、用途、类别、发起人、地址" value="${esc(f.q||'')}">
+    ${f.payee?`<span class="chip">收款方 ${esc(short(f.payee))}<button data-clearpayee aria-label="清除">×</button></span>`:''}
+    <button class="btn" id="fApply">筛选</button><button class="btn ghost" id="fReset">清空</button><button class="btn" id="csv">导出 CSV</button></div></div></section>
+  <section class="card"><div class="hd"><h2>${rows.length} 笔${rows.length>=S.ledger.limit?'（只显示最近 '+S.ledger.limit+' 笔）':''}</h2><span class="muted" style="font-size:12px">已付出：${Object.entries(sum).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></div>
+  <div class="bd flush scroll">${rows.length?`<table><thead><tr><th>时间</th><th>编号</th><th>收款方</th><th class="r">金额</th><th class="hide-sm">用途</th><th>状态</th><th class="hide-sm">原因 / 交易</th></tr></thead><tbody>${rows.map(r=>`<tr class="click" data-detail="${esc(r.request_id)}"><td class="mono" style="white-space:nowrap">${fmtTime(r.created_at)}</td><td class="mono">${esc(r.request_id)}</td><td>${r.payee_name?esc(r.payee_name):`<span class="mono">${esc(short(r.payee))}</span>`}</td><td class="r" style="white-space:nowrap">${fmtAmt(r.amount,r.token)}</td><td class="hide-sm">${esc(r.memo||'—')}</td><td>${st(r.status)}</td><td class="hide-sm muted" style="font-size:12px">${r.messages.length?esc(r.messages.join('；')):(r.tx_hash?`<span class="mono">${esc(short(r.tx_hash))}</span>`:'')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">没有符合条件的记录</div>'}</div>
+  ${rows.length>=S.ledger.limit?`<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="more">再加载 ${S.ledger.limit} 笔</button></div>`:''}</section>`};
+BIND.ledger=()=>{
+  const apply=()=>{const end=$('#fEnd').value;S.ledger.f={...S.ledger.f,status:$('#fStatus').value,token:$('#fToken').value,q:$('#fQ').value.trim(),start:$('#fStart').value,endDay:end,end:end?new Date(new Date(end+'T00:00:00Z').getTime()+864e5).toISOString().slice(0,10):''};S.ledger.limit=100;render()};
+  $('#fApply').onclick=apply;$('#fQ').onkeydown=e=>{if(e.key==='Enter')apply()};
+  ['#fStatus','#fToken','#fStart','#fEnd'].forEach(s=>$(s).onchange=apply);
+  $('#fReset').onclick=()=>{S.ledger.f={};render()};
+  const cp=document.querySelector('[data-clearpayee]');if(cp)cp.onclick=()=>{delete S.ledger.f.payee;render()};
+  const more=$('#more');if(more)more.onclick=()=>{S.ledger.limit+=100;render()};
+  $('#csv').onclick=async()=>{if(window.CONSOLE_DEMO)return toast('演示版不能下载文件。正式版点这里会下载当前筛选结果的 CSV。');try{const t=await api('/api/payments.csv?'+ledgerQuery());const url=URL.createObjectURL(new Blob([t],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='ledger-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出')}catch(e){toast(e.message,true)}};
+  bindDetail()};
+
+// ---------- 04 payees ----------
+const ADDR=/^0x[0-9a-fA-F]{40}$/;
+VIEWS.payees=async()=>{
+  const p=await api('/api/payees');S.payees=p;
+  return `
+  ${card(`白名单 · ${p.whitelist.length} 个`,p.whitelist.length?`<table><thead><tr><th>名称</th><th>地址</th><th class="hide-sm">别名</th><th class="r">累计付出</th><th class="r hide-sm">笔数</th><th class="hide-sm">最近</th><th></th></tr></thead><tbody>${p.whitelist.map((w,i)=>`<tr><td><b>${esc(w.name)}</b>${w.needs_approval?' <span class="chip review">每笔需签字</span>':''}${w.risk?' <span class="chip block">在风险名单</span>':''}</td><td>${addr(w.address,w.url)}</td><td class="hide-sm muted">${esc(w.aliases.join('、')||'—')}</td><td class="r">${fmtMoved(w.moved)}</td><td class="r num hide-sm">${w.requests}${w.blocked?` <span class="block">(${w.blocked} 拦)</span>`:''}</td><td class="hide-sm mono muted">${w.last_at?fmtTime(w.last_at):'—'}</td><td class="r" style="white-space:nowrap"><button class="btn sm" data-led="${esc(w.address)}">账本</button> <button class="btn sm" data-edit="${i}">编辑</button> <button class="btn sm danger" data-del="${i}">删除</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">白名单是空的。员工只会给白名单里的地址付款。</div>',{flush:true,cls:'scroll',right:'<button class="btn signal sm" id="addPayee">添加收款方</button>'})}
+  ${card(`白名单外出现过的地址 · ${p.unknown.length}`,p.unknown.length?`<table><thead><tr><th>地址</th><th class="r">请求</th><th class="r">被拦截</th><th>最近</th><th></th></tr></thead><tbody>${p.unknown.map(u=>`<tr><td>${addr(u.payee,u.url)}${u.risk?' <span class="chip block">风险</span>':''}</td><td class="r num">${u.requests}</td><td class="r num block">${u.blocked}</td><td class="mono muted">${fmtTime(u.last_at)}</td><td class="r" style="white-space:nowrap"><button class="btn sm" data-trust="${esc(u.payee)}">加入白名单</button> ${u.risk?'':`<button class="btn sm danger" data-risk="${esc(u.payee)}">标为风险</button>`}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">没有陌生地址的付款请求</div>',{flush:true,cls:'scroll'})}
+  ${card('风险地址',`<div class="stack"><p class="muted" style="margin:0">发往这些地址的请求一律拦截，就算它在白名单里。</p><div class="row" id="riskList">${p.risk_addresses.map(a=>`<span class="chip block mono">${esc(short(a))}<button data-unrisk="${esc(a)}" aria-label="移除">×</button></span>`).join('')||'<span class="muted">暂无</span>'}</div>
+    <div class="row"><input id="riskNew" class="grow mono" style="width:auto" placeholder="0x…"><button class="btn danger" id="riskAdd">加入风险名单</button></div></div>`)}`};
+function payeeForm(pv={name:'',aliases:[],address:'',needs_approval:false},title='添加收款方'){return new Promise(res=>{
+  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true"><div class="bd"><h2>${title}</h2>
+  <label class="f"><span>名称</span><input id="pfName" value="${esc(pv.name)}" placeholder="Alice"></label>
+  <label class="f"><span>钱包地址</span><input id="pfAddr" class="mono" value="${esc(pv.address)}" placeholder="0x 开头的 42 位地址"></label>
+  <label class="f"><span>别名（逗号分隔，群里写哪个都能认出）</span><input id="pfAlias" value="${esc(pv.aliases.join(', '))}" placeholder="alice, 爱丽丝"></label>
+  <label class="switch"><input type="checkbox" id="pfNeed" ${pv.needs_approval?'checked':''}> 给这个人的每一笔都要老板签字</label>
+  <div class="note">核对地址时请对照对方亲自发来的地址，看完整的 42 位，不要只看首尾几位。地址投毒常用首尾相同的假地址。</div>
+  <span id="pfErr" class="block"></span></div>
+  <div class="ft"><button class="btn" data-x>取消</button><button class="btn primary" id="pfOk">保存到白名单</button></div></div>`;
+  const close=v=>{$('#overlay').innerHTML='';res(v)};
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(null));
+  $('#pfOk').onclick=()=>{const v={name:$('#pfName').value.trim(),address:$('#pfAddr').value.trim(),aliases:$('#pfAlias').value.split(/[,，]/).map(x=>x.trim()).filter(Boolean),needs_approval:$('#pfNeed').checked};
+    if(!v.name)return $('#pfErr').textContent='请填名称';if(!ADDR.test(v.address))return $('#pfErr').textContent='地址格式不对：要 0x 开头加 40 位十六进制';close(v)};
+  $('#pfName').focus();})}
+async function saveRules(mut,ok){const cfg=JSON.parse(JSON.stringify(S.rules));mut(cfg);
+  try{const r=await put('/api/rules',cfg);toast(r.changes&&r.changes.length?'已保存：'+r.changes.join('；'):(ok||'没有改动'));await refresh()}catch(e){toast(e.message,true)}}
+BIND.payees=()=>{
+  $('#addPayee').onclick=async()=>{const v=await payeeForm();if(v)saveRules(c=>c.payees.push(v))};
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async()=>{const i=+b.dataset.edit,cur=S.rules.payees[i];const v=await payeeForm({aliases:[],...cur},'编辑收款方');if(v)saveRules(c=>c.payees[i]=v)});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const i=+b.dataset.del,cur=S.rules.payees[i];if(await confirmBox('从白名单删除？',`删除 <b>${esc(cur.name)}</b> 后，发给 TA 的请求会被拦截。历史账本不受影响。`,'删除',true))saveRules(c=>c.payees.splice(i,1))});
+  document.querySelectorAll('[data-led]').forEach(b=>b.onclick=()=>{S.ledger.f={payee:b.dataset.led};location.hash='#ledger'});
+  document.querySelectorAll('[data-trust]').forEach(b=>b.onclick=async()=>{const v=await payeeForm({name:'',aliases:[],address:b.dataset.trust,needs_approval:true},'加入白名单');if(v)saveRules(c=>c.payees.push(v))});
+  const addRisk=a=>saveRules(c=>{c.risk_addresses=[...new Set([...(c.risk_addresses||[]),a])]});
+  document.querySelectorAll('[data-risk]').forEach(b=>b.onclick=()=>addRisk(b.dataset.risk));
+  document.querySelectorAll('[data-unrisk]').forEach(b=>b.onclick=()=>saveRules(c=>{c.risk_addresses=(c.risk_addresses||[]).filter(x=>x.toLowerCase()!==b.dataset.unrisk)}));
+  $('#riskAdd').onclick=()=>{const a=$('#riskNew').value.trim();if(!ADDR.test(a))return toast('地址格式不对',true);addRisk(a)}};
+
+// ---------- 05 rules + simulator ----------
+const TZS=['Asia/Shanghai','Asia/Hong_Kong','Asia/Singapore','Asia/Tokyo','Asia/Seoul','Asia/Dubai','Europe/London','Europe/Berlin','America/New_York','America/Los_Angeles','UTC'];
+VIEWS.rules=async()=>{const r=S.rules,tokens=[...new Set([...Object.keys(r.single_limit||{}),...Object.keys(r.daily_limit||{})])];
+  return `
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('限额',`<div class="scroll"><table id="limits"><thead><tr><th>币种</th><th>单笔上限</th><th>每日自动付上限</th><th></th></tr></thead><tbody>${tokens.map(t=>`<tr data-tok="${esc(t)}"><td class="mono">${esc(t)}</td><td><input class="mono" data-s value="${esc(r.single_limit[t]??'0')}" inputmode="decimal"></td><td><input class="mono" data-d value="${esc(r.daily_limit[t]??'0')}" inputmode="decimal"></td><td><button class="btn sm ghost" data-rmtok>移除</button></td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="padding:10px 12px;border-top:1px solid var(--line)"><input id="newTok" class="mono" style="width:120px" placeholder="币种，如 USDC"><button class="btn sm" id="addTok">添加币种</button><span class="muted" style="font-size:12px">超过单笔上限要老板签字；当天自动付累计超过每日上限也要签字。</span></div>`,{flush:true})}
+  ${card('审批与检测',`<div class="stack">
+    <label class="f"><span>需审批类别（逗号分隔）</span><input id="cats" value="${esc((r.approval_categories||[]).join(', '))}" placeholder="KOL, 空投"></label>
+    <label class="f"><span>重复付款检测（天）</span><input id="dup" type="number" min="1" max="365" value="${esc(r.duplicate_window_days||30)}"></label>
+    <label class="f"><span>时区（"每日"按这个时区算）</span><select id="tz">${[...new Set([r.timezone,...TZS])].map(z=>`<option ${z===r.timezone?'selected':''}>${esc(z)}</option>`).join('')}</select></label>
+    <label class="f"><span>老板 Telegram 用户名（逗号分隔，只有他们能审批和暂停）</span><input id="owners" value="${esc((r.owners||[]).join(', '))}"></label>
+    <label class="switch"><input type="checkbox" id="ro" ${r.read_only?'checked':''}> 试用只读：员工不自动付任何钱，全部要老板确认</label>
+  </div>`)}
+  <div class="row"><button class="btn primary" id="saveRules">保存规则</button><button class="btn ghost" id="resetRules">撤销修改</button><span id="dirty" class="review" hidden>有未保存的修改</span></div>
+  <p class="muted" style="margin:0;font-size:12px">白名单和风险地址在 <a href="#payees">收款人</a> 页管理。保存后机器人从下一条消息起按新规则执行，修改会记进审计日志。</p>
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('规则试算',`<div class="stack">
+    <p class="muted" style="margin:0">输入一句群里会出现的付款请求，看员工会怎么处理。只是试算：不记账、不付款、不发到群里。按的是<b>已保存</b>的规则。</p>
+    <div class="row"><input id="simText" class="grow" style="width:auto" placeholder="付 Alice 300 USDT 设计费"><button class="btn signal" id="simGo">试算</button></div>
+    <div class="row" id="simEx">${['付 Alice 300 USDT 设计费','付 Alice 800 USDT 视频','付 Mia 200 USDT KOL 推广','付 0x9f3c000000000000000000000000000000004a21 50 USDT','给 bob 0.1 BNB gas'].map(x=>`<button class="btn sm ghost" data-ex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <div id="simOut"></div></div>`)}
+  ${card('当前生效的规则',`<pre class="report" id="rulesText">加载中…</pre>`)}
+  </div></div>`};
+BIND.rules=async()=>{
+  const mark=()=>{S.dirtyRules=true;$('#dirty').hidden=false};
+  document.querySelectorAll('#page input,#page select').forEach(i=>{if(!['simText','newTok'].includes(i.id))i.addEventListener('input',mark)});
+  const collect=()=>{const c=JSON.parse(JSON.stringify(S.rules)),list=s=>s.split(/[,，]/).map(x=>x.trim()).filter(Boolean);
+    c.single_limit={};c.daily_limit={};document.querySelectorAll('#limits tbody tr').forEach(tr=>{c.single_limit[tr.dataset.tok]=tr.querySelector('[data-s]').value.trim();c.daily_limit[tr.dataset.tok]=tr.querySelector('[data-d]').value.trim()});
+    c.approval_categories=list($('#cats').value);c.duplicate_window_days=parseInt($('#dup').value,10)||30;c.timezone=$('#tz').value;c.owners=list($('#owners').value);c.read_only=$('#ro').checked;return c};
+  $('#saveRules').onclick=async()=>{const c=collect();try{const r=await put('/api/rules',c);S.dirtyRules=false;toast(r.changes.length?'已保存：'+r.changes.join('；'):'没有改动');await refresh()}catch(e){toast(e.message,true)}};
+  $('#resetRules').onclick=()=>{S.dirtyRules=false;render()};
+  $('#addTok').onclick=()=>{const t=$('#newTok').value.trim().toUpperCase();if(!/^[A-Z0-9]{2,10}$/.test(t))return toast('币种代码 2–10 位字母或数字',true);
+    if(document.querySelector(`#limits tr[data-tok="${t}"]`))return toast('已经有 '+t,true);
+    $('#limits tbody').insertAdjacentHTML('beforeend',`<tr data-tok="${esc(t)}"><td class="mono">${esc(t)}</td><td><input class="mono" data-s value="0"></td><td><input class="mono" data-d value="0"></td><td><button class="btn sm ghost" data-rmtok>移除</button></td></tr>`);$('#newTok').value='';mark()};
+  $('#limits').onclick=e=>{const b=e.target.closest('[data-rmtok]');if(b){b.closest('tr').remove();mark()}};
+  const sim=async()=>{const text=$('#simText').value.trim();if(!text)return;try{const r=await post('/api/simulate',{text});
+    if(!r.parsed){$('#simOut').innerHTML=`<div class="note">员工没看懂这句话，会在群里追问：<br>${esc(r.reply)}</div>`;return}
+    const [l,c]=OUTCOME[r.outcome];
+    $('#simOut').innerHTML=`<div class="stack"><div class="row"><span class="pill ${c}"><span class="dot"></span>${l}</span><span>${r.payee_name?esc(r.payee_name):`<span class="mono">${esc(short(r.payee))}</span>`} · ${fmtAmt(r.amount,r.token)}</span>${r.category?`<span class="chip">${esc(r.category)}</span>`:''}</div>
+      ${r.messages.length?`<div class="row">${r.messages.map(m=>`<span class="chip ${c}">${esc(m)}</span>`).join('')}</div>`:'<span class="muted">所有规则都通过</span>'}
+      <span class="label">员工在群里会这样回</span><div class="chat" style="height:auto;max-height:260px"><div class="msg me"><span class="who">你</span>${esc(text)}</div><div class="msg bot"><span class="who">KAGOU 员工</span>${esc(r.reply)}</div></div></div>`}catch(e){toast(e.message,true)}};
+  $('#simGo').onclick=sim;$('#simText').onkeydown=e=>{if(e.key==='Enter')sim()};
+  document.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{$('#simText').value=b.dataset.ex;sim()});
+  try{$('#rulesText').textContent=(await api('/api/preview/rules')).text}catch(e){$('#rulesText').textContent=e.message}};
+
+// ---------- 06 treasury ----------
+VIEWS.treasury=async()=>{const t=await api('/api/treasury'),tg=await api('/api/telegram');
+  return `
+  <div class="grid g3">
+    <section class="card kpi"><span class="label">国库余额</span><span class="v">${t.balance?fmtMoved(t.balance):'—'}</span><span class="s">${t.error?`<span class="block">读取失败：${esc(t.error)}</span>`:t.balance?'所有国库地址合计，实时读链':'部署时没配置国库地址或代币'}</span></section>
+    <section class="card kpi"><span class="label">实时监控</span><span class="v ${t.monitoring?'ok':'muted'}">${t.monitoring?'开启':'未开启'}</span><span class="s">${t.monitoring?'每 5 分钟检查一次国库转账':'需要国库地址、浏览器 API 和 ETHERSCAN_API_KEY'}</span></section>
+    <section class="card kpi"><span class="label">发到群里</span><span class="v ${t.alerts_enabled?'':'muted'}">${t.alerts_enabled?'开':'关'}</span><span class="s"><label class="switch"><input type="checkbox" id="alertsOn" ${t.alerts_enabled?'checked':''}> 预警发到 Telegram 群</label></span></section>
+  </div>
+  <div class="grid g2">
+    ${card('国库地址',t.addresses.length?`<div class="stack">${t.addresses.map(a=>addr(a.address,a.url)).join('')}</div>`:'<p class="muted" style="margin:0">还没配置。在部署的 <code>config/chain.json</code> 里填 <code>treasury_addresses</code>（一般是你们的 Safe 地址）。</p>')}
+    ${card('预警规则',`<ul style="margin:0;padding-left:18px;display:grid;gap:6px">
+      <li>大额转出：${Object.keys(t.thresholds).length?Object.entries(t.thresholds).map(([k,v])=>`单笔超过 <b class="num">${fmtNum(v)}</b> ${esc(k)}`).join('，'):'未设置阈值'}</li>
+      <li>转给白名单外的陌生地址</li>
+      <li>地址投毒：收到首尾和常用地址相同的小额转账</li></ul><p class="muted" style="margin:8px 0 0;font-size:12px">同一笔交易只提醒一次，重启也不会重复。</p>`)}
+  </div>
+  ${card(`预警记录 · ${t.alerts.length}`,feed(t.alerts,'还没有预警。国库有大额转出、陌生地址或投毒时会出现在这里。'),{flush:true})}`};
+BIND.treasury=()=>{$('#alertsOn').onchange=async e=>{try{const tg=await api('/api/telegram');await put('/api/telegram/settings',{...tg.settings,treasury_alerts:e.target.checked});toast(e.target.checked?'预警会发到群里':'预警只记在控制台，不发群');render()}catch(err){toast(err.message,true)}}};
+
+// ---------- 07 employee ----------
+const WALLET={turnkey:'Turnkey（限额写在签名层）',evm:'本地密钥（只用于测试网）',test:'测试模式（不签名）'};
+VIEWS.employee=async()=>{const e=await api('/api/employee');
+  const checks=[
+    [e.live,'实盘已开启','测试模式：绿灯付款不会真的上链'],
+    [e.wallet_kind==='turnkey'||!e.live,e.live?'签名层有限额（Turnkey 策略）':'测试模式不需要签名','实盘没用 Turnkey，限额只在代码里'],
+    [!!e.safe_address,'国库在 Safe 多签里，员工只能提提案','没配置 Safe：超额付款只能靠老板手动转'],
+    [!!e.agent_id,'有 ERC-8004 链上工号','还没注册 ERC-8004 工号'],
+    [!e.paused,'付款正常','付款已暂停'],
+  ];
+  return `
+  <div class="grid g2" style="align-items:start">
+  ${card('员工档案',`<dl class="kv">
+    <dt>岗位</dt><dd>${esc(e.role)}</dd>
+    <dt>ERC-8004 工号</dt><dd>${e.agent_id?`<span class="num">#${esc(e.agent_id)}</span>`:'<span class="muted">未注册（运行 scripts/register_agent.py）</span>'}</dd>
+    <dt>员工钱包</dt><dd>${addr(e.wallet,e.wallet_url)}</dd>
+    <dt>签名方式</dt><dd>${esc(WALLET[e.wallet_kind]||e.wallet_kind||'—')}</dd>
+    <dt>网络</dt><dd>${e.network?`${esc(e.network)} <span class="muted mono">chain ${esc(e.chain_id)}</span>`:'<span class="muted">未配置链（全部测试模式）</span>'}</dd>
+    <dt>Safe 多签</dt><dd>${addr(e.safe_address,e.safe_url)}</dd>
+    <dt>支持币种</dt><dd>${e.tokens.map(t=>`<span class="chip">${esc(t)}</span>`).join(' ')}</dd>
+    <dt>控制台启动</dt><dd class="mono">${fmtTime(e.console_started_at)}</dd></dl>`)}
+  ${card('安全状态',`<ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${checks.map(([ok,y,n])=>`<li class="row"><span class="pill ${ok?'ok':'review'}">${ok?'OK':'注意'}</span><span>${esc(ok?y:n)}</span></li>`).join('')}</ul>
+    <p class="muted" style="margin:12px 0 0;font-size:12px">私钥只在钱包服务商的签名层，控制台、机器人和数据库里都没有。放款判断只在规则引擎里，AI 模型的输出只是建议。</p>`)}
+  </div>
+  ${card('今日额度',`<table><thead><tr><th>币种</th><th class="r">单笔上限</th><th class="r">每日上限</th><th class="r">今日已自动付</th><th style="width:30%">使用</th></tr></thead><tbody>${e.limits.map(l=>{const p=Number(l.daily)>0?Math.min(100,Number(l.spent_today)/Number(l.daily)*100):0;return `<tr><td class="mono">${esc(l.token)}</td><td class="r num">${fmtNum(l.single)}</td><td class="r num">${fmtNum(l.daily)}</td><td class="r num">${fmtNum(l.spent_today)}</td><td><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></td></tr>`}).join('')}</tbody></table>`,{flush:true,cls:'scroll',right:'<a class="btn sm" href="#rules">改限额</a>'})}`};
+
+// ---------- 08 telegram ----------
+VIEWS.telegram=async()=>{const t=await api('/api/telegram');S.tg=t;const s=t.settings;
+  const steps=[
+    [!!t.bot,'在 @BotFather 新建机器人，把 token 设成服务器的 TELEGRAM_BOT_TOKEN，启动机器人'],
+    [t.bot&&t.bot.reads_all_group_messages,'在 @BotFather 发 /setprivacy 选 Disable，机器人才能看到群里的付款请求和骗子消息'],
+    [!!t.chat,'把机器人拉进群，在下面填群 ID（周报、简报、预警和公告发到这里）'],
+    ...(member('community_support')?[[false,'社区客服要删骗子消息：把机器人设为群管理员并勾选「删除消息」（不删只警告则不需要）']]:[]),
+    [t.owners.length>0,'在规则里填老板的 Telegram 用户名（只有他们能审批和暂停）'],
+    [t.online,'机器人在线，群里发 /help 测试'],
+  ];
+  return `
+  <div class="grid g4">
+    <section class="card kpi"><span class="label">机器人</span><span class="v" style="font-size:18px">${t.bot?'@'+esc(t.bot.username):'未连接'}</span><span class="s">${t.bot?esc(t.bot.name||''):'还没启动过机器人'}</span></section>
+    <section class="card kpi"><span class="label">状态</span><span class="v ${t.online?'ok':'block'}" style="font-size:18px">${t.online?'在线':'离线'}</span><span class="s">最后心跳 ${ago(t.heartbeat)}</span></section>
+    <section class="card kpi"><span class="label">通知群</span><span class="v mono" style="font-size:16px">${esc(t.chat||'未设置')}</span><span class="s">${t.chat_source==='console'?'在控制台设置':t.chat_source==='env'?'部署时设置':'周报、预警发到这里'}</span></section>
+    <section class="card kpi"><span class="label">群消息权限</span><span class="v ${t.bot?(t.bot.reads_all_group_messages?'ok':'block'):'muted'}" style="font-size:18px">${t.bot?(t.bot.reads_all_group_messages?'能看全部消息':'只能看命令'):'—'}</span><span class="s">${t.bot&&!t.bot.reads_all_group_messages?'去 @BotFather /setprivacy 选 Disable':'隐私模式要关掉'}</span></section>
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('接入步骤',`<ol class="steps">${steps.map(([ok,txt])=>`<li class="${ok?'done':''}">${esc(txt)}</li>`).join('')}</ol>`)}
+  ${card('通知群和审批人',`<div class="stack">
+    <label class="f"><span>群 ID</span><div class="row"><input id="chatId" class="mono grow" style="width:auto" value="${esc(t.chat||'')}" placeholder="-1001234567890"><button class="btn" id="saveChat">保存</button></div></label>
+    <p class="muted" style="margin:0;font-size:12px">怎么拿群 ID：把 @RawDataBot 拉进群，它会回一串以 -100 开头的数字，拿到后把它踢掉。</p>
+    <div><span class="label">审批人（老板）</span><div class="row" style="margin-top:6px">${t.owners.map(o=>`<span class="chip">@${esc(o)}</span>`).join('')||'<span class="block">还没设置，任何人都不能审批</span>'}<a class="btn sm" href="#rules">修改</a></div></div></div>`)}
+  ${card('自动通知',`<div class="stack">
+    <div class="row"><label class="switch grow"><input type="checkbox" id="sWeekly" ${s.weekly_report?'checked':''}> 每周周报</label><select id="sWeekday" style="width:auto">${WEEK.map((w,i)=>`<option value="${i}" ${s.report_weekday===i?'selected':''}>${w}</option>`).join('')}</select><select id="sHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.report_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
+    <div class="row"><label class="switch grow"><input type="checkbox" id="sDigest" ${s.daily_digest?'checked':''}> 每日账本</label><select id="sDigestHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.digest_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
+    <div class="row"><label class="switch grow"><input type="checkbox" id="sRemind" ${s.pending_reminder_hours?'checked':''}> 有付款没签字时提醒老板，每隔</label><select id="sRemindH" style="width:auto">${[1,2,4,8,12,24].map(h=>`<option value="${h}" ${(s.pending_reminder_hours||4)===h?'selected':''}>${h} 小时</option>`).join('')}</select></div>
+    <label class="switch"><input type="checkbox" id="sAlerts" ${s.treasury_alerts?'checked':''}> 国库预警发到群里</label>
+    <label class="switch"><input type="checkbox" id="sQuiet" ${s.quiet_auto_pay?'checked':''}> 自动付款只回一行（群里消息多时更清爽）</label>
+    <div class="row"><button class="btn primary" id="saveNotify">保存通知设置</button><span class="muted" style="font-size:12px">时间按规则里的时区（${esc(S.rules.timezone)}）</span></div></div>`)}
+  ${card('现在发到群里',`<div class="stack">
+    <div class="row">${[['report','上周周报'],['today','今日账本'],['pending','待签字列表'],['rules','当前规则']].map(([k,l])=>`<button class="btn sm" data-send="${k}">${l}</button>`).join('')}</div>
+    <textarea id="customMsg" placeholder="自定义消息，例如：本周五前把发票发到群里"></textarea>
+    <div class="row"><button class="btn signal" id="sendCustom">发送</button><span class="muted" style="font-size:12px">消息先排队，机器人几秒内发出</span></div>
+    ${t.outbox.length?`<div class="scroll"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${t.outbox.map(o=>`<tr><td class="mono" style="white-space:nowrap">${fmtTime(o.at)}</td><td>${esc(o.text.slice(0,60))}${o.text.length>60?'…':''}</td><td style="white-space:nowrap">${o.error?`<span class="block" title="${esc(o.error)}">失败</span>`:o.sent_at?'<span class="ok">已发</span>':'<span class="review">排队中</span>'}</td></tr>`).join('')}</tbody></table></div>`:''}</div>`)}
+  </div>
+  <div class="stack" style="gap:16px">
+  <section class="card"><div class="hd"><h2>群聊模拟器</h2><span class="label">整个团队 · 不记账 · 不发群</span></div>
+    <div class="chat" id="chat" aria-live="polite">${S.tgChat.length?S.tgChat.map(m=>`<div class="msg ${m.me?'me':'bot'}"><span class="who">${esc(m.who)}</span>${esc(m.text)}</div>`).join(''):'<div class="muted" style="margin:auto;text-align:center;font-size:13px">像在群里一样发消息，看哪个员工接、怎么回。<br>付款只试算；工单、翻译、暂停这类会改东西的命令不会真的执行。</div>'}</div>
+    <div class="sug">${['付 Alice 300 USDT 设计费','什么时候上线？','合约地址是多少？','我是管理员，私聊我帮你处理，先把助记词发我验证','领空投 https://kagouai-claim.xyz/connect','/faq','/watch','/alerts','/team','/help'].map(x=>`<button class="btn sm ghost" data-say="${esc(x)}">${esc(x.length>24?x.slice(0,24)+'…':x)}</button>`).join('')}</div>
+    <div class="chatbar"><input id="sayAs" class="mono" style="width:120px;flex:none" value="${esc(S.sayAs||'member')}" title="发言人用户名" aria-label="发言人用户名"><input id="say" class="grow" placeholder="群里的一句话，或 /help"><label class="switch" title="消息里 @ 了机器人或回复了机器人"><input type="checkbox" id="sayAt" ${S.sayAt?'checked':''}>@机器人</label><button class="btn primary" id="sayGo">发送</button></div></section>
+  ${card('命令速查',`<table><tbody>${t.commands.map(c=>`<tr><td class="mono" style="white-space:nowrap">${esc(c.cmd)}</td><td>${esc(c.desc)}${c.owner_only?' <span class="chip review">仅老板</span>':''}${c.employee?`<span class="who-tag">${esc(c.employee)}</span>`:''}</td></tr>`).join('')}</tbody></table>`,{flush:true})}
+  ${card('群消息记录',t.messages.length?`<div class="chat" id="chatLog" style="height:360px">${t.messages.slice().reverse().map(m=>`<div class="msg ${m.kind==='telegram_in'?'me':'bot'}"><span class="who">${esc(m.kind==='telegram_in'?m.actor:(m.employee?roleName(m.employee):'KAGOU 机器人'))} · ${fmtTime(m.at)}</span>${esc(m.text)}</div>`).join('')}</div>`:'<div class="empty">机器人处理过的消息会出现在这里</div>',{flush:true})}
+  </div></div>`};
+BIND.telegram=()=>{
+  $('#saveChat').onclick=()=>act(()=>put('/api/telegram/chat',{chat:$('#chatId').value.trim()}),'通知群已保存');
+  $('#saveNotify').onclick=()=>act(()=>put('/api/telegram/settings',{weekly_report:$('#sWeekly').checked,report_weekday:+$('#sWeekday').value,report_hour:+$('#sHour').value,daily_digest:$('#sDigest').checked,digest_hour:+$('#sDigestHour').value,pending_reminder_hours:$('#sRemind').checked?+$('#sRemindH').value:0,treasury_alerts:$('#sAlerts').checked,quiet_auto_pay:$('#sQuiet').checked}),'通知设置已保存，机器人立即生效');
+  document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.send})));
+  $('#sendCustom').onclick=async()=>{const text=$('#customMsg').value.trim();if(!text)return toast('消息不能为空',true);if(await confirmBox('发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
+  for(const el of [$('#chat'),$('#chatLog')])if(el)el.scrollTop=el.scrollHeight;
+  const say=async text=>{text=text.trim();if(!text)return;S.sayAs=$('#sayAs').value.trim().replace(/^@/,'')||'member';S.sayAt=$('#sayAt').checked;
+    S.tgChat.push({me:true,text,who:'@'+S.sayAs+(S.sayAt?' · @机器人':'')});let reply,who='KAGOU 机器人';
+    try{const r=await post('/api/chat/simulate',{text,username:S.sayAs,mentioned:S.sayAt});
+      who=r.employee_name||who;
+      reply=r.reply?(r.delete?'（这条消息会被删除）\n':'')+r.reply:'（没有员工接这句话：普通闲聊不回复。勾选「@机器人」试试）'}
+    catch(e){reply=e.message}
+    S.tgChat.push({me:false,text:reply,who});S.tgChat=S.tgChat.slice(-40);render()};
+  $('#sayGo').onclick=()=>say($('#say').value);$('#say').onkeydown=e=>{if(e.key==='Enter')say($('#say').value)};
+  document.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>say(b.dataset.say));
+  setTimeout(()=>{const i=$('#say');if(i&&S.tgChat.length)i.focus()},0)};
+
+// ---------- 09 reports ----------
+S.week=0;
+VIEWS.reports=async()=>{const [w,d]=await Promise.all([api('/api/report/weekly?weeks_ago='+S.week),api('/api/report/today')]);
+  return `<div class="grid g2" style="align-items:start">
+  ${card('周报',`<div class="stack"><div class="row"><select id="week" style="width:auto">${[...Array(13).keys()].map(i=>`<option value="${i}" ${S.week===i?'selected':''}>${i===0?'上周':i+1+' 周前'}</option>`).join('')}</select><button class="btn sm" data-copy="${esc(w.text)}">复制</button><button class="btn sm" data-sendr="report">发到群里</button></div><pre class="report">${esc(w.text)}</pre></div>`)}
+  ${card('今日账本',`<div class="stack"><div class="row"><button class="btn sm" data-copy="${esc(d.text)}">复制</button><button class="btn sm" data-sendr="today">发到群里</button></div><pre class="report">${esc(d.text)}</pre></div>`)}
+  </div>
+  ${card('导出',`<div class="row"><span class="grow muted">完整账本（含所有字段）导出成 CSV，Excel 可以直接打开。</span><a class="btn" href="#ledger">去账本导出</a></div>`)}`};
+BIND.reports=()=>{$('#week').onchange=e=>{S.week=+e.target.value;render()};
+  document.querySelectorAll('[data-sendr]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.sendr})))};
+
+// ---------- 10 audit ----------
+VIEWS.audit=async()=>{const k=S.audit.kind;const items=await api('/api/events?limit=100'+(k?'&kind='+k:''));S.audit.items=items;
+  const tabs=[['','全部'],['audit','操作'],['alert','预警'],['support','客服'],['translate','翻译'],['telegram_in,telegram_out','Telegram'],['system','系统']];
+  return `<section class="card"><div class="tabs" role="tablist">${tabs.map(([v,l])=>`<button role="tab" aria-selected="${k===v}" data-kind="${v}">${l}</button>`).join('')}</div>
+  <div id="auditFeed">${feed(items,'没有记录')}</div>
+  ${items.length>=100?'<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="auditMore">加载更早的</button></div>':''}</section>
+  <p class="muted" style="font-size:12px;margin:0">审计日志只增不删：雇佣和停用员工、暂停、恢复、签字、驳回、修改规则和设置、发群消息、客服拦截、翻译发布、非老板的越权尝试都会记下来。</p>`};
+BIND.audit=()=>{document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{S.audit.kind=b.dataset.kind;render()});
+  const m=$('#auditMore');if(m)m.onclick=async()=>{const last=S.audit.items[S.audit.items.length-1];const more=await api(`/api/events?limit=100&before=${last.id}`+(S.audit.kind?'&kind='+S.audit.kind:''));S.audit.items=S.audit.items.concat(more);$('#auditFeed').innerHTML=feed(S.audit.items);if(more.length<100)m.remove()}};
+
+// ---------- 11 settings ----------
+VIEWS.settings=async()=>`
+  <div class="grid g2" style="align-items:start">
+  ${card('外观',`<div class="stack"><label class="f"><span>主题</span><select id="theme">${[['dark','深色'],['light','浅色'],['auto','跟随系统']].map(([v,l])=>`<option value="${v}" ${store.get('cs-theme','dark')===v?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label class="f"><span>自动刷新</span><select id="auto">${[['0','关'],['15','每 15 秒'],['60','每分钟']].map(([v,l])=>`<option value="${v}" ${store.get('cs-auto','60')===v?'selected':''}>${l}</option>`).join('')}</select></label></div>`)}
+  ${card('登录',`<div class="stack"><p class="muted" style="margin:0">令牌只保存在这个标签页。换令牌要在服务器上改 <code>CHAINSTAFF_CONSOLE_TOKEN</code> 并重启控制台，旧令牌立即失效。</p><div><button class="btn" id="logout">退出登录</button></div></div>`)}
+  ${card('紧急操作',`<div class="stack"><p class="muted" style="margin:0">发现异常时先暂停：之后所有付款请求都会被拦截，直到恢复。Telegram 群里老板发 /pause 效果一样。</p><div><button class="btn danger" id="kill2">${S.status.paused?'恢复付款':'一键暂停所有付款'}</button></div></div>`)}
+  ${card('快捷键',`<table><tbody><tr><td class="mono">R</td><td>刷新数据</td></tr><tr><td class="mono">Esc</td><td>关闭弹窗和详情</td></tr></tbody></table>`,{flush:true})}
+  </div>`;
+BIND.settings=()=>{$('#theme').onchange=e=>{store.set('cs-theme',e.target.value);applyTheme()};
+  $('#auto').onchange=e=>{store.set('cs-auto',e.target.value);startAuto();toast('已保存')};
+  $('#logout').onclick=()=>logout('已退出');$('#kill2').onclick=()=>$('#kill').click()};
+
+// ---------- shared: hire flow, row editors ----------
+function promptBox(title,body,label,value,okText='确定',maxlen=30){return new Promise(res=>{
+  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="bd"><h2 id="mt">${esc(title)}</h2>${body?`<div class="muted">${body}</div>`:''}<label class="f"><span>${esc(label)}</span><input id="pv" value="${esc(value||'')}" maxlength="${maxlen}"></label></div><div class="ft"><button class="btn" data-x>取消</button><button class="btn primary" data-ok>${esc(okText)}</button></div></div>`;
+  const close=v=>{$('#overlay').innerHTML='';res(v)};
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(null));
+  const ok=()=>close($('#pv').value.trim());$('#overlay').querySelector('[data-ok]').onclick=ok;
+  $('#pv').onkeydown=e=>{if(e.key==='Enter')ok()};$('#pv').focus();$('#pv').select()})}
+const ROLE_PAGE={finance_ops:'overview',community_support:'support',chain_monitor:'monitor',announcement_translator:'translator',campaign_payouts:'payouts',airdrop_sybil:'sybil'};
+async function hireFlow(id){const r=(S.team?.roles||[]).find(x=>x.id===id);if(!r)return;
+  const body=`${esc(r.summary)}<ul class="duties" style="margin-top:8px">${r.duties.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>${r.needs.length?`<p style="margin:8px 0 0">上岗前需要：${r.needs.map(esc).join('、')}</p>`:''}<p style="margin:8px 0 0">${r.touches_money?'这个岗位会动钱，所有付款都受规则引擎和限额约束。':'这个岗位只读、回答和起草，不碰钱。'}</p>`;
+  const name=await promptBox('雇佣'+r.name,body,'在群里的称呼',r.name,'雇佣');if(name===null)return;
+  try{await post('/api/team/hire',{role:id,name:name||r.name});toast(`${name||r.name} 已上岗`);await refresh();location.hash='#'+ROLE_PAGE[id]}catch(e){toast(e.message,true)}}
+async function toggleRole(role,on){
+  if(!on&&!await confirmBox(`停用${roleName(role)}？`,'停用后机器人不再以这个身份回复，也不发它的通知和预警。设置和记录都保留，随时可以重新上岗。','停用',true))return;
+  act(()=>put('/api/team/'+role,{enabled:on}),on?'已上岗':'已停用')}
+document.addEventListener('click',async e=>{
+  const h=e.target.closest('[data-hire]');if(h){e.preventDefault();return hireFlow(h.dataset.hire)}
+  const t=e.target.closest('[data-toggle-role]');if(t){e.preventDefault();return toggleRole(t.dataset.toggleRole,t.dataset.on==='1')}
+  const a=e.target.closest('[data-addrow]');if(a){const box=document.getElementById(a.dataset.addrow);box.insertAdjacentHTML('beforeend',EDITORS[a.dataset.addrow].row({}));box.lastElementChild.querySelector('input,textarea')?.focus();return}
+  const d=e.target.closest('[data-delrow]');if(d){d.closest('.er').remove()}});
+const EDITORS={};
+function rowsEditor(id,rows,cols,cls,addText='添加一行'){
+  const row=r=>`<div class="er ${cls}">${cols.map(c=>c.ta?`<textarea data-k="${c.k}" placeholder="${esc(c.ph)}" aria-label="${esc(c.ph)}">${esc(r[c.k]??'')}</textarea>`:`<input data-k="${c.k}" class="${c.mono?'mono':''}" placeholder="${esc(c.ph)}" aria-label="${esc(c.ph)}" value="${esc(r[c.k]??'')}">`).join('')}<button class="btn sm ghost" data-delrow title="删除这一行">删除</button></div>`;
+  EDITORS[id]={row};return `<div id="${id}">${rows.map(row).join('')}</div><button class="btn sm" data-addrow="${id}">+ ${esc(addText)}</button>`}
+function faqEditor(id,rows){
+  const row=r=>`<div class="er faq"><div class="stack"><input data-k="q" placeholder="问题，例如：什么时候上线？" aria-label="问题" value="${esc(r.q||'')}"><input data-k="keywords" placeholder="关键词，用逗号分开：上线, launch, 主网" aria-label="关键词" value="${esc((r.keywords||[]).join(', '))}"><textarea data-k="a" placeholder="回答（机器人会原文发出，不会改写）" aria-label="回答">${esc(r.a||'')}</textarea></div><button class="btn sm ghost" data-delrow>删除</button></div>`;
+  EDITORS[id]={row};return `<div id="${id}" class="stack" style="gap:8px">${rows.map(row).join('')}</div><button class="btn sm" data-addrow="${id}" style="margin-top:8px">+ 添加问题</button>`}
+const collect=id=>[...document.getElementById(id).children].map(el=>Object.fromEntries([...el.querySelectorAll('[data-k]')].map(i=>[i.dataset.k,i.value.trim()])));
+const splitList=v=>v.split(/[,，、\n]+/).map(x=>x.trim()).filter(Boolean);
+function notHired(role){const r=(S.team?.roles||[]).find(x=>x.id===role);
+  return `<section class="card"><div class="hd"><span class="av">${esc(r.name[0])}</span><h2>${esc(r.name)}</h2><span class="pill muted">未雇佣</span></div><div class="bd stack">
+  <p style="margin:0">${esc(r.summary)}</p><ul class="duties">${r.duties.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>
+  ${r.needs.length?`<p class="muted" style="margin:0;font-size:12px">上岗前需要：${r.needs.map(esc).join('、')}</p>`:''}
+  <div><button class="btn signal" data-hire="${r.id}">雇佣${esc(r.name)}</button></div></div></section>`}
+const offNote=role=>{const m=member(role);return m&&!m.enabled?`<div class="note block row"><span class="grow"><b>${esc(m.name)}已停用。</b>机器人不会以这个身份回复，也不发它的通知。设置照常可以改。</span><button class="btn sm ok" data-toggle-role="${role}" data-on="1">重新上岗</button></div>`:''};
+const kpi=(l,v,s='',cls='')=>`<section class="card kpi"><span class="label">${l}</span><span class="v ${cls}">${v}</span><span class="s">${s}</span></section>`;
+
+// ---------- team ----------
+VIEWS.team=async()=>{const t=await api('/api/team');S.team=t;renderNav();
+  const on=t.members.filter(m=>m.enabled),todo=t.members.reduce((a,m)=>a+(m.enabled?(m.todo?.value||0):0),0);
+  const msgs=t.members.reduce((a,m)=>a+(m.activity_7d.telegram_in||0),0);
+  const live=t.roles.filter(r=>r.status==='live'),soon=t.roles.filter(r=>r.status!=='live');
+  const empCard=m=>`<section class="card emp"><div class="hd"><span class="av ${m.enabled?'on':''}">${esc(m.name[0])}</span><div class="grow" style="min-width:0"><h2>${esc(m.name)}</h2><span class="muted" style="font-size:12px">${esc(m.title)}${m.hired_at?' · '+fmtTime(m.hired_at).split(' ')[0]+' 入职':''}</span></div>
+    <span class="pill ${m.enabled?'ok':'block'}"><span class="dot"></span>${m.enabled?'在岗':'停用'}</span><span class="pill ${m.touches_money?'review':'muted'}">${m.touches_money?'动钱':'不碰钱'}</span></div>
+    <div class="bd"><p class="muted" style="margin:0">${esc(m.summary)}</p>
+    <div class="grid g2" style="gap:8px"><div class="mini"><span class="label">${esc(m.headline.label)}</span><span class="num">${esc(m.headline.value)}</span></div>
+    <a class="mini" href="${esc(m.todo.href)}" style="text-decoration:none"><span class="label">${esc(m.todo.label)}</span><span class="num ${m.todo.value?'review':''}">${esc(m.todo.value)}</span></a></div>
+    ${m.setup.length?`<div class="note">${m.setup.map(x=>`<div>· ${esc(x)}</div>`).join('')}</div>`:'<div class="note ok">配置齐全，正常工作。</div>'}
+    <div class="row"><a class="btn sm primary" href="#${ROLE_PAGE[m.role]}">管理</a>
+    <button class="btn sm ${m.enabled?'':'ok'}" data-toggle-role="${m.role}" data-on="${m.enabled?0:1}">${m.enabled?'停用':'上岗'}</button>
+    <button class="btn sm ghost" data-rename="${m.role}">改称呼</button>
+    ${m.role!=='finance_ops'?`<button class="btn sm ghost block" data-dismiss="${m.role}">解雇</button>`:''}</div></div></section>`;
+  const roleCard=r=>`<section class="card"><div class="hd"><h2>${esc(r.name)}</h2>${r.status!=='live'?'<span class="pill muted">即将上线</span>':r.hired?'<span class="pill ok">已在团队</span>':'<span class="pill review">可雇佣</span>'}${r.touches_money?'<span class="pill review">动钱</span>':''}</div>
+    <div class="bd stack"><p style="margin:0;font-size:13px">${esc(r.summary)}</p><ul class="duties">${r.duties.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>
+    ${r.status==='live'?(r.hired?`<div><a class="btn sm" href="#${ROLE_PAGE[r.id]}">去管理</a></div>`:`<div><button class="btn sm signal" data-hire="${r.id}">雇佣</button></div>`):'<p class="muted" style="margin:0;font-size:12px">开发中，上线后可以在这里一键雇佣。</p>'}</div></section>`;
+  return `
+  <div class="grid g4">
+    ${kpi('在岗员工',`${on.length}<span class="muted" style="font-size:14px"> / ${t.members.length}</span>`,'一个 Telegram 机器人托管全部员工')}
+    ${kpi('等你处理',todo,'签字、工单、翻译草稿、高危预警',todo?'review':'')}
+    ${kpi('7 天群消息',msgs,'员工接手的群消息')}
+    ${kpi('岗位库',`${live.length}<span class="muted" style="font-size:14px"> + ${soon.length}</span>`,`${live.length} 个可雇佣，${soon.length} 个即将上线`)}
+  </div>
+  <div class="grid g2">${t.members.map(empCard).join('')}</div>
+  ${live.some(r=>!r.hired)?`<div class="note info row"><span class="grow">还有 ${live.filter(r=>!r.hired).length} 个岗位可以雇佣，雇佣后立刻在同一个机器人里上岗。</span></div>`:''}
+  <div class="grid g2" style="align-items:start">
+    <div class="stack" style="gap:16px"><h2>岗位库</h2><div class="grid g2">${t.roles.map(roleCard).join('')}</div></div>
+    <div class="stack" style="gap:16px"><h2>团队动态</h2>${card('最近',feed(t.recent,'还没有动态'),{flush:true,right:'<a class="btn sm" href="#audit">审计日志</a>'})}
+    ${card('分工规则',`<ol class="steps"><li>群里每条消息先过社区客服的骗局检查，骗子消息不会进到其他员工。</li><li>以「付 / 给 / 转 / pay」开头的是付款请求，交给财务运营员按规则处理。</li><li>其他问题交给社区客服：只按你写的 FAQ 原文回答，答不了的开工单转人工。</li><li>链上监控员和公告翻译员不接群聊，只发预警、简报和你确认过的公告。</li><li>停用的员工不回复任何消息，它的命令会提示「没上岗」。</li></ol>`)}</div>
+  </div>`};
+BIND.team=()=>{
+  document.querySelectorAll('[data-rename]').forEach(b=>b.onclick=async()=>{const m=member(b.dataset.rename);
+    const v=await promptBox('改称呼','控制台、群聊模拟器、/help 和 /team 里都用这个名字。','称呼',m.name,'保存');if(v)act(()=>put('/api/team/'+m.role,{name:v}),'已改名')});
+  document.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=async()=>{const n=roleName(b.dataset.dismiss);
+    if(await confirmBox(`解雇${n}？`,'它会从团队里移除，机器人不再以这个身份工作。设置、工单和记录都保留，重新雇佣后原样恢复。','解雇',true))act(()=>api('/api/team/'+b.dataset.dismiss,{method:'DELETE'}),'已解雇')})};
+
+// ---------- community support ----------
+const ACTION={scam:['拦截骗局','block'],faq:['按 FAQ 回答','ok'],tx:['查交易','info'],ticket:['转人工','review'],unknown:['答不了','muted'],none:['不回复','muted']};
+const SCAM={SECRET_REQUEST:'索要助记词/私钥',FAKE_ADMIN:'冒充管理员',ADMIN_NAME:'自称官方',PHISHING_LINK:'仿冒网址',SUSPICIOUS_LINK:'可疑链接',DM_BAIT:'私聊诱导',GIVEAWAY:'转币翻倍'};
+VIEWS.support=async()=>{if(!member('community_support'))return notHired('community_support');
+  const d=await api('/api/support');S.sup=d;const s=d.settings,st=d.stats,c=st.counts;
+  const open=d.tickets.filter(t=>t.status==='open');
+  return `${offNote('community_support')}
+  <div class="grid g4">
+    ${kpi('7 天回答',c.faq+c.tx,`FAQ ${c.faq} · 查交易 ${c.tx}`)}
+    ${kpi('7 天拦截骗局',c.scam,Object.entries(st.scam_kinds).map(([k,n])=>`${SCAM[k]||k} ${n}`).join('，')||'没有发现骗子',c.scam?'block':'')}
+    ${kpi('待处理工单',open.length,open.length?'<a href="#tickets">去处理 ↓</a>':'都处理完了',open.length?'review':'')}
+    ${kpi('自己答上的比例',st.answer_rate==null?'—':Math.round(st.answer_rate*100)+'%','被问到的问题里，不用转人工的占比')}
+  </div>
+  ${!s.faq.length||!s.admins.length||!s.official_domains.length?`<div class="note">还差几步：${[!s.faq.length&&'写几条 FAQ',!s.admins.length&&'填真管理员的用户名（用来识别冒充者）',!s.official_domains.length&&'填官方域名（用来识别仿冒网址）'].filter(Boolean).join('、')}。</div>`:''}
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('基本设置',`<div class="stack">
+    <label class="f"><span>项目名</span><input id="spName" value="${esc(s.project_name)}" placeholder="KAGOU"></label>
+    <label class="f"><span>真管理员（Telegram 用户名，逗号分开）</span><input id="spAdmins" class="mono" value="${esc(s.admins.map(a=>'@'+a).join(', '))}" placeholder="@cc_xbnb, @kagou_mod"></label>
+    <label class="f"><span>官方域名（逗号分开，子域名自动算官方）</span><input id="spDomains" class="mono" value="${esc(s.official_domains.join(', '))}" placeholder="kagouai.com"></label>
+    <div class="grid g2" style="gap:10px">
+    <label class="f"><span>什么时候回答</span><select id="spMode"><option value="mention" ${s.answer_mode==='mention'?'selected':''}>只在 @机器人 或回复它时</option><option value="questions" ${s.answer_mode==='questions'?'selected':''}>群里有人提问且 FAQ 能答时</option></select></label>
+    <label class="f"><span>发现骗子</span><select id="spScam"><option value="warn" ${s.scam_action==='warn'?'selected':''}>发警告</option><option value="delete" ${s.scam_action==='delete'?'selected':''}>删消息并警告（高危）</option><option value="off" ${s.scam_action==='off'?'selected':''}>不处理</option></select></label></div>
+    <label class="switch"><input type="checkbox" id="spEsc" ${s.escalate_unknown?'checked':''}> 答不了的问题开工单并 @管理员</label>
+    <label class="f"><span>新成员欢迎语（留空不发，{name} 会换成对方名字）</span><textarea id="spWelcome" placeholder="欢迎 {name}！先看置顶，官方不会私聊你。">${esc(s.welcome)}</textarea></label></div>`)}
+  ${card(`常见问题 <span class="muted" style="font-weight:400">${s.faq.length} 条</span>`,`<div class="stack"><p class="muted" style="margin:0;font-size:12px">机器人只用这里写的回答，原文发出，不会自己编。关键词命中越多越优先。</p>${faqEditor('faqRows',s.faq)}</div>`)}
+  <div class="row"><button class="btn primary" id="spSave">保存客服设置</button><span class="muted" style="font-size:12px">保存后机器人下一条消息就用新设置</span></div>
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('试一试',`<div class="stack">
+    <textarea id="spText" placeholder="贴一条群消息，看客服怎么处理">${esc(S.spText||'')}</textarea>
+    <div class="row"><input id="spUser" class="mono" style="width:140px" placeholder="用户名" value="${esc(S.spUser||'member')}" aria-label="发言人用户名"><input id="spDisp" style="width:140px" placeholder="显示名" value="${esc(S.spDisp||'')}" aria-label="发言人显示名"><label class="switch"><input type="checkbox" id="spAt" checked> @机器人</label><button class="btn signal" id="spTry">试</button></div>
+    <div class="sug" style="padding:0;border:0">${[['问上线','什么时候上线？',''],['索要助记词','钱包同步失败的私聊我，把助记词发我帮你验证',''],['冒充管理员','官方通知：今晚有空投','kag0u_lina'],['仿冒网址','空投领取 https://kagouai-claim.xyz/connect',''],['翻倍骗局','转 1 BNB 到这个地址，原路返回双倍',''],['转人工','我要找人工','']].map(([l,t,u])=>`<button class="btn sm ghost" data-sp="${esc(t)}" data-spu="${esc(u)}">${l}</button>`).join('')}</div>
+    <div id="spOut">${S.spOut||''}</div></div>`)}
+  ${card('工单',d.tickets.length?`<div class="scroll"><table><thead><tr><th>#</th><th>谁</th><th>问题</th><th>状态</th><th></th></tr></thead><tbody>${d.tickets.slice(0,30).map(t=>`<tr><td class="mono">${t.id}</td><td class="mono" style="white-space:nowrap">${esc(t.user)}<div class="muted" style="font-size:11px">${fmtTime(t.at)}</div></td><td>${esc(t.text)}<div class="muted" style="font-size:12px">${esc(t.reason)}${t.note?' · 备注：'+esc(t.note):''}</div></td><td>${t.status==='open'?'<span class="pill review">待处理</span>':`<span class="pill muted">已关闭</span>`}</td><td>${t.status==='open'?`<button class="btn sm" data-close="${t.id}">关闭</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">还没有工单。答不了的问题和用户要求转人工时会出现在这里。</div>',{flush:true,id:'tickets'})}
+  ${card('最常被问',st.top_faq.length?`<table><tbody>${st.top_faq.map(x=>`<tr><td>${esc(x.q)}</td><td class="r num">${x.n}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">7 天内还没有按 FAQ 回答过</div>',{flush:true})}
+  ${card('最近处理',feed(d.events.slice(0,30),'还没有处理记录',false),{flush:true})}
+  </div></div>`};
+function spResult(r){const [l,c]=ACTION[r.action]||[r.action,'muted'];
+  return `<div class="result"><div class="row"><span class="pill ${c}"><span class="dot"></span>${l}</span>${r.delete?'<span class="pill block">删除原消息</span>':''}${r.findings.map(f=>`<span class="chip ${f.severity==='high'?'block':'review'}" title="${esc(f.reason)}">${esc(SCAM[f.kind]||f.kind)}</span>`).join('')}</div>
+  ${r.text?`<div class="msg bot" style="max-width:100%"><span class="who">${esc(roleName('community_support'))}</span>${esc(r.text)}</div>`:'<span class="muted">不回复（普通闲聊或没被问到）</span>'}</div>`}
+BIND.support=()=>{if(!$('#spSave'))return;
+  $('#spSave').onclick=()=>{const faq=collect('faqRows').filter(x=>x.q||x.a).map(x=>({q:x.q,a:x.a,keywords:splitList(x.keywords)}));
+    act(()=>put('/api/support/settings',{project_name:$('#spName').value,admins:splitList($('#spAdmins').value),official_domains:splitList($('#spDomains').value),faq,answer_mode:$('#spMode').value,scam_action:$('#spScam').value,escalate_unknown:$('#spEsc').checked,welcome:$('#spWelcome').value}),'客服设置已保存')};
+  const run=async()=>{S.spText=$('#spText').value;S.spUser=$('#spUser').value;S.spDisp=$('#spDisp').value;if(!S.spText.trim())return toast('先贴一条消息',true);
+    try{S.spOut=spResult(await post('/api/support/simulate',{text:S.spText,username:S.spUser,display_name:S.spDisp,mentioned:$('#spAt').checked}));$('#spOut').innerHTML=S.spOut}catch(e){toast(e.message,true)}};
+  $('#spTry').onclick=run;
+  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{$('#spText').value=b.dataset.sp;$('#spUser').value=b.dataset.spu||'member';$('#spDisp').value=b.dataset.spu?'KAGOU Lina':'';run()});
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{const note=await promptBox(`关闭工单 #${b.dataset.close}`,'处理完了就关掉。可以留一句备注，方便以后查。','备注（可空）','','关闭',300);
+    if(note!==null)act(()=>post(`/api/support/tickets/${b.dataset.close}/close`,{note}),'工单已关闭')})};
+
+// ---------- chain monitor ----------
+VIEWS.monitor=async()=>{if(!member('chain_monitor'))return notHired('chain_monitor');
+  const d=await api('/api/monitor');const s=d.settings,st=d.stats,run=d.last_run,K=d.kind_names;
+  const f=S.monF||'';const alerts=d.alerts.filter(a=>!f||(f==='high'?a.data?.severity==='high':a.data?.kind===f));
+  const kinds=[...new Set(d.alerts.map(a=>a.data?.kind).filter(Boolean))];
+  return `${offNote('chain_monitor')}
+  ${!d.source?'<div class="note block"><b>读不到链上转账。</b>部署时设置 <code>ETHERSCAN_API_KEY</code>（Etherscan V2 多链接口，免费档即可），并在链配置里填 <code>explorer_api_url</code>。在这之前只有余额检查能用。</div>':''}
+  ${run&&!run.ok?`<div class="note block">最近一次检查失败：${esc(run.error)}（${fmtTime(run.at)}）</div>`:''}
+  <div class="grid g4">
+    ${kpi('盯盘地址',d.watch.length,d.watch_source==='chain'?'来自链配置的国库地址':d.watch_source==='console'?'在控制台设置':'还没设置')}
+    ${kpi('7 天预警',st.total,Object.entries(st.by_kind).map(([k,n])=>`${K[k]||k} ${n}`).join('，')||'一切正常')}
+    ${kpi('7 天高危',st.high,'大额转出、地址投毒、无限授权',st.high?'block':'')}
+    ${kpi('最近检查',run?ago(run.at):'从未',run?`${run.ok?'正常':'失败'} · ${run.transfers} 笔转账 · ${run.approvals} 笔授权`:'机器人每 5 分钟查一次',run&&!run.ok?'block':'')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('预警',`<div class="tabs" role="tablist" style="margin:-14px -16px 0">${[['','全部'],['high','高危'],...kinds.map(k=>[k,K[k]||k])].map(([v,l])=>`<button role="tab" aria-selected="${f===v}" data-monf="${v}">${esc(l)}</button>`).join('')}</div>
+    ${alerts.length?`<div class="feed" style="margin:0 -16px -14px">${alerts.slice(0,60).map(a=>`<div class="it"><span class="sev ${a.data?.severity==='high'?'block':'review'}">${a.data?.severity==='high'?'高危':'注意'}</span><div>${esc(a.text)}${a.data?.url?`<div><a class="copy" href="${esc(a.data.url)}" target="_blank" rel="noreferrer">在浏览器查看交易</a></div>`:''}</div><span class="t">${fmtTime(a.at)}</span></div>`).join('')}</div>`:'<div class="empty">没有预警</div>'}`,{right:`<button class="btn sm" id="monCheck">立即检查</button>`})}
+  ${card('链上简报',`<div class="stack"><pre class="report" id="brief">读取中…</pre><div class="row"><button class="btn sm" id="briefSend">发到群里</button><span class="muted" style="font-size:12px">${s.daily_brief?`每天 ${String(s.brief_hour).padStart(2,'0')}:00 自动发`:'自动简报已关闭'}</span></div></div>`)}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('盯哪些地址',`<div class="stack"><p class="muted" style="margin:0;font-size:12px">${d.watch_source==='chain'?'现在用的是链配置里的国库地址。在这里填了就以这里为准。':'国库、多签、热钱包、做市地址都可以加，最多 50 个。'}</p>
+    ${rowsEditor('monWatch',s.watch.length?s.watch:d.watch.map(w=>({address:w.address,label:w.label})),[{k:'address',ph:'0x 地址',mono:1},{k:'label',ph:'名字，例如 国库'}],'c2','添加地址')}</div>`)}
+  ${card('预警线',`<div class="stack">
+    <span class="label">大额转出（单笔达到就报警）</span>${rowsEditor('monTh',Object.entries(d.thresholds).map(([token,amount])=>({token,amount})),[{k:'token',ph:'币种 USDT',mono:1},{k:'amount',ph:'数量',mono:1}],'c3','添加币种')}
+    <span class="label">余额下限（低于就提醒，每天一次）</span>${rowsEditor('monLow',Object.entries(s.low_balance).map(([token,amount])=>({token,amount})),[{k:'token',ph:'币种 BNB',mono:1},{k:'amount',ph:'下限',mono:1}],'c3','添加币种')}
+    <span class="label">可信授权合约（给它们授权不报警，例如 DEX 路由）</span>${rowsEditor('monSp',s.known_spenders,[{k:'address',ph:'0x 合约地址',mono:1},{k:'label',ph:'名字'}],'c2','添加合约')}</div>`)}
+  ${card('检查项',`<div class="stack">
+    <label class="switch"><input type="checkbox" id="mUnk" ${s.alert_unknown_counterparty?'checked':''}> 向白名单外的陌生地址转出</label>
+    <label class="switch"><input type="checkbox" id="mPoi" ${s.alert_poisoning?'checked':''}> 地址投毒（假冒熟人地址的零额转账）</label>
+    <label class="switch"><input type="checkbox" id="mApp" ${s.alert_approvals?'checked':''}> 无限授权和 NFT 全部授权</label>
+    <div class="row"><label class="switch grow"><input type="checkbox" id="mBrief" ${s.daily_brief?'checked':''}> 每日链上简报</label><select id="mHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.brief_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
+    <p class="muted" style="margin:0;font-size:12px">只读：监控员不签名、不动钱。每条预警只发一次，重启也不会重复。</p></div>`)}
+  <div class="row"><button class="btn primary" id="monSave">保存监控设置</button></div>
+  </div></div>`};
+BIND.monitor=()=>{if(!$('#monSave'))return;
+  api('/api/monitor/brief').then(r=>{$('#brief').textContent=r.text}).catch(e=>{$('#brief').textContent=e.message});
+  document.querySelectorAll('[data-monf]').forEach(b=>b.onclick=()=>{S.monF=b.dataset.monf;render()});
+  $('#monCheck').onclick=async()=>{try{const r=await post('/api/monitor/check');toast(r.last_run?.ok===false?'检查失败：'+r.last_run.error:`检查完成，新预警 ${r.new.length} 条`,r.last_run?.ok===false);render()}catch(e){toast(e.message,true)}};
+  $('#briefSend').onclick=async()=>{const text=$('#brief').textContent;if(await confirmBox('把简报发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
+  const amounts=id=>Object.fromEntries(collect(id).filter(x=>x.token||x.amount).map(x=>[x.token.toUpperCase(),x.amount]));
+  $('#monSave').onclick=()=>act(()=>put('/api/monitor/settings',{watch:collect('monWatch').filter(x=>x.address),thresholds:amounts('monTh'),low_balance:amounts('monLow'),known_spenders:collect('monSp').filter(x=>x.address),
+    alert_unknown_counterparty:$('#mUnk').checked,alert_poisoning:$('#mPoi').checked,alert_approvals:$('#mApp').checked,daily_brief:$('#mBrief').checked,brief_hour:+$('#mHour').value}),'监控设置已保存')};
+
+// ---------- announcement translator ----------
+VIEWS.translator=async()=>{if(!member('announcement_translator'))return notHired('announcement_translator');
+  const d=await api('/api/translator');S.tr=d;const s=d.settings,L=d.languages;
+  const drafts=d.drafts,open=drafts.filter(x=>x.status==='draft');
+  const dcard=x=>`<section class="card"><div class="hd"><span class="mono">#${x.id}</span>${x.status==='draft'?'<span class="pill review">待确认</span>':x.status==='posted'?'<span class="pill ok">已发出</span>':'<span class="pill muted">已作废</span>'}<span class="grow"></span><span class="muted" style="font-size:12px">${fmtTime(x.at)}${x.decided_by?' · '+esc(x.decided_by):''}</span></div>
+    <div class="bd stack"><details ${x.status==='draft'?'open':''}><summary>中文原文</summary><pre class="report" style="margin-top:8px">${esc(x.source)}</pre></details>
+    ${x.warnings.length?`<div class="note block">${x.warnings.map(w=>`<div>⚠️ ${esc(w)}</div>`).join('')}</div>`:'<div class="note ok">数字、地址、链接、@账号和术语都核对过，没发现问题。</div>'}
+    ${Object.entries(x.outputs).map(([k,v])=>`<label class="f"><span>${esc(L[k]||k)}${s.chats[k]?' · 发到 '+esc(s.chats[k]):''}</span>${x.status==='draft'?`<textarea data-tr="${x.id}" data-lang="${esc(k)}" style="min-height:200px">${esc(v)}</textarea>`:`<pre class="report">${esc(v)}</pre>`}</label>`).join('')}
+    ${x.status==='draft'?`<div class="row"><button class="btn signal" data-trpost="${x.id}">确认并发到群里</button><button class="btn" data-trsave="${x.id}">保存修改</button><button class="btn ghost block" data-trdrop="${x.id}">作废</button></div>`:''}</div></section>`;
+  return `${offNote('announcement_translator')}
+  ${!d.configured?'<div class="note block"><b>翻译员还没接上模型。</b>部署时设置 <code>ANTHROPIC_API_KEY</code>，重启控制台和机器人后就能翻译。草稿和术语表现在就可以准备。</div>':''}
+  <div class="grid g4">
+    ${kpi('待确认草稿',open.length,open.length?'确认后才会发出':'没有待确认的',open.length?'review':'')}
+    ${kpi('已发出',drafts.filter(x=>x.status==='posted').length,'最近 50 份草稿里')}
+    ${kpi('目标语言',s.languages.length,s.languages.map(k=>L[k]).join('、'))}
+    ${kpi('模型',`<span style="font-size:15px">${esc(d.model)}</span>`,'Anthropic Claude · 只出草稿，不自动发')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('写公告',`<div class="stack">
+    <textarea id="trSrc" style="min-height:200px" placeholder="贴中文公告原文。数字、地址、链接、@账号会自动核对有没有翻错。">${esc(S.trSrc||'')}</textarea>
+    <div class="row">${Object.entries(L).map(([k,l])=>`<label class="switch"><input type="checkbox" data-trl="${k}" ${s.languages.includes(k)?'checked':''}> ${esc(l)}</label>`).join('')}</div>
+    <div class="row"><button class="btn signal" id="trGo" ${d.configured?'':'disabled'}>生成翻译草稿</button><span class="muted" style="font-size:12px" id="trBusy">群里老板发 /translate 原文 也可以</span></div></div>`)}
+  ${open.length||drafts.length?drafts.map(dcard).join(''):card('草稿','<div class="empty">还没有翻译草稿</div>')}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('翻译设置',`<div class="stack">
+    <label class="f"><span>项目名</span><input id="trName" value="${esc(s.project_name)}" placeholder="KAGOU"></label>
+    <label class="f"><span>语气</span><select id="trTone">${[['formal','正式（交易所/协议公告）'],['friendly','亲切（社区运营口吻）'],['concise','简洁（只留事实）']].map(([v,l])=>`<option value="${v}" ${s.tone===v?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label class="f"><span>给翻译员的说明（可空）</span><textarea id="trNotes" placeholder="例如：读者主要是日本散户，避免过于口语">${esc(s.notes)}</textarea></label>
+    <span class="label">术语表（译文留空 = 原样保留）</span>${rowsEditor('trGloss',s.glossary,[{k:'term',ph:'原词，例如 链工'},{k:'translation',ph:'固定译法，例如 ChainStaff'}],'c3','添加术语')}
+    <span class="label">按语言分群发（留空 = 发到通知群 ${esc(d.chat||'（未设置）')}）</span>
+    ${Object.entries(L).filter(([k])=>s.languages.includes(k)).map(([k,l])=>`<label class="f"><span>${esc(l)} 群 ID</span><input class="mono" data-trc="${k}" value="${esc(s.chats[k]||'')}" placeholder="-100…"></label>`).join('')}
+    <div class="row"><button class="btn primary" id="trSave">保存翻译设置</button></div></div>`)}
+  ${card('流程',`<ol class="steps"><li>老板在这里或群里发 /translate 原文。</li><li>Claude 一次出所有目标语言的草稿。</li><li>规则逐条核对数字、地址、链接、@账号和术语，有出入就标红。</li><li>老板改好、确认，机器人才发到群里。没确认的草稿永远不会发出。</li></ol>`)}
+  </div></div>`};
+BIND.translator=()=>{if(!$('#trSave'))return;
+  const langs=()=>[...document.querySelectorAll('[data-trl]')].filter(i=>i.checked).map(i=>i.dataset.trl);
+  $('#trSrc').oninput=e=>{S.trSrc=e.target.value};
+  $('#trGo').onclick=async()=>{const text=$('#trSrc').value.trim();if(!text)return toast('先贴公告原文',true);if(!langs().length)return toast('至少选一种语言',true);
+    const b=$('#trGo');b.disabled=true;$('#trBusy').innerHTML='<span class="spin"></span> Claude 正在翻译，通常十几秒…';
+    try{await post('/api/translator/drafts',{text,languages:langs()});S.trSrc='';toast('草稿已生成，核对后确认发出');render()}catch(e){toast(e.message,true);b.disabled=false;$('#trBusy').textContent=''}};
+  const outputs=id=>Object.fromEntries([...document.querySelectorAll(`[data-tr="${id}"]`)].map(t=>[t.dataset.lang,t.value]));
+  document.querySelectorAll('[data-trsave]').forEach(b=>b.onclick=()=>act(()=>put('/api/translator/drafts/'+b.dataset.trsave,{outputs:outputs(b.dataset.trsave)}),'修改已保存，重新核对过了'));
+  document.querySelectorAll('[data-trpost]').forEach(b=>b.onclick=async()=>{const id=b.dataset.trpost,o=outputs(id);
+    if(!await confirmBox(`发出翻译 #${id}？`,Object.entries(o).map(([k,v])=>`<b>${esc(S.tr.languages[k]||k)}</b><br>${esc(v).replace(/\n/g,'<br>')}`).join('<hr style="border:0;border-top:1px solid var(--line)">'),'确认发出'))return;
+    try{await put('/api/translator/drafts/'+id,{outputs:o});await act(()=>post(`/api/translator/drafts/${id}/post`))}catch(e){toast(e.message,true)}});
+  document.querySelectorAll('[data-trdrop]').forEach(b=>b.onclick=async()=>{if(await confirmBox(`作废草稿 #${b.dataset.trdrop}？`,'作废后不能再发出，需要的话重新生成。','作废',true))act(()=>post(`/api/translator/drafts/${b.dataset.trdrop}/discard`),'已作废')});
+  $('#trSave').onclick=()=>act(()=>put('/api/translator/settings',{languages:langs(),tone:$('#trTone').value,project_name:$('#trName').value,notes:$('#trNotes').value,
+    glossary:collect('trGloss').filter(x=>x.term),chats:Object.fromEntries([...document.querySelectorAll('[data-trc]')].map(i=>[i.dataset.trc,i.value.trim()]))}),'翻译设置已保存')};
+
+// ---------- shared: downloads ----------
+async function download(path,demoMsg){if(window.CONSOLE_DEMO)return toast(demoMsg||'演示版不能下载文件。正式版点这里会下载文件。');
+  try{const r=await fetch(path,{headers:{'Authorization':'Bearer '+token}});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.detail||('下载失败 '+r.status))}
+    const name=(r.headers.get('content-disposition')||'').match(/filename="([^"]+)"/)?.[1]||'export';
+    const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已下载 '+name)}
+  catch(e){toast(e.message,true)}}
+
+// ---------- campaign payouts ----------
+const BSTATUS={draft:['待确认','review'],proposed:['等 Safe 签字','review'],executed:['已执行','ok'],cancelled:['已作废','muted']};
+const bst=s=>{const [l,c]=BSTATUS[s]||[s,'muted'];return `<span class="pill ${c}"><span class="dot"></span>${l}</span>`};
+const MODE_HELP={fixed:'名单每行：地址,金额[,备注]。例如 0xabc…,300,KOL 小王',pool:'名单每行：地址,积分[,备注]。奖池按积分比例分，向下取整到 6 位小数'};
+function payItems(items,limit=300){return items.length?`<div class="scroll"><table><thead><tr><th>行</th><th>地址</th><th style="text-align:right">数量</th><th>结果</th></tr></thead><tbody>${items.slice(0,limit).map(i=>`<tr><td class="mono muted">${i.line}</td><td class="mono" style="white-space:nowrap">${esc(short(i.address)||i.address)}${i.note?`<div class="muted" style="font-size:11px">${esc(i.note)}</div>`:''}</td><td class="num" style="text-align:right">${i.status==='ok'?fmtNum(i.amount):'—'}</td><td>${i.status==='ok'?(i.adjusted.length?`<span class="pill review">已调整</span><div class="muted" style="font-size:11px">${i.adjusted.map(esc).join('；')}</div>`:'<span class="pill ok">发放</span>'):`<span class="pill block">剔除</span><div class="muted" style="font-size:11px">${i.reasons.map(esc).join('；')}</div>`}</td></tr>`).join('')}</tbody></table></div>${items.length>limit?`<p class="muted" style="font-size:12px;margin:8px 16px">只显示前 ${limit} 行，共 ${items.length} 行。</p>`:''}`:'<div class="empty">没有行</div>'}
+function paySummary(s,token){return `<div class="grid g4" style="gap:8px"><div class="mini"><span class="label">可发放</span><span class="num">${s.payable}</span></div><div class="mini"><span class="label">合计</span><span class="num">${fmtNum(s.total)} ${esc(token)}</span></div><div class="mini"><span class="label">剔除</span><span class="num ${s.excluded?'block':''}">${s.excluded}</span></div><div class="mini"><span class="label">调整</span><span class="num ${s.adjusted?'review':''}">${s.adjusted}</span></div></div>
+  ${Object.keys(s.excluded_reasons||{}).length?`<p class="muted" style="margin:0;font-size:12px">剔除原因：${Object.entries(s.excluded_reasons).map(([k,n])=>`${esc(k)} ${n}`).join('，')}</p>`:''}
+  ${(s.errors||[]).length||(s.parse_problems||[]).length?`<div class="note block">${[...(s.errors||[]),...(s.parse_problems||[])].map(x=>`<div>${esc(x)}</div>`).join('')}</div>`:''}`}
+VIEWS.payouts=async()=>{if(!member('campaign_payouts'))return notHired('campaign_payouts');
+  const d=await api('/api/payouts');S.pay=d;const f=S.payForm||(S.payForm={campaign:'',token:d.tokens.includes('USDT')?'USDT':d.tokens[0]||'USDT',mode:'fixed',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:'',text:''});
+  const pv=S.payPreview;
+  return `${offNote('campaign_payouts')}
+  ${!d.safe?'<div class="note block"><b>还没配置 Safe 多签地址。</b>批次照样能核对和导出名单，但要导出 Safe 批量交易文件，需要在链配置里填 <code>safe_address</code> 和代币合约地址。</div>':''}
+  <div class="grid g4">
+    ${kpi('待确认批次',d.pending,d.pending?'核对后确认才会生成提案':'没有待确认的',d.pending?'review':'')}
+    ${kpi('等 Safe 签字',d.awaiting_signature,'导出文件后在 Safe 里签')}
+    ${kpi('已提案金额',Object.entries(d.paid_totals).map(([k,v])=>`${fmtNum(v)} <span class="muted" style="font-size:13px">${esc(k)}</span>`).join('<br>')||'0','含已执行')}
+    ${kpi('Safe 多签',d.safe?`<span style="font-size:15px" class="mono">${esc(short(d.safe))}</span>`:'未配置','员工不签名，只出提案',d.safe?'':'review')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('新建结算批次',`<div class="stack">
+    <div class="grid g2" style="gap:8px"><label class="f"><span>活动名称</span><input id="pyCamp" value="${esc(f.campaign)}" placeholder="例如 10 月 KOL 结算" maxlength="80"></label>
+    <label class="f"><span>币种</span><select id="pyTok">${d.tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select></label></div>
+    <div class="grid g2" style="gap:8px"><label class="f"><span>结算方式</span><select id="pyMode"><option value="fixed" ${f.mode==='fixed'?'selected':''}>按名单金额</option><option value="pool" ${f.mode==='pool'?'selected':''}>按积分分奖池</option></select></label>
+    ${f.mode==='pool'?`<label class="f"><span>奖池总额</span><input id="pyPool" class="mono" value="${esc(f.pool)}" placeholder="例如 10000"></label>`:`<label class="f"><span>预算上限（可空）</span><input id="pyBudget" class="mono" value="${esc(f.budget)}" placeholder="超过就不能生成"></label>`}</div>
+    <div class="grid g2" style="gap:8px"><label class="f"><span>单人上限（可空）</span><input id="pyCap" class="mono" value="${esc(f.per_person_cap)}" placeholder="${f.mode==='pool'?'超过按上限发':'超过就剔除'}"></label>
+    <label class="f"><span>最低发放额（可空）</span><input id="pyMin" class="mono" value="${esc(f.min_amount)}" placeholder="低于就不发，省 gas"></label></div>
+    <label class="f"><span>剔除反女巫结果（可选）</span><select id="pySyb"><option value="">不使用</option>${d.sybil_checks.map(c=>`<option value="${c.id}" ${String(f.sybil_check)===String(c.id)?'selected':''}>#${c.id} ${esc(c.name)} · 剔除 ${c.excluded}</option>`).join('')}</select></label>
+    <label class="f"><span>名单</span><textarea id="pyText" class="mono" style="min-height:180px" placeholder="${esc(MODE_HELP[f.mode])}">${esc(f.text)}</textarea></label>
+    <p class="muted" style="margin:0;font-size:12px">${esc(MODE_HELP[f.mode])}。可以直接从表格复制粘贴，第一行是表头也没关系。同一活动里已经发过的地址会自动剔除。</p>
+    <div class="row"><button class="btn" id="pyPrev">核对预览</button><button class="btn signal" id="pyMake" ${pv&&pv.ok?'':'disabled'}>生成批次</button><span class="muted" style="font-size:12px">${pv?(pv.ok?'预览通过，可以生成':'预览有问题，改好再生成'):'先预览，看清楚再生成'}</span></div>
+    ${pv?`<div class="stack" id="pyPv">${paySummary(pv.summary,pv.summary.token)}</div>`:''}</div>`,{id:'pyNew'})}
+  ${pv?card('预览明细',payItems(pv.items),{flush:true}):''}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('结算批次',d.batches.length?`<div class="scroll"><table><thead><tr><th>#</th><th>活动</th><th style="text-align:right">合计</th><th>状态</th></tr></thead><tbody>${d.batches.map(b=>`<tr class="click" data-batch="${b.id}"><td class="mono">${b.id}</td><td>${esc(b.campaign)}<div class="muted" style="font-size:11px">${fmtTime(b.at)} · ${b.summary.payable} 个地址${b.summary.excluded?` · 剔除 ${b.summary.excluded}`:''}</div></td><td class="num" style="text-align:right;white-space:nowrap">${fmtNum(b.summary.total)} <span class="muted">${esc(b.token)}</span></td><td>${bst(b.status)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">还没有结算批次</div>',{flush:true})}
+  ${card('怎么发出去',`<ol class="steps"><li>粘贴名单，结算员核对地址、去重、对风险名单和反女巫结果，按规则算出每人多少。</li><li>老板看过明细，点「确认并生成提案」。</li><li>下载 Safe 批量交易文件，在 Safe{Wallet} 的 Transaction Builder 里导入（或用 CSV Airdrop 应用导入 CSV），多签人一次签完。</li><li>执行后把交易哈希填回来，结算员记账；同一活动下这些地址不会再被重复发放。</li></ol><p class="muted" style="margin:8px 0 0;font-size:12px">结算员不持有私钥、不签名、不发交易。所有批量付款都要经过 Safe 多签。</p>`)}
+  </div></div>`};
+BIND.payouts=()=>{if(!$('#pyPrev'))return;
+  const form=()=>{const f=S.payForm;f.campaign=$('#pyCamp').value;f.token=$('#pyTok').value;f.mode=$('#pyMode').value;if($('#pyPool'))f.pool=$('#pyPool').value;if($('#pyBudget'))f.budget=$('#pyBudget').value;
+    f.per_person_cap=$('#pyCap').value;f.min_amount=$('#pyMin').value;f.sybil_check=$('#pySyb').value;f.text=$('#pyText').value;return f};
+  const body=f=>({campaign:f.campaign,text:f.text,sybil_check:f.sybil_check?+f.sybil_check:null,rules:{token:f.token,mode:f.mode,pool:f.mode==='pool'?f.pool:null,budget:f.mode==='fixed'?f.budget:null,per_person_cap:f.per_person_cap,min_amount:f.min_amount}});
+  document.querySelectorAll('#pyNew input,#pyNew textarea,#pyNew select').forEach(el=>el.addEventListener('input',()=>{form();if(S.payPreview){S.payPreview=null;$('#pyMake').disabled=true}}));
+  $('#pyMode').onchange=()=>{form();S.payPreview=null;render()};
+  $('#pyPrev').onclick=async()=>{const f=form();try{S.payPreview=await post('/api/payouts/preview',body(f));render()}catch(e){toast(e.message,true)}};
+  $('#pyMake').onclick=async()=>{const f=form(),s=S.payPreview?.summary;if(!s)return;
+    if(!await confirmBox('生成结算批次？',`「${esc(f.campaign||'（未填活动名）')}」：${s.payable} 个地址，合计 ${esc(fmtNum(s.total))} ${esc(s.token)}，剔除 ${s.excluded} 个。<br>生成后还要老板再确认一次，才会出 Safe 提案文件。`,'生成'))return;
+    try{const b=await post('/api/payouts/batches',body(f));S.payPreview=null;S.payForm=null;toast(`批次 #${b.id} 已生成，等老板确认`);await refresh();openBatch(b.id)}catch(e){toast(e.message,true)}};
+  document.querySelectorAll('[data-batch]').forEach(tr=>tr.onclick=()=>openBatch(+tr.dataset.batch))};
+async function openBatch(id){let b;try{b=await api('/api/payouts/batches/'+id)}catch(e){return toast(e.message,true)}
+  const ok=b.items.filter(i=>i.status==='ok'),r=b.rules;
+  drawer(`结算批次 #${b.id}`,`<div class="stack">
+    <div class="row">${bst(b.status)}<span class="grow"></span><span class="muted" style="font-size:12px">${fmtTime(b.at)} · ${esc(b.created_by)}${b.decided_by?` · ${esc(b.decided_by)} ${fmtTime(b.decided_at)}`:''}</span></div>
+    <h3 style="margin:0">${esc(b.campaign)}</h3>
+    ${paySummary(b.summary,b.token)}
+    <p class="muted" style="margin:0;font-size:12px">规则：${r.mode==='pool'?`按积分分奖池 ${esc(r.pool)} ${esc(r.token)}`:`按名单金额${r.budget?`，预算 ${esc(r.budget)}`:''}`}${r.per_person_cap?`，单人上限 ${esc(r.per_person_cap)}`:''}${Number(r.min_amount)?`，最低 ${esc(r.min_amount)}`:''}${r.sybil_check?`，剔除反女巫检查 #${r.sybil_check}`:''}</p>
+    ${b.tx_hash?`<p style="margin:0">交易：${b.tx_url?`<a href="${esc(b.tx_url)}" target="_blank" rel="noreferrer" class="mono">${esc(short(b.tx_hash))}</a>`:`<span class="mono">${esc(b.tx_hash)}</span>`}</p>`:''}
+    ${b.note?`<p class="muted" style="margin:0">备注：${esc(b.note)}</p>`:''}
+    <div class="row" style="flex-wrap:wrap">
+    ${b.status==='draft'?`<button class="btn signal" data-bact="propose">确认并生成提案</button>`:''}
+    ${['proposed','executed'].includes(b.status)?`<button class="btn primary" data-bexp="safe_json">下载 Safe 批量交易</button><button class="btn" data-bexp="csv_airdrop">下载 CSV Airdrop</button><button class="btn" data-bexp="list">下载名单</button>`:''}
+    ${b.status==='proposed'?`<button class="btn ok" data-bact="executed">标记已执行</button>`:''}
+    ${['draft','proposed'].includes(b.status)?`<button class="btn ghost block" data-bact="cancel">作废</button>`:''}</div>
+    <h3 style="margin:8px 0 0">明细（发放 ${ok.length} / 共 ${b.items.length} 行）</h3>
+    <div style="margin:0 -16px">${payItems(b.items,500)}</div></div>`);
+  document.querySelectorAll('[data-bexp]').forEach(x=>x.onclick=()=>download(`/api/payouts/batches/${id}/export/${x.dataset.bexp}`,'演示版不能下载文件。正式版会下载 Safe{Wallet} 可以直接导入的批量交易文件。'));
+  document.querySelectorAll('[data-bact]').forEach(x=>x.onclick=async()=>{const a=x.dataset.bact;let extra={};
+    if(a==='propose'&&!await confirmBox(`确认批次 #${id}？`,`${ok.length} 笔，合计 ${esc(fmtNum(b.summary.total))} ${esc(b.token)}。确认后可以下载 Safe 批量交易文件，钱要等多签人在 Safe 里签完才会动。`,'确认'))return;
+    if(a==='executed'){const h=await promptBox(`批次 #${id} 已在 Safe 执行`,'把 Safe 执行后的交易哈希填进来，方便以后核对（可空）。','交易哈希','','标记已执行',80);if(h===null)return;extra={tx_hash:h}}
+    if(a==='cancel'){const n=await promptBox(`作废批次 #${id}？`,'作废后不能再导出。如果已经在 Safe 里提交了，记得在 Safe 里也拒绝掉。','原因（可空）','','作废',200);if(n===null)return;extra={note:n}}
+    try{await post(`/api/payouts/batches/${id}/${a}`,extra);toast({propose:'已确认，可以下载 Safe 文件',executed:'已标记执行',cancel:'已作废'}[a]);await refresh();openBatch(id)}catch(e){toast(e.message,true)}})}
+
+// ---------- airdrop sybil ----------
+const VERD={clean:['干净','ok'],review:['待复核','review'],excluded:['剔除','block']};
+VIEWS.sybil=async()=>{if(!member('airdrop_sybil'))return notHired('airdrop_sybil');
+  const d=await api('/api/sybil');S.syb=d;const s=d.settings,R=d.rule_names;
+  const cur=S.sybSel||d.checks.find(c=>c.status!=='failed')?.id;const c=cur?await api('/api/sybil/checks/'+cur).catch(()=>null):null;
+  clearTimeout(S.sybTimer);if(d.checks.some(x=>x.status==='running'))S.sybTimer=setTimeout(()=>{if(S.route==='sybil'&&!$('#overlay').innerHTML)render()},2500);
+  const res=c?.result,vf=S.sybF??(res=>res&&res.counts.excluded?'excluded':'')(c?.result);
+  const rows=res?res.addresses.filter(a=>!vf||(vf.startsWith('c:')?String(a.cluster)===vf.slice(2):a.verdict===vf)):[];
+  return `${offNote('airdrop_sybil')}
+  ${!d.ready?'<div class="note block"><b>没有接上链上数据。</b>部署时设置 <code>ETHERSCAN_API_KEY</code>，反女巫员会逐个地址查资金来源和交易记录。在这之前只能做格式、重复和风险名单检查，或者在下面导入你已有的链上资料。</div>':''}
+  <div class="grid g4">
+    ${kpi('检查过的名单',d.checks.length,d.checks.length?`最近：${esc(d.checks[0].name)}`:'还没有')}
+    ${kpi('当前结果',res?`${res.counts.clean} / ${res.counts.review} / ${res.counts.excluded}`:'—','干净 / 待复核 / 剔除',res?.counts.excluded?'block':'')}
+    ${kpi('女巫团伙',res?res.clusters.length:'—',res?.clusters.length?`最大 ${res.clusters[0].size} 个地址`:'没有发现团伙')}
+    ${kpi('数据来源',d.ready?'Etherscan':'导入资料',d.ready?'免费档每秒 5 次，1000 个地址约 4 分钟':'设置 API key 后自动查')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${c?card(`检查 #${c.id} · ${esc(c.name)}`,c.status==='running'?`<div class="stack"><div class="row"><span class="spin"></span><span>正在查链上数据：${c.progress} / ${c.total}</span></div><div class="bar"><i style="width:${c.total?Math.round(c.progress/c.total*100):0}%"></i></div><p class="muted" style="margin:0;font-size:12px">可以离开这一页，查完会记在审计日志里。</p></div>`
+    :c.status==='failed'?`<div class="note block">检查失败：${esc(c.error)}</div>`
+    :`<div class="stack">
+      <div class="grid g4" style="gap:8px">${['clean','review','excluded'].map(v=>`<div class="mini"><span class="label">${VERD[v][0]}</span><span class="num ${v==='excluded'&&res.counts[v]?'block':v==='review'&&res.counts[v]?'review':''}">${res.counts[v]}</span></div>`).join('')}<div class="mini"><span class="label">干净名单</span><span class="num">${res.clean.length}</span></div></div>
+      <p class="muted" style="margin:0;font-size:12px">共 ${res.total} 个地址${res.duplicates?`，名单里重复 ${res.duplicates} 次`:''}${res.invalid.length?`，${res.invalid.length} 行不是有效地址`:''}；查到链上数据 ${res.with_data} 个${res.lookup_errors?`，${res.lookup_errors} 个查询失败`:''}。干净名单${s.review_as==='exclude'?'不含':'包含'}待复核地址。</p>
+      ${Object.keys(res.by_rule).length?`<p style="margin:0;font-size:13px">${Object.entries(res.by_rule).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span class="pill muted" style="margin:0 4px 4px 0">${esc(R[k]||k)} ${n}</span>`).join('')}</p>`:''}
+      <div class="row" style="flex-wrap:wrap"><button class="btn signal" id="sybPay">干净名单交给营销结算员</button><button class="btn" data-sybexp="clean">下载干净名单</button><button class="btn" data-sybexp="excluded">下载剔除名单和理由</button><button class="btn ghost" data-sybexp="all">下载全部</button></div></div>`)
+    :card('检查结果','<div class="empty">还没有检查。在右边粘贴空投名单开始。</div>')}
+  ${res?card('团伙',res.clusters.length?`<div class="scroll"><table><thead><tr><th>#</th><th>地址数</th><th>特征</th><th>资金来源</th></tr></thead><tbody>${res.clusters.slice(0,50).map(k=>`<tr class="click" data-sybf="c:${k.id}"><td class="mono">${k.id}</td><td class="num">${k.size}</td><td>${k.kinds.map(x=>esc(R[x]||x)).join('、')}</td><td class="mono">${k.funder?esc(short(k.funder)):'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">没有发现团伙</div>',{flush:true}):''}
+  ${res?card('地址明细',`<div class="tabs" role="tablist" style="margin:-14px -16px 0">${[['','全部'],['excluded','剔除'],['review','待复核'],['clean','干净'],...(vf.startsWith('c:')?[[vf,'团伙 #'+vf.slice(2)]]:[])].map(([v,l])=>`<button role="tab" aria-selected="${vf===v}" data-sybf="${v}">${esc(l)}</button>`).join('')}</div>
+    ${rows.length?`<div class="scroll" style="margin:0 -16px -14px"><table><thead><tr><th>地址</th><th>结果</th><th>理由</th></tr></thead><tbody>${rows.slice(0,300).map(a=>`<tr><td class="mono" style="white-space:nowrap">${esc(short(a.address))}${a.cluster?`<div class="muted" style="font-size:11px">团伙 #${a.cluster}</div>`:''}</td><td><span class="pill ${VERD[a.verdict][1]}">${VERD[a.verdict][0]}</span></td><td style="font-size:12px">${a.reasons.length?a.reasons.map(r=>`<div>${r.severity==='high'?'🔴':r.severity==='medium'?'🟡':'⚪'} ${esc(r.text)}</div>`).join(''):'<span class="muted">没有发现问题</span>'}</td></tr>`).join('')}</tbody></table>${rows.length>300?`<p class="muted" style="font-size:12px;margin:8px 16px">只显示前 300 个，下载可以看全部。</p>`:''}</div>`:'<div class="empty">没有</div>'}`):''}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('新的检查',`<div class="stack"><label class="f"><span>名单名称</span><input id="sybName" placeholder="例如 第一期空投" maxlength="80"></label>
+    <label class="f"><span>地址名单</span><textarea id="sybText" class="mono" style="min-height:160px" placeholder="每行一个地址，或者直接粘贴表格（取第一列）"></textarea></label>
+    <div class="row"><button class="btn signal" id="sybGo">开始检查</button><span class="muted" style="font-size:12px">一次最多 3000 个地址</span></div></div>`)}
+  ${d.checks.length?card('历史检查',`<div class="scroll"><table><tbody>${d.checks.map(x=>`<tr class="click" data-sybsel="${x.id}" ${x.id===cur?'aria-current="true"':''}><td class="mono">#${x.id}</td><td>${esc(x.name)}<div class="muted" style="font-size:11px">${fmtTime(x.at)} · ${x.total} 个地址</div></td><td>${x.status==='running'?`<span class="pill review">进行中 ${x.progress}/${x.total}</span>`:x.status==='failed'?'<span class="pill block">失败</span>':`<span class="muted" style="font-size:12px;white-space:nowrap">剔除 ${x.counts.excluded} · 团伙 ${x.clusters}</span>`}</td></tr>`).join('')}</tbody></table></div>`,{flush:true}):''}
+  ${card('判定规则',`<div class="stack">
+    <div class="grid g2" style="gap:8px"><label class="f"><span>几个地址算一个团伙</span><input id="sbMin" class="mono" value="${s.cluster_min}"></label><label class="f"><span>批量创建时间窗口（分钟）</span><input id="sbWin" class="mono" value="${s.window_minutes}"></label></div>
+    <div class="grid g2" style="gap:8px"><label class="f"><span>少于几笔交易算没活动</span><input id="sbTx" class="mono" value="${s.min_tx}"></label><label class="f"><span>这天之后新建的算新钱包</span><input id="sbAfter" class="mono" value="${esc(s.created_after)}" placeholder="2026-09-01（可空）"></label></div>
+    <label class="f"><span>忽略的资金来源（交易所热钱包、水龙头、跨链桥，一行一个）</span><textarea id="sbIgn" class="mono" placeholder="0x…">${esc(s.ignore_funders.join('\n'))}</textarea></label>
+    <label class="f"><span>待复核的地址</span><select id="sbRev"><option value="keep" ${s.review_as==='keep'?'selected':''}>留在干净名单里（只剔除高危）</option><option value="exclude" ${s.review_as==='exclude'?'selected':''}>也一起剔除（更严格）</option></select></label>
+    <div class="row"><button class="btn primary" id="sbSave">保存规则</button></div>
+    <p class="muted" style="margin:0;font-size:12px">🔴 高危直接剔除：同一资金来源、名单内互相打钱（3 个以上）、批量创建、操作完全相同、风险名单。🟡 待复核：几乎没活动、快照前新建、两个地址互相打钱。每条都写清楚理由，方便人工复核和对外解释。</p></div>`)}
+  ${card('导入链上资料（可选）',`<div class="stack"><p class="muted" style="margin:0;font-size:12px">已经有数据的话可以直接导入，不用再查。每行：地址,第一笔资金来源,首次交易时间,交易数[,首笔金额]</p>
+    <textarea id="sbProf" class="mono" placeholder="0xabc…,0xfunder…,2026-09-03T10:00:00,4,0.01"></textarea><div class="row"><button class="btn" id="sbImp">导入</button></div></div>`)}
+  </div></div>`};
+BIND.sybil=()=>{if(!$('#sybGo'))return;
+  $('#sybGo').onclick=async()=>{const text=$('#sybText').value.trim();if(!text)return toast('先粘贴地址名单',true);
+    try{const r=await post('/api/sybil/checks',{name:$('#sybName').value,text});S.sybSel=r.id;S.sybF=undefined;toast(`检查 #${r.id} 已开始`);render()}catch(e){toast(e.message,true)}};
+  document.querySelectorAll('[data-sybsel]').forEach(tr=>tr.onclick=()=>{S.sybSel=+tr.dataset.sybsel;S.sybF=undefined;render()});
+  document.querySelectorAll('[data-sybf]').forEach(b=>b.onclick=()=>{S.sybF=b.dataset.sybf;render()});
+  document.querySelectorAll('[data-sybexp]').forEach(b=>b.onclick=()=>{const id=S.sybSel||S.syb.checks.find(c=>c.status!=='failed')?.id;download(`/api/sybil/checks/${id}/export/${b.dataset.sybexp}`)});
+  $('#sybPay')&&($('#sybPay').onclick=async()=>{const id=S.sybSel||S.syb.checks.find(c=>c.status!=='failed')?.id;let c;try{c=await api('/api/sybil/checks/'+id)}catch(e){return toast(e.message,true)}
+    if(!member('campaign_payouts')){toast('先在团队里雇佣营销结算员');location.hash='#team';return}
+    S.payForm={campaign:c.name,token:(S.pay?.tokens||['USDT']).includes('USDT')?'USDT':S.pay.tokens[0],mode:'pool',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:String(c.id),text:c.result.clean.map(a=>a+',1').join('\n')};S.payPreview=null;
+    toast(`已把 ${c.result.clean.length} 个干净地址交给营销结算员：每人积分 1（平分奖池），填上奖池总额就能核对`);location.hash='#payouts'});
+  $('#sbSave').onclick=()=>act(()=>put('/api/sybil/settings',{cluster_min:+$('#sbMin').value,window_minutes:+$('#sbWin').value,min_tx:+$('#sbTx').value,created_after:$('#sbAfter').value.trim(),ignore_funders:splitList($('#sbIgn').value),review_as:$('#sbRev').value}),'规则已保存，下次检查生效');
+  $('#sbImp').onclick=async()=>{const text=$('#sbProf').value.trim();if(!text)return toast('先粘贴资料',true);try{const r=await post('/api/sybil/profiles',{text});toast(`导入了 ${r.imported} 个地址的资料`);render()}catch(e){toast(e.message,true)}}};
+
+// ---------- boot ----------
+function applyTheme(){const t=store.get('cs-theme','dark'),r=document.documentElement;r.removeAttribute('data-auto');
+  if(t==='auto'){r.removeAttribute('data-theme');r.setAttribute('data-auto','1')}else r.setAttribute('data-theme',t)}
+let timer;function startAuto(){clearInterval(timer);const s=+store.get('cs-auto','60');if(s)timer=setInterval(()=>{if(document.visibilityState==='visible'&&!$('#overlay').innerHTML&&!S.dirtyRules&&!(document.activeElement&&document.activeElement.matches('input,textarea,select')))refresh()},s*1000)}
+function logout(msg){token='';try{sessionStorage.removeItem('cs-token')}catch(e){}$('#app').hidden=true;$('#login').hidden=false;$('#loginMsg').textContent=msg||'';clearInterval(timer)}
+async function connect(){token=$('#token').value.trim()||token;if(!token)return;
+  try{await api('/api/status');try{sessionStorage.setItem('cs-token',token)}catch(e){}$('#login').hidden=true;$('#app').hidden=false;S.route=route();await refresh();startAuto()}
+  catch(e){$('#loginMsg').textContent=e.message}}
+$('#connect').onclick=connect;$('#token').onkeydown=e=>{if(e.key==='Enter')connect()};
+applyTheme();
+if(window.CONSOLE_DEMO){$('#demoBar').hidden=false;$('#demoBar').innerHTML=window.CONSOLE_DEMO}
+if(token)connect();
 })();
 </script>
 </body>

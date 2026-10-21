@@ -47,3 +47,16 @@ class RpcClient:
     def safe_nonce(self, safe: str) -> int:
         raw = self.call("eth_call", [{"to": to_checksum_address(safe), "data": "0x" + SAFE_NONCE.hex()}, "latest"])
         return int(raw, 16)
+
+    def tx_status(self, tx_hash: str) -> dict:
+        """success | failed | pending | not_found, from the receipt (or the pending transaction)."""
+        receipt = self.call("eth_getTransactionReceipt", [tx_hash])
+        if receipt:
+            return {
+                "status": "success" if int(receipt.get("status", "0x0"), 16) == 1 else "failed",
+                "block": int(receipt["blockNumber"], 16),
+                "from": receipt.get("from"),
+                "to": receipt.get("to"),
+            }
+        tx = self.call("eth_getTransactionByHash", [tx_hash])
+        return {"status": "pending", "block": None, "from": tx.get("from"), "to": tx.get("to")} if tx else {"status": "not_found", "block": None}
