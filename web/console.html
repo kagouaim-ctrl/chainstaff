@@ -163,6 +163,33 @@ pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:va
 
 .demo{background:var(--signal);color:#0b0b0c;font-size:12px;padding:6px 24px;display:flex;gap:8px;flex-wrap:wrap}
 
+/* team */
+.nav .ng{display:flex;align-items:center;gap:6px;padding:14px 18px 4px;font:500 10px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.nav .ng:first-child{padding-top:6px}
+.nav .ng em{font-style:normal;margin-left:auto;border:1px solid var(--line2);padding:0 4px;letter-spacing:.02em}
+.nav .ng em.off{color:var(--block);border-color:var(--block)}
+.av{width:34px;height:34px;flex:none;display:grid;place-items:center;border:1px solid var(--line2);font-weight:600;font-size:15px;background:var(--bg)}
+.av.on{border-color:var(--signal);color:var(--signal)}
+.emp .bd{display:grid;gap:12px}
+.emp .grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mini{display:grid;gap:2px;padding:8px 10px;border:1px solid var(--line);background:var(--bg);min-width:0}
+.mini .num{font-size:18px}
+.mini a{text-decoration:none}
+.duties{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:2px}
+.stack > [data-addrow]{justify-self:start}
+.er{display:grid;gap:8px;align-items:start;margin-bottom:8px}
+.er.c2{grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto}
+.er.c3{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+.er.faq{grid-template-columns:minmax(0,1fr) auto;padding:10px;border:1px solid var(--line);background:var(--bg)}
+.er.faq > .stack{gap:6px}
+.sev{font:500 10px/1.8 var(--mono);letter-spacing:.06em;padding:0 6px;border:1px solid currentColor;white-space:nowrap}
+.feed .k.support{color:var(--ok);border-color:var(--ok)} .feed .k.translate{color:var(--info);border-color:var(--info)}
+.who-tag{font:500 10px/1.6 var(--mono);color:var(--muted);border:1px solid var(--line2);padding:0 4px;margin-left:6px;white-space:nowrap}
+.result{border:1px solid var(--line2);padding:12px;display:grid;gap:8px;background:var(--bg)}
+details > summary{cursor:pointer;color:var(--muted);font-size:12px}
+.spin{display:inline-block;width:10px;height:10px;border:1px solid currentColor;border-right-color:transparent;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
 @media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr)}
@@ -170,7 +197,8 @@ pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:va
   .brand{padding:12px 16px}
   .nav{flex-direction:row;padding:0;overflow-x:auto;scrollbar-width:none}
   .nav a{border-left:0;border-bottom:2px solid transparent;padding:10px 12px;white-space:nowrap}
-  .nav a .n{display:none}
+  .nav a .n,.nav .ng{display:none}
+  .er.c2,.er.c3{grid-template-columns:minmax(0,1fr)}
   .nav a[aria-current="page"]{border-bottom-color:var(--signal);background:none}
   .side-foot{display:none}
   .top{position:static;padding:12px 16px}
@@ -258,7 +286,7 @@ const addr=(a,url)=>a?`<span class="addr"><span title="${esc(a)}">${esc(short(a)
 const STATUS={executing:['执行中','review'],paid:['已自动付','ok'],failed:['失败','block'],pending_approval:['待签字','review'],approved:['老板已签','ok'],rejected:['已驳回','muted'],blocked:['已拦截','block']};
 const OUTCOME={AUTO_PAY:['自动付','ok'],NEEDS_APPROVAL:['需签字','review'],BLOCK:['拦截','block']};
 const st=s=>{const [l,c]=STATUS[s]||[s,'muted'];return `<span class="pill ${c}"><span class="dot"></span>${l}</span>`};
-const KIND={audit:'操作',alert:'预警',telegram_in:'收到',telegram_out:'发出',system:'系统'};
+const KIND={audit:'操作',alert:'预警',telegram_in:'收到',telegram_out:'发出',system:'系统',support:'客服',translate:'翻译'};
 const WEEK=['周一','周二','周三','周四','周五','周六','周日'];
 
 // ---------- UI helpers ----------
@@ -281,15 +309,31 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').innerH
 function card(title,body,{right='',flush=false,id='',cls=''}={}){return `<section class="card ${cls}" ${id?`id="${id}"`:''}><div class="hd"><h2>${title}</h2>${right}</div><div class="bd${flush?' flush':''}">${body}</div></section>`}
 
 // ---------- state & routing ----------
+// [route, label, group, role that owns the page]
 const PAGES=[
-  ['overview','总览','01'],['approvals','审批','02'],['ledger','账本','03'],['payees','收款人','04'],['rules','规则与试算','05'],
-  ['treasury','国库与预警','06'],['employee','员工档案','07'],['telegram','Telegram','08'],['reports','报告','09'],['audit','审计日志','10'],['settings','设置','11']];
-const S={status:null,route:'overview',ledger:{limit:100,f:{}},audit:{kind:'',items:[]},tgChat:[],dirtyRules:false};
-function route(){const r=(location.hash||'#overview').slice(1).split('?')[0];return PAGES.some(p=>p[0]===r)?r:'overview'}
-function renderNav(){const pend=S.status?.pending||0;
-  $('#nav').innerHTML=PAGES.map(([k,l,n])=>`<a href="#${k}" ${S.route===k?'aria-current="page"':''}><span class="n">${n}</span>${l}${k==='approvals'&&pend?`<span class="badge">${pend}</span>`:''}</a>`).join('')}
+  ['team','团队总览','团队',''],
+  ['overview','财务总览','财务运营员','finance_ops'],['approvals','审批','财务运营员','finance_ops'],['ledger','账本','财务运营员','finance_ops'],
+  ['payees','收款人','财务运营员','finance_ops'],['rules','规则与试算','财务运营员','finance_ops'],['treasury','国库','财务运营员','finance_ops'],
+  ['reports','报告','财务运营员','finance_ops'],['employee','员工档案','财务运营员','finance_ops'],
+  ['support','社区客服','社区客服','community_support'],
+  ['monitor','链上监控','链上监控员','chain_monitor'],
+  ['translator','公告翻译','公告翻译员','announcement_translator'],
+  ['telegram','Telegram','通用',''],['audit','审计日志','通用',''],['settings','设置','通用','']];
+const S={status:null,route:'team',team:null,ledger:{limit:100,f:{}},audit:{kind:'',items:[]},tgChat:[],dirtyRules:false};
+function route(){const r=(location.hash||'#team').slice(1).split('?')[0];return PAGES.some(p=>p[0]===r)?r:'team'}
+const member=role=>(S.team?.members||[]).find(m=>m.role===role);
+const roleName=role=>member(role)?.name||(S.team?.roles||[]).find(r=>r.id===role)?.name||role;
+function renderNav(){const pend=S.status?.pending||0;let g='',out='';
+  const todo=Object.fromEntries((S.team?.members||[]).map(m=>[m.role,m.todo?.value||0]));
+  for(const [k,l,grp,role] of PAGES){
+    if(grp!==g){g=grp;const m=role&&member(role);
+      out+=`<div class="ng">${esc(role&&m?m.name:grp)}${role?(m?(m.enabled?'':'<em class="off">停用</em>'):'<em>未雇佣</em>'):''}</div>`}
+    const badge=k==='approvals'?pend:(['support','monitor','translator'].includes(k)&&member(role)?todo[role]:0);
+    out+=`<a href="#${k}" ${S.route===k?'aria-current="page"':''}>${l}${badge?`<span class="badge">${badge}</span>`:''}</a>`}
+  $('#nav').innerHTML=out}
 function renderTop(){const s=S.status||{};
-  $('#title').textContent=PAGES.find(p=>p[0]===S.route)[1];
+  const pg=PAGES.find(p=>p[0]===S.route);
+  $('#title').textContent=['support','monitor','translator'].includes(pg[0])&&member(pg[3])?member(pg[3]).name:pg[1];
   const pills=[s.live?'<span class="pill block"><span class="dot"></span>实盘</span>':'<span class="pill muted"><span class="dot"></span>测试模式</span>'];
   if(s.read_only)pills.push('<span class="pill review">试用只读</span>');
   if(s.paused)pills.push('<span class="pill block">已暂停</span>');
@@ -305,8 +349,8 @@ $('#refresh').onclick=()=>refresh(true);
 
 async function refresh(say){
   try{
-    const [s,r]=await Promise.all([api('/api/status'),api('/api/rules')]);
-    S.status={...s,read_only:!!r.read_only};S.rules=r;TZ=r.timezone||TZ;
+    const [s,r,t]=await Promise.all([api('/api/status'),api('/api/rules'),api('/api/team')]);
+    S.status={...s,read_only:!!r.read_only};S.rules=r;S.team=t;TZ=r.timezone||TZ;
     renderTop();await render();if(say)toast('已刷新');
   }catch(e){toast(e.message,true)}
 }
@@ -331,7 +375,7 @@ function chart(series){
   <div class="legend"><span><i style="background:var(--ok)"></i>自动付</span><span><i style="background:var(--review)"></i>需签字</span><span><i style="background:var(--block)"></i>拦截</span></div>`}
 function budgetBars(b){return b.length?b.map(x=>{const p=Number(x.limit)>0?Math.min(100,Number(x.spent)/Number(x.limit)*100):0;
   return `<div class="stack" style="gap:4px"><div class="row"><span class="grow">${esc(x.token)}</span><span class="num">${fmtNum(x.spent)} / ${fmtNum(x.limit)}</span></div><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></div>`}).join(''):'<p class="muted">还没设每日上限。</p>'}
-function feed(items,empty='暂无记录'){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="k ${esc(e.kind)}">${KIND[e.kind]||esc(e.kind)}</span><div>${esc(e.text).replace(/\n/g,'<br>')}${e.actor?`<div class="muted" style="font-size:12px">${esc(e.actor)}</div>`:''}</div><span class="t">${fmtTime(e.at)}</span></div>`).join('')}</div>`:`<div class="empty">${empty}</div>`}
+function feed(items,empty='暂无记录',who=true){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="k ${esc(e.kind)}">${KIND[e.kind]||esc(e.kind)}</span><div>${esc(e.text).replace(/\n/g,'<br>')}${(e.actor&&e.actor!==e.employee)||(who&&e.employee)?`<div class="muted" style="font-size:12px">${esc(e.actor&&e.actor!==e.employee?e.actor:'')}${who&&e.employee?`<span class="who-tag">${esc(roleName(e.employee))}</span>`:''}</div>`:''}</div><span class="t">${fmtTime(e.at)}</span></div>`).join('')}</div>`:`<div class="empty">${empty}</div>`}
 const VIEWS={},BIND={};
 VIEWS.overview=async()=>{
   const o=await api('/api/overview');const m=o.month,c=m.counts;
@@ -566,8 +610,9 @@ VIEWS.employee=async()=>{const e=await api('/api/employee');
 VIEWS.telegram=async()=>{const t=await api('/api/telegram');S.tg=t;const s=t.settings;
   const steps=[
     [!!t.bot,'在 @BotFather 新建机器人，把 token 设成服务器的 TELEGRAM_BOT_TOKEN，启动机器人'],
-    [t.bot&&t.bot.reads_all_group_messages,'在 @BotFather 发 /setprivacy 选 Disable，机器人才能看到群里的付款请求'],
-    [!!t.chat,'把机器人拉进财务群，在下面填群 ID'],
+    [t.bot&&t.bot.reads_all_group_messages,'在 @BotFather 发 /setprivacy 选 Disable，机器人才能看到群里的付款请求和骗子消息'],
+    [!!t.chat,'把机器人拉进群，在下面填群 ID（周报、简报、预警和公告发到这里）'],
+    ...(member('community_support')?[[false,'社区客服要删骗子消息：把机器人设为群管理员并勾选「删除消息」（不删只警告则不需要）']]:[]),
     [t.owners.length>0,'在规则里填老板的 Telegram 用户名（只有他们能审批和暂停）'],
     [t.online,'机器人在线，群里发 /help 测试'],
   ];
@@ -599,12 +644,12 @@ VIEWS.telegram=async()=>{const t=await api('/api/telegram');S.tg=t;const s=t.set
     ${t.outbox.length?`<div class="scroll"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${t.outbox.map(o=>`<tr><td class="mono" style="white-space:nowrap">${fmtTime(o.at)}</td><td>${esc(o.text.slice(0,60))}${o.text.length>60?'…':''}</td><td style="white-space:nowrap">${o.error?`<span class="block" title="${esc(o.error)}">失败</span>`:o.sent_at?'<span class="ok">已发</span>':'<span class="review">排队中</span>'}</td></tr>`).join('')}</tbody></table></div>`:''}</div>`)}
   </div>
   <div class="stack" style="gap:16px">
-  <section class="card"><div class="hd"><h2>群聊模拟器</h2><span class="label">不记账 · 不发群</span></div>
-    <div class="chat" id="chat" aria-live="polite">${S.tgChat.length?S.tgChat.map(m=>`<div class="msg ${m.me?'me':'bot'}"><span class="who">${m.me?'你':'KAGOU 员工'}</span>${esc(m.text)}</div>`).join(''):'<div class="muted" style="margin:auto;text-align:center;font-size:13px">像在群里一样发消息，看员工怎么回。<br>付款请求只试算，不会真的记账或付款。</div>'}</div>
-    <div class="sug">${['付 Alice 300 USDT 设计费','付 Mia 200 USDT KOL','/rules','/today','/pending','/report','/help'].map(x=>`<button class="btn sm ghost" data-say="${esc(x)}">${esc(x)}</button>`).join('')}</div>
-    <div class="chatbar"><input id="say" class="grow" placeholder="付 Bob 120 USDT 翻译费 或 /help"><button class="btn primary" id="sayGo">发送</button></div></section>
-  ${card('命令速查',`<table><tbody>${t.commands.map(c=>`<tr><td class="mono" style="white-space:nowrap">${esc(c.cmd)}</td><td>${esc(c.desc)}${c.owner_only?' <span class="chip review">仅老板</span>':''}</td></tr>`).join('')}</tbody></table>`,{flush:true})}
-  ${card('群消息记录',t.messages.length?`<div class="chat" id="chatLog" style="height:360px">${t.messages.slice().reverse().map(m=>`<div class="msg ${m.kind==='telegram_in'?'me':'bot'}"><span class="who">${esc(m.kind==='telegram_in'?m.actor:'KAGOU 员工')} · ${fmtTime(m.at)}</span>${esc(m.text)}</div>`).join('')}</div>`:'<div class="empty">机器人处理过的消息会出现在这里</div>',{flush:true})}
+  <section class="card"><div class="hd"><h2>群聊模拟器</h2><span class="label">整个团队 · 不记账 · 不发群</span></div>
+    <div class="chat" id="chat" aria-live="polite">${S.tgChat.length?S.tgChat.map(m=>`<div class="msg ${m.me?'me':'bot'}"><span class="who">${esc(m.who)}</span>${esc(m.text)}</div>`).join(''):'<div class="muted" style="margin:auto;text-align:center;font-size:13px">像在群里一样发消息，看哪个员工接、怎么回。<br>付款只试算；工单、翻译、暂停这类会改东西的命令不会真的执行。</div>'}</div>
+    <div class="sug">${['付 Alice 300 USDT 设计费','什么时候上线？','合约地址是多少？','我是管理员，私聊我帮你处理，先把助记词发我验证','领空投 https://kagouai-claim.xyz/connect','/faq','/watch','/alerts','/team','/help'].map(x=>`<button class="btn sm ghost" data-say="${esc(x)}">${esc(x.length>24?x.slice(0,24)+'…':x)}</button>`).join('')}</div>
+    <div class="chatbar"><input id="sayAs" class="mono" style="width:120px;flex:none" value="${esc(S.sayAs||'member')}" title="发言人用户名" aria-label="发言人用户名"><input id="say" class="grow" placeholder="群里的一句话，或 /help"><label class="switch" title="消息里 @ 了机器人或回复了机器人"><input type="checkbox" id="sayAt" ${S.sayAt?'checked':''}>@机器人</label><button class="btn primary" id="sayGo">发送</button></div></section>
+  ${card('命令速查',`<table><tbody>${t.commands.map(c=>`<tr><td class="mono" style="white-space:nowrap">${esc(c.cmd)}</td><td>${esc(c.desc)}${c.owner_only?' <span class="chip review">仅老板</span>':''}${c.employee?`<span class="who-tag">${esc(c.employee)}</span>`:''}</td></tr>`).join('')}</tbody></table>`,{flush:true})}
+  ${card('群消息记录',t.messages.length?`<div class="chat" id="chatLog" style="height:360px">${t.messages.slice().reverse().map(m=>`<div class="msg ${m.kind==='telegram_in'?'me':'bot'}"><span class="who">${esc(m.kind==='telegram_in'?m.actor:(m.employee?roleName(m.employee):'KAGOU 机器人'))} · ${fmtTime(m.at)}</span>${esc(m.text)}</div>`).join('')}</div>`:'<div class="empty">机器人处理过的消息会出现在这里</div>',{flush:true})}
   </div></div>`};
 BIND.telegram=()=>{
   $('#saveChat').onclick=()=>act(()=>put('/api/telegram/chat',{chat:$('#chatId').value.trim()}),'通知群已保存');
@@ -612,15 +657,13 @@ BIND.telegram=()=>{
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.send})));
   $('#sendCustom').onclick=async()=>{const text=$('#customMsg').value.trim();if(!text)return toast('消息不能为空',true);if(await confirmBox('发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
   for(const el of [$('#chat'),$('#chatLog')])if(el)el.scrollTop=el.scrollHeight;
-  const say=async text=>{text=text.trim();if(!text)return;S.tgChat.push({me:true,text});let reply;
-    try{const cmd=text.match(/^\/(\w+)/);
-      if(cmd){const c=cmd[1].toLowerCase();
-        if(['approve','reject','pause','resume'].includes(c))reply=`/${c} 是老板命令，会真的改变付款状态，模拟器里不执行。到「审批」页或右上角按钮操作。`;
-        else if(c==='start')reply=(await api('/api/preview/help')).text;
-        else reply=(await api('/api/preview/'+c)).text}
-      else{const r=await post('/api/simulate',{text});reply=r.reply}}
+  const say=async text=>{text=text.trim();if(!text)return;S.sayAs=$('#sayAs').value.trim().replace(/^@/,'')||'member';S.sayAt=$('#sayAt').checked;
+    S.tgChat.push({me:true,text,who:'@'+S.sayAs+(S.sayAt?' · @机器人':'')});let reply,who='KAGOU 机器人';
+    try{const r=await post('/api/chat/simulate',{text,username:S.sayAs,mentioned:S.sayAt});
+      who=r.employee_name||who;
+      reply=r.reply?(r.delete?'（这条消息会被删除）\n':'')+r.reply:'（没有员工接这句话：普通闲聊不回复。勾选「@机器人」试试）'}
     catch(e){reply=e.message}
-    S.tgChat.push({me:false,text:reply});S.tgChat=S.tgChat.slice(-40);render()};
+    S.tgChat.push({me:false,text:reply,who});S.tgChat=S.tgChat.slice(-40);render()};
   $('#sayGo').onclick=()=>say($('#say').value);$('#say').onkeydown=e=>{if(e.key==='Enter')say($('#say').value)};
   document.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>say(b.dataset.say));
   setTimeout(()=>{const i=$('#say');if(i&&S.tgChat.length)i.focus()},0)};
@@ -638,11 +681,11 @@ BIND.reports=()=>{$('#week').onchange=e=>{S.week=+e.target.value;render()};
 
 // ---------- 10 audit ----------
 VIEWS.audit=async()=>{const k=S.audit.kind;const items=await api('/api/events?limit=100'+(k?'&kind='+k:''));S.audit.items=items;
-  const tabs=[['','全部'],['audit','操作'],['alert','预警'],['telegram_in,telegram_out','Telegram'],['system','系统']];
+  const tabs=[['','全部'],['audit','操作'],['alert','预警'],['support','客服'],['translate','翻译'],['telegram_in,telegram_out','Telegram'],['system','系统']];
   return `<section class="card"><div class="tabs" role="tablist">${tabs.map(([v,l])=>`<button role="tab" aria-selected="${k===v}" data-kind="${v}">${l}</button>`).join('')}</div>
   <div id="auditFeed">${feed(items,'没有记录')}</div>
   ${items.length>=100?'<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="auditMore">加载更早的</button></div>':''}</section>
-  <p class="muted" style="font-size:12px;margin:0">审计日志只增不删：暂停、恢复、签字、驳回、修改规则、发群消息、非老板的越权尝试都会记下来。</p>`};
+  <p class="muted" style="font-size:12px;margin:0">审计日志只增不删：雇佣和停用员工、暂停、恢复、签字、驳回、修改规则和设置、发群消息、客服拦截、翻译发布、非老板的越权尝试都会记下来。</p>`};
 BIND.audit=()=>{document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{S.audit.kind=b.dataset.kind;render()});
   const m=$('#auditMore');if(m)m.onclick=async()=>{const last=S.audit.items[S.audit.items.length-1];const more=await api(`/api/events?limit=100&before=${last.id}`+(S.audit.kind?'&kind='+S.audit.kind:''));S.audit.items=S.audit.items.concat(more);$('#auditFeed').innerHTML=feed(S.audit.items);if(more.length<100)m.remove()}};
 
@@ -658,6 +701,227 @@ VIEWS.settings=async()=>`
 BIND.settings=()=>{$('#theme').onchange=e=>{store.set('cs-theme',e.target.value);applyTheme()};
   $('#auto').onchange=e=>{store.set('cs-auto',e.target.value);startAuto();toast('已保存')};
   $('#logout').onclick=()=>logout('已退出');$('#kill2').onclick=()=>$('#kill').click()};
+
+// ---------- shared: hire flow, row editors ----------
+function promptBox(title,body,label,value,okText='确定'){return new Promise(res=>{
+  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="bd"><h2 id="mt">${esc(title)}</h2>${body?`<div class="muted">${body}</div>`:''}<label class="f"><span>${esc(label)}</span><input id="pv" value="${esc(value||'')}" maxlength="30"></label></div><div class="ft"><button class="btn" data-x>取消</button><button class="btn primary" data-ok>${esc(okText)}</button></div></div>`;
+  const close=v=>{$('#overlay').innerHTML='';res(v)};
+  $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(null));
+  const ok=()=>close($('#pv').value.trim());$('#overlay').querySelector('[data-ok]').onclick=ok;
+  $('#pv').onkeydown=e=>{if(e.key==='Enter')ok()};$('#pv').focus();$('#pv').select()})}
+const ROLE_PAGE={finance_ops:'overview',community_support:'support',chain_monitor:'monitor',announcement_translator:'translator'};
+async function hireFlow(id){const r=(S.team?.roles||[]).find(x=>x.id===id);if(!r)return;
+  const body=`${esc(r.summary)}<ul class="duties" style="margin-top:8px">${r.duties.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>${r.needs.length?`<p style="margin:8px 0 0">上岗前需要：${r.needs.map(esc).join('、')}</p>`:''}<p style="margin:8px 0 0">${r.touches_money?'这个岗位会动钱，所有付款都受规则引擎和限额约束。':'这个岗位只读、回答和起草，不碰钱。'}</p>`;
+  const name=await promptBox('雇佣'+r.name,body,'在群里的称呼',r.name,'雇佣');if(name===null)return;
+  try{await post('/api/team/hire',{role:id,name:name||r.name});toast(`${name||r.name} 已上岗`);await refresh();location.hash='#'+ROLE_PAGE[id]}catch(e){toast(e.message,true)}}
+async function toggleRole(role,on){
+  if(!on&&!await confirmBox(`停用${roleName(role)}？`,'停用后机器人不再以这个身份回复，也不发它的通知和预警。设置和记录都保留，随时可以重新上岗。','停用',true))return;
+  act(()=>put('/api/team/'+role,{enabled:on}),on?'已上岗':'已停用')}
+document.addEventListener('click',async e=>{
+  const h=e.target.closest('[data-hire]');if(h){e.preventDefault();return hireFlow(h.dataset.hire)}
+  const t=e.target.closest('[data-toggle-role]');if(t){e.preventDefault();return toggleRole(t.dataset.toggleRole,t.dataset.on==='1')}
+  const a=e.target.closest('[data-addrow]');if(a){const box=document.getElementById(a.dataset.addrow);box.insertAdjacentHTML('beforeend',EDITORS[a.dataset.addrow].row({}));box.lastElementChild.querySelector('input,textarea')?.focus();return}
+  const d=e.target.closest('[data-delrow]');if(d){d.closest('.er').remove()}});
+const EDITORS={};
+function rowsEditor(id,rows,cols,cls,addText='添加一行'){
+  const row=r=>`<div class="er ${cls}">${cols.map(c=>c.ta?`<textarea data-k="${c.k}" placeholder="${esc(c.ph)}" aria-label="${esc(c.ph)}">${esc(r[c.k]??'')}</textarea>`:`<input data-k="${c.k}" class="${c.mono?'mono':''}" placeholder="${esc(c.ph)}" aria-label="${esc(c.ph)}" value="${esc(r[c.k]??'')}">`).join('')}<button class="btn sm ghost" data-delrow title="删除这一行">删除</button></div>`;
+  EDITORS[id]={row};return `<div id="${id}">${rows.map(row).join('')}</div><button class="btn sm" data-addrow="${id}">+ ${esc(addText)}</button>`}
+function faqEditor(id,rows){
+  const row=r=>`<div class="er faq"><div class="stack"><input data-k="q" placeholder="问题，例如：什么时候上线？" aria-label="问题" value="${esc(r.q||'')}"><input data-k="keywords" placeholder="关键词，用逗号分开：上线, launch, 主网" aria-label="关键词" value="${esc((r.keywords||[]).join(', '))}"><textarea data-k="a" placeholder="回答（机器人会原文发出，不会改写）" aria-label="回答">${esc(r.a||'')}</textarea></div><button class="btn sm ghost" data-delrow>删除</button></div>`;
+  EDITORS[id]={row};return `<div id="${id}" class="stack" style="gap:8px">${rows.map(row).join('')}</div><button class="btn sm" data-addrow="${id}" style="margin-top:8px">+ 添加问题</button>`}
+const collect=id=>[...document.getElementById(id).children].map(el=>Object.fromEntries([...el.querySelectorAll('[data-k]')].map(i=>[i.dataset.k,i.value.trim()])));
+const splitList=v=>v.split(/[,，、\n]+/).map(x=>x.trim()).filter(Boolean);
+function notHired(role){const r=(S.team?.roles||[]).find(x=>x.id===role);
+  return `<section class="card"><div class="hd"><span class="av">${esc(r.name[0])}</span><h2>${esc(r.name)}</h2><span class="pill muted">未雇佣</span></div><div class="bd stack">
+  <p style="margin:0">${esc(r.summary)}</p><ul class="duties">${r.duties.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>
+  ${r.needs.length?`<p class="muted" style="margin:0;font-size:12px">上岗前需要：${r.needs.map(esc).join('、')}</p>`:''}
+  <div><button class="btn signal" data-hire="${r.id}">雇佣${esc(r.name)}</button></div></div></section>`}
+const offNote=role=>{const m=member(role);return m&&!m.enabled?`<div class="note block row"><span class="grow"><b>${esc(m.name)}已停用。</b>机器人不会以这个身份回复，也不发它的通知。设置照常可以改。</span><button class="btn sm ok" data-toggle-role="${role}" data-on="1">重新上岗</button></div>`:''};
+const kpi=(l,v,s='',cls='')=>`<section class="card kpi"><span class="label">${l}</span><span class="v ${cls}">${v}</span><span class="s">${s}</span></section>`;
+
+// ---------- team ----------
+VIEWS.team=async()=>{const t=await api('/api/team');S.team=t;renderNav();
+  const on=t.members.filter(m=>m.enabled),todo=t.members.reduce((a,m)=>a+(m.enabled?(m.todo?.value||0):0),0);
+  const msgs=t.members.reduce((a,m)=>a+(m.activity_7d.telegram_in||0),0);
+  const live=t.roles.filter(r=>r.status==='live'),soon=t.roles.filter(r=>r.status!=='live');
+  const empCard=m=>`<section class="card emp"><div class="hd"><span class="av ${m.enabled?'on':''}">${esc(m.name[0])}</span><div class="grow" style="min-width:0"><h2>${esc(m.name)}</h2><span class="muted" style="font-size:12px">${esc(m.title)}${m.hired_at?' · '+fmtTime(m.hired_at).split(' ')[0]+' 入职':''}</span></div>
+    <span class="pill ${m.enabled?'ok':'block'}"><span class="dot"></span>${m.enabled?'在岗':'停用'}</span><span class="pill ${m.touches_money?'review':'muted'}">${m.touches_money?'动钱':'不碰钱'}</span></div>
+    <div class="bd"><p class="muted" style="margin:0">${esc(m.summary)}</p>
+    <div class="grid g2" style="gap:8px"><div class="mini"><span class="label">${esc(m.headline.label)}</span><span class="num">${esc(m.headline.value)}</span></div>
+    <a class="mini" href="${esc(m.todo.href)}" style="text-decoration:none"><span class="label">${esc(m.todo.label)}</span><span class="num ${m.todo.value?'review':''}">${esc(m.todo.value)}</span></a></div>
+    ${m.setup.length?`<div class="note">${m.setup.map(x=>`<div>· ${esc(x)}</div>`).join('')}</div>`:'<div class="note ok">配置齐全，正常工作。</div>'}
+    <div class="row"><a class="btn sm primary" href="#${ROLE_PAGE[m.role]}">管理</a>
+    <button class="btn sm ${m.enabled?'':'ok'}" data-toggle-role="${m.role}" data-on="${m.enabled?0:1}">${m.enabled?'停用':'上岗'}</button>
+    <button class="btn sm ghost" data-rename="${m.role}">改称呼</button>
+    ${m.role!=='finance_ops'?`<button class="btn sm ghost block" data-dismiss="${m.role}">解雇</button>`:''}</div></div></section>`;
+  const roleCard=r=>`<section class="card"><div class="hd"><h2>${esc(r.name)}</h2>${r.status!=='live'?'<span class="pill muted">即将上线</span>':r.hired?'<span class="pill ok">已在团队</span>':'<span class="pill review">可雇佣</span>'}${r.touches_money?'<span class="pill review">动钱</span>':''}</div>
+    <div class="bd stack"><p style="margin:0;font-size:13px">${esc(r.summary)}</p><ul class="duties">${r.duties.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>
+    ${r.status==='live'?(r.hired?`<div><a class="btn sm" href="#${ROLE_PAGE[r.id]}">去管理</a></div>`:`<div><button class="btn sm signal" data-hire="${r.id}">雇佣</button></div>`):'<p class="muted" style="margin:0;font-size:12px">开发中，上线后可以在这里一键雇佣。</p>'}</div></section>`;
+  return `
+  <div class="grid g4">
+    ${kpi('在岗员工',`${on.length}<span class="muted" style="font-size:14px"> / ${t.members.length}</span>`,'一个 Telegram 机器人托管全部员工')}
+    ${kpi('等你处理',todo,'签字、工单、翻译草稿、高危预警',todo?'review':'')}
+    ${kpi('7 天群消息',msgs,'员工接手的群消息')}
+    ${kpi('岗位库',`${live.length}<span class="muted" style="font-size:14px"> + ${soon.length}</span>`,`${live.length} 个可雇佣，${soon.length} 个即将上线`)}
+  </div>
+  <div class="grid g2">${t.members.map(empCard).join('')}</div>
+  ${live.some(r=>!r.hired)?`<div class="note info row"><span class="grow">还有 ${live.filter(r=>!r.hired).length} 个岗位可以雇佣，雇佣后立刻在同一个机器人里上岗。</span></div>`:''}
+  <div class="grid g2" style="align-items:start">
+    <div class="stack" style="gap:16px"><h2>岗位库</h2><div class="grid g2">${t.roles.map(roleCard).join('')}</div></div>
+    <div class="stack" style="gap:16px"><h2>团队动态</h2>${card('最近',feed(t.recent,'还没有动态'),{flush:true,right:'<a class="btn sm" href="#audit">审计日志</a>'})}
+    ${card('分工规则',`<ol class="steps"><li>群里每条消息先过社区客服的骗局检查，骗子消息不会进到其他员工。</li><li>以「付 / 给 / 转 / pay」开头的是付款请求，交给财务运营员按规则处理。</li><li>其他问题交给社区客服：只按你写的 FAQ 原文回答，答不了的开工单转人工。</li><li>链上监控员和公告翻译员不接群聊，只发预警、简报和你确认过的公告。</li><li>停用的员工不回复任何消息，它的命令会提示「没上岗」。</li></ol>`)}</div>
+  </div>`};
+BIND.team=()=>{
+  document.querySelectorAll('[data-rename]').forEach(b=>b.onclick=async()=>{const m=member(b.dataset.rename);
+    const v=await promptBox('改称呼','控制台、群聊模拟器、/help 和 /team 里都用这个名字。','称呼',m.name,'保存');if(v)act(()=>put('/api/team/'+m.role,{name:v}),'已改名')});
+  document.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=async()=>{const n=roleName(b.dataset.dismiss);
+    if(await confirmBox(`解雇${n}？`,'它会从团队里移除，机器人不再以这个身份工作。设置、工单和记录都保留，重新雇佣后原样恢复。','解雇',true))act(()=>api('/api/team/'+b.dataset.dismiss,{method:'DELETE'}),'已解雇')})};
+
+// ---------- community support ----------
+const ACTION={scam:['拦截骗局','block'],faq:['按 FAQ 回答','ok'],tx:['查交易','info'],ticket:['转人工','review'],unknown:['答不了','muted'],none:['不回复','muted']};
+const SCAM={SECRET_REQUEST:'索要助记词/私钥',FAKE_ADMIN:'冒充管理员',ADMIN_NAME:'自称官方',PHISHING_LINK:'仿冒网址',SUSPICIOUS_LINK:'可疑链接',DM_BAIT:'私聊诱导',GIVEAWAY:'转币翻倍'};
+VIEWS.support=async()=>{if(!member('community_support'))return notHired('community_support');
+  const d=await api('/api/support');S.sup=d;const s=d.settings,st=d.stats,c=st.counts;
+  const open=d.tickets.filter(t=>t.status==='open');
+  return `${offNote('community_support')}
+  <div class="grid g4">
+    ${kpi('7 天回答',c.faq+c.tx,`FAQ ${c.faq} · 查交易 ${c.tx}`)}
+    ${kpi('7 天拦截骗局',c.scam,Object.entries(st.scam_kinds).map(([k,n])=>`${SCAM[k]||k} ${n}`).join('，')||'没有发现骗子',c.scam?'block':'')}
+    ${kpi('待处理工单',open.length,open.length?'<a href="#tickets">去处理 ↓</a>':'都处理完了',open.length?'review':'')}
+    ${kpi('自己答上的比例',st.answer_rate==null?'—':Math.round(st.answer_rate*100)+'%','被问到的问题里，不用转人工的占比')}
+  </div>
+  ${!s.faq.length||!s.admins.length||!s.official_domains.length?`<div class="note">还差几步：${[!s.faq.length&&'写几条 FAQ',!s.admins.length&&'填真管理员的用户名（用来识别冒充者）',!s.official_domains.length&&'填官方域名（用来识别仿冒网址）'].filter(Boolean).join('、')}。</div>`:''}
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('基本设置',`<div class="stack">
+    <label class="f"><span>项目名</span><input id="spName" value="${esc(s.project_name)}" placeholder="KAGOU"></label>
+    <label class="f"><span>真管理员（Telegram 用户名，逗号分开）</span><input id="spAdmins" class="mono" value="${esc(s.admins.map(a=>'@'+a).join(', '))}" placeholder="@cc_xbnb, @kagou_mod"></label>
+    <label class="f"><span>官方域名（逗号分开，子域名自动算官方）</span><input id="spDomains" class="mono" value="${esc(s.official_domains.join(', '))}" placeholder="kagouai.com"></label>
+    <div class="grid g2" style="gap:10px">
+    <label class="f"><span>什么时候回答</span><select id="spMode"><option value="mention" ${s.answer_mode==='mention'?'selected':''}>只在 @机器人 或回复它时</option><option value="questions" ${s.answer_mode==='questions'?'selected':''}>群里有人提问且 FAQ 能答时</option></select></label>
+    <label class="f"><span>发现骗子</span><select id="spScam"><option value="warn" ${s.scam_action==='warn'?'selected':''}>发警告</option><option value="delete" ${s.scam_action==='delete'?'selected':''}>删消息并警告（高危）</option><option value="off" ${s.scam_action==='off'?'selected':''}>不处理</option></select></label></div>
+    <label class="switch"><input type="checkbox" id="spEsc" ${s.escalate_unknown?'checked':''}> 答不了的问题开工单并 @管理员</label>
+    <label class="f"><span>新成员欢迎语（留空不发，{name} 会换成对方名字）</span><textarea id="spWelcome" placeholder="欢迎 {name}！先看置顶，官方不会私聊你。">${esc(s.welcome)}</textarea></label></div>`)}
+  ${card(`常见问题 <span class="muted" style="font-weight:400">${s.faq.length} 条</span>`,`<div class="stack"><p class="muted" style="margin:0;font-size:12px">机器人只用这里写的回答，原文发出，不会自己编。关键词命中越多越优先。</p>${faqEditor('faqRows',s.faq)}</div>`)}
+  <div class="row"><button class="btn primary" id="spSave">保存客服设置</button><span class="muted" style="font-size:12px">保存后机器人下一条消息就用新设置</span></div>
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('试一试',`<div class="stack">
+    <textarea id="spText" placeholder="贴一条群消息，看客服怎么处理">${esc(S.spText||'')}</textarea>
+    <div class="row"><input id="spUser" class="mono" style="width:140px" placeholder="用户名" value="${esc(S.spUser||'member')}" aria-label="发言人用户名"><input id="spDisp" style="width:140px" placeholder="显示名" value="${esc(S.spDisp||'')}" aria-label="发言人显示名"><label class="switch"><input type="checkbox" id="spAt" checked> @机器人</label><button class="btn signal" id="spTry">试</button></div>
+    <div class="sug" style="padding:0;border:0">${[['问上线','什么时候上线？',''],['索要助记词','钱包同步失败的私聊我，把助记词发我帮你验证',''],['冒充管理员','官方通知：今晚有空投','kag0u_lina'],['仿冒网址','空投领取 https://kagouai-claim.xyz/connect',''],['翻倍骗局','转 1 BNB 到这个地址，原路返回双倍',''],['转人工','我要找人工','']].map(([l,t,u])=>`<button class="btn sm ghost" data-sp="${esc(t)}" data-spu="${esc(u)}">${l}</button>`).join('')}</div>
+    <div id="spOut">${S.spOut||''}</div></div>`)}
+  ${card('工单',d.tickets.length?`<div class="scroll"><table><thead><tr><th>#</th><th>谁</th><th>问题</th><th>状态</th><th></th></tr></thead><tbody>${d.tickets.slice(0,30).map(t=>`<tr><td class="mono">${t.id}</td><td class="mono" style="white-space:nowrap">${esc(t.user)}<div class="muted" style="font-size:11px">${fmtTime(t.at)}</div></td><td>${esc(t.text)}<div class="muted" style="font-size:12px">${esc(t.reason)}${t.note?' · 备注：'+esc(t.note):''}</div></td><td>${t.status==='open'?'<span class="pill review">待处理</span>':`<span class="pill muted">已关闭</span>`}</td><td>${t.status==='open'?`<button class="btn sm" data-close="${t.id}">关闭</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">还没有工单。答不了的问题和用户要求转人工时会出现在这里。</div>',{flush:true,id:'tickets'})}
+  ${card('最常被问',st.top_faq.length?`<table><tbody>${st.top_faq.map(x=>`<tr><td>${esc(x.q)}</td><td class="r num">${x.n}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">7 天内还没有按 FAQ 回答过</div>',{flush:true})}
+  ${card('最近处理',feed(d.events.slice(0,30),'还没有处理记录',false),{flush:true})}
+  </div></div>`};
+function spResult(r){const [l,c]=ACTION[r.action]||[r.action,'muted'];
+  return `<div class="result"><div class="row"><span class="pill ${c}"><span class="dot"></span>${l}</span>${r.delete?'<span class="pill block">删除原消息</span>':''}${r.findings.map(f=>`<span class="chip ${f.severity==='high'?'block':'review'}" title="${esc(f.reason)}">${esc(SCAM[f.kind]||f.kind)}</span>`).join('')}</div>
+  ${r.text?`<div class="msg bot" style="max-width:100%"><span class="who">${esc(roleName('community_support'))}</span>${esc(r.text)}</div>`:'<span class="muted">不回复（普通闲聊或没被问到）</span>'}</div>`}
+BIND.support=()=>{if(!$('#spSave'))return;
+  $('#spSave').onclick=()=>{const faq=collect('faqRows').filter(x=>x.q||x.a).map(x=>({q:x.q,a:x.a,keywords:splitList(x.keywords)}));
+    act(()=>put('/api/support/settings',{project_name:$('#spName').value,admins:splitList($('#spAdmins').value),official_domains:splitList($('#spDomains').value),faq,answer_mode:$('#spMode').value,scam_action:$('#spScam').value,escalate_unknown:$('#spEsc').checked,welcome:$('#spWelcome').value}),'客服设置已保存')};
+  const run=async()=>{S.spText=$('#spText').value;S.spUser=$('#spUser').value;S.spDisp=$('#spDisp').value;if(!S.spText.trim())return toast('先贴一条消息',true);
+    try{S.spOut=spResult(await post('/api/support/simulate',{text:S.spText,username:S.spUser,display_name:S.spDisp,mentioned:$('#spAt').checked}));$('#spOut').innerHTML=S.spOut}catch(e){toast(e.message,true)}};
+  $('#spTry').onclick=run;
+  document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{$('#spText').value=b.dataset.sp;$('#spUser').value=b.dataset.spu||'member';$('#spDisp').value=b.dataset.spu?'KAGOU Lina':'';run()});
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{const note=await promptBox(`关闭工单 #${b.dataset.close}`,'处理完了就关掉。可以留一句备注，方便以后查。','备注（可空）','','关闭');
+    if(note!==null)act(()=>post(`/api/support/tickets/${b.dataset.close}/close`,{note}),'工单已关闭')})};
+
+// ---------- chain monitor ----------
+VIEWS.monitor=async()=>{if(!member('chain_monitor'))return notHired('chain_monitor');
+  const d=await api('/api/monitor');const s=d.settings,st=d.stats,run=d.last_run,K=d.kind_names;
+  const f=S.monF||'';const alerts=d.alerts.filter(a=>!f||(f==='high'?a.data?.severity==='high':a.data?.kind===f));
+  const kinds=[...new Set(d.alerts.map(a=>a.data?.kind).filter(Boolean))];
+  return `${offNote('chain_monitor')}
+  ${!d.source?'<div class="note block"><b>读不到链上转账。</b>部署时设置 <code>ETHERSCAN_API_KEY</code>（Etherscan V2 多链接口，免费档即可），并在链配置里填 <code>explorer_api_url</code>。在这之前只有余额检查能用。</div>':''}
+  ${run&&!run.ok?`<div class="note block">最近一次检查失败：${esc(run.error)}（${fmtTime(run.at)}）</div>`:''}
+  <div class="grid g4">
+    ${kpi('盯盘地址',d.watch.length,d.watch_source==='chain'?'来自链配置的国库地址':d.watch_source==='console'?'在控制台设置':'还没设置')}
+    ${kpi('7 天预警',st.total,Object.entries(st.by_kind).map(([k,n])=>`${K[k]||k} ${n}`).join('，')||'一切正常')}
+    ${kpi('7 天高危',st.high,'大额转出、地址投毒、无限授权',st.high?'block':'')}
+    ${kpi('最近检查',run?ago(run.at):'从未',run?`${run.ok?'正常':'失败'} · ${run.transfers} 笔转账 · ${run.approvals} 笔授权`:'机器人每 5 分钟查一次',run&&!run.ok?'block':'')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('预警',`<div class="tabs" role="tablist" style="margin:-14px -16px 0">${[['','全部'],['high','高危'],...kinds.map(k=>[k,K[k]||k])].map(([v,l])=>`<button role="tab" aria-selected="${f===v}" data-monf="${v}">${esc(l)}</button>`).join('')}</div>
+    ${alerts.length?`<div class="feed" style="margin:0 -16px -14px">${alerts.slice(0,60).map(a=>`<div class="it"><span class="sev ${a.data?.severity==='high'?'block':'review'}">${a.data?.severity==='high'?'高危':'注意'}</span><div>${esc(a.text)}${a.data?.url?`<div><a class="copy" href="${esc(a.data.url)}" target="_blank" rel="noreferrer">在浏览器查看交易</a></div>`:''}</div><span class="t">${fmtTime(a.at)}</span></div>`).join('')}</div>`:'<div class="empty">没有预警</div>'}`,{right:`<button class="btn sm" id="monCheck">立即检查</button>`})}
+  ${card('链上简报',`<div class="stack"><pre class="report" id="brief">读取中…</pre><div class="row"><button class="btn sm" id="briefSend">发到群里</button><span class="muted" style="font-size:12px">${s.daily_brief?`每天 ${String(s.brief_hour).padStart(2,'0')}:00 自动发`:'自动简报已关闭'}</span></div></div>`)}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('盯哪些地址',`<div class="stack"><p class="muted" style="margin:0;font-size:12px">${d.watch_source==='chain'?'现在用的是链配置里的国库地址。在这里填了就以这里为准。':'国库、多签、热钱包、做市地址都可以加，最多 50 个。'}</p>
+    ${rowsEditor('monWatch',s.watch.length?s.watch:d.watch.map(w=>({address:w.address,label:w.label})),[{k:'address',ph:'0x 地址',mono:1},{k:'label',ph:'名字，例如 国库'}],'c2','添加地址')}</div>`)}
+  ${card('预警线',`<div class="stack">
+    <span class="label">大额转出（单笔达到就报警）</span>${rowsEditor('monTh',Object.entries(d.thresholds).map(([token,amount])=>({token,amount})),[{k:'token',ph:'币种 USDT',mono:1},{k:'amount',ph:'数量',mono:1}],'c3','添加币种')}
+    <span class="label">余额下限（低于就提醒，每天一次）</span>${rowsEditor('monLow',Object.entries(s.low_balance).map(([token,amount])=>({token,amount})),[{k:'token',ph:'币种 BNB',mono:1},{k:'amount',ph:'下限',mono:1}],'c3','添加币种')}
+    <span class="label">可信授权合约（给它们授权不报警，例如 DEX 路由）</span>${rowsEditor('monSp',s.known_spenders,[{k:'address',ph:'0x 合约地址',mono:1},{k:'label',ph:'名字'}],'c2','添加合约')}</div>`)}
+  ${card('检查项',`<div class="stack">
+    <label class="switch"><input type="checkbox" id="mUnk" ${s.alert_unknown_counterparty?'checked':''}> 向白名单外的陌生地址转出</label>
+    <label class="switch"><input type="checkbox" id="mPoi" ${s.alert_poisoning?'checked':''}> 地址投毒（假冒熟人地址的零额转账）</label>
+    <label class="switch"><input type="checkbox" id="mApp" ${s.alert_approvals?'checked':''}> 无限授权和 NFT 全部授权</label>
+    <div class="row"><label class="switch grow"><input type="checkbox" id="mBrief" ${s.daily_brief?'checked':''}> 每日链上简报</label><select id="mHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.brief_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
+    <p class="muted" style="margin:0;font-size:12px">只读：监控员不签名、不动钱。每条预警只发一次，重启也不会重复。</p></div>`)}
+  <div class="row"><button class="btn primary" id="monSave">保存监控设置</button></div>
+  </div></div>`};
+BIND.monitor=()=>{if(!$('#monSave'))return;
+  api('/api/monitor/brief').then(r=>{$('#brief').textContent=r.text}).catch(e=>{$('#brief').textContent=e.message});
+  document.querySelectorAll('[data-monf]').forEach(b=>b.onclick=()=>{S.monF=b.dataset.monf;render()});
+  $('#monCheck').onclick=async()=>{try{const r=await post('/api/monitor/check');toast(r.last_run?.ok===false?'检查失败：'+r.last_run.error:`检查完成，新预警 ${r.new.length} 条`,r.last_run?.ok===false);render()}catch(e){toast(e.message,true)}};
+  $('#briefSend').onclick=async()=>{const text=$('#brief').textContent;if(await confirmBox('把简报发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
+  const amounts=id=>Object.fromEntries(collect(id).filter(x=>x.token||x.amount).map(x=>[x.token.toUpperCase(),x.amount]));
+  $('#monSave').onclick=()=>act(()=>put('/api/monitor/settings',{watch:collect('monWatch').filter(x=>x.address),thresholds:amounts('monTh'),low_balance:amounts('monLow'),known_spenders:collect('monSp').filter(x=>x.address),
+    alert_unknown_counterparty:$('#mUnk').checked,alert_poisoning:$('#mPoi').checked,alert_approvals:$('#mApp').checked,daily_brief:$('#mBrief').checked,brief_hour:+$('#mHour').value}),'监控设置已保存')};
+
+// ---------- announcement translator ----------
+VIEWS.translator=async()=>{if(!member('announcement_translator'))return notHired('announcement_translator');
+  const d=await api('/api/translator');S.tr=d;const s=d.settings,L=d.languages;
+  const drafts=d.drafts,open=drafts.filter(x=>x.status==='draft');
+  const dcard=x=>`<section class="card"><div class="hd"><span class="mono">#${x.id}</span>${x.status==='draft'?'<span class="pill review">待确认</span>':x.status==='posted'?'<span class="pill ok">已发出</span>':'<span class="pill muted">已作废</span>'}<span class="grow"></span><span class="muted" style="font-size:12px">${fmtTime(x.at)}${x.decided_by?' · '+esc(x.decided_by):''}</span></div>
+    <div class="bd stack"><details ${x.status==='draft'?'open':''}><summary>中文原文</summary><pre class="report" style="margin-top:8px">${esc(x.source)}</pre></details>
+    ${x.warnings.length?`<div class="note block">${x.warnings.map(w=>`<div>⚠️ ${esc(w)}</div>`).join('')}</div>`:'<div class="note ok">数字、地址、链接、@账号和术语都核对过，没发现问题。</div>'}
+    ${Object.entries(x.outputs).map(([k,v])=>`<label class="f"><span>${esc(L[k]||k)}${s.chats[k]?' · 发到 '+esc(s.chats[k]):''}</span>${x.status==='draft'?`<textarea data-tr="${x.id}" data-lang="${esc(k)}" style="min-height:200px">${esc(v)}</textarea>`:`<pre class="report">${esc(v)}</pre>`}</label>`).join('')}
+    ${x.status==='draft'?`<div class="row"><button class="btn signal" data-trpost="${x.id}">确认并发到群里</button><button class="btn" data-trsave="${x.id}">保存修改</button><button class="btn ghost block" data-trdrop="${x.id}">作废</button></div>`:''}</div></section>`;
+  return `${offNote('announcement_translator')}
+  ${!d.configured?'<div class="note block"><b>翻译员还没接上模型。</b>部署时设置 <code>ANTHROPIC_API_KEY</code>，重启控制台和机器人后就能翻译。草稿和术语表现在就可以准备。</div>':''}
+  <div class="grid g4">
+    ${kpi('待确认草稿',open.length,open.length?'确认后才会发出':'没有待确认的',open.length?'review':'')}
+    ${kpi('已发出',drafts.filter(x=>x.status==='posted').length,'最近 50 份草稿里')}
+    ${kpi('目标语言',s.languages.length,s.languages.map(k=>L[k]).join('、'))}
+    ${kpi('模型',`<span style="font-size:15px">${esc(d.model)}</span>`,'Anthropic Claude · 只出草稿，不自动发')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('写公告',`<div class="stack">
+    <textarea id="trSrc" style="min-height:200px" placeholder="贴中文公告原文。数字、地址、链接、@账号会自动核对有没有翻错。">${esc(S.trSrc||'')}</textarea>
+    <div class="row">${Object.entries(L).map(([k,l])=>`<label class="switch"><input type="checkbox" data-trl="${k}" ${s.languages.includes(k)?'checked':''}> ${esc(l)}</label>`).join('')}</div>
+    <div class="row"><button class="btn signal" id="trGo" ${d.configured?'':'disabled'}>生成翻译草稿</button><span class="muted" style="font-size:12px" id="trBusy">群里老板发 /translate 原文 也可以</span></div></div>`)}
+  ${open.length||drafts.length?drafts.map(dcard).join(''):card('草稿','<div class="empty">还没有翻译草稿</div>')}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('翻译设置',`<div class="stack">
+    <label class="f"><span>项目名</span><input id="trName" value="${esc(s.project_name)}" placeholder="KAGOU"></label>
+    <label class="f"><span>语气</span><select id="trTone">${[['formal','正式（交易所/协议公告）'],['friendly','亲切（社区运营口吻）'],['concise','简洁（只留事实）']].map(([v,l])=>`<option value="${v}" ${s.tone===v?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label class="f"><span>给翻译员的说明（可空）</span><textarea id="trNotes" placeholder="例如：读者主要是日本散户，避免过于口语">${esc(s.notes)}</textarea></label>
+    <span class="label">术语表（译文留空 = 原样保留）</span>${rowsEditor('trGloss',s.glossary,[{k:'term',ph:'原词，例如 链工'},{k:'translation',ph:'固定译法，例如 ChainStaff'}],'c3','添加术语')}
+    <span class="label">按语言分群发（留空 = 发到通知群 ${esc(d.chat||'（未设置）')}）</span>
+    ${Object.entries(L).filter(([k])=>s.languages.includes(k)).map(([k,l])=>`<label class="f"><span>${esc(l)} 群 ID</span><input class="mono" data-trc="${k}" value="${esc(s.chats[k]||'')}" placeholder="-100…"></label>`).join('')}
+    <div class="row"><button class="btn primary" id="trSave">保存翻译设置</button></div></div>`)}
+  ${card('流程',`<ol class="steps"><li>老板在这里或群里发 /translate 原文。</li><li>Claude 一次出所有目标语言的草稿。</li><li>规则逐条核对数字、地址、链接、@账号和术语，有出入就标红。</li><li>老板改好、确认，机器人才发到群里。没确认的草稿永远不会发出。</li></ol>`)}
+  </div></div>`};
+BIND.translator=()=>{if(!$('#trSave'))return;
+  const langs=()=>[...document.querySelectorAll('[data-trl]')].filter(i=>i.checked).map(i=>i.dataset.trl);
+  $('#trSrc').oninput=e=>{S.trSrc=e.target.value};
+  $('#trGo').onclick=async()=>{const text=$('#trSrc').value.trim();if(!text)return toast('先贴公告原文',true);if(!langs().length)return toast('至少选一种语言',true);
+    const b=$('#trGo');b.disabled=true;$('#trBusy').innerHTML='<span class="spin"></span> Claude 正在翻译，通常十几秒…';
+    try{await post('/api/translator/drafts',{text,languages:langs()});S.trSrc='';toast('草稿已生成，核对后确认发出');render()}catch(e){toast(e.message,true);b.disabled=false;$('#trBusy').textContent=''}};
+  const outputs=id=>Object.fromEntries([...document.querySelectorAll(`[data-tr="${id}"]`)].map(t=>[t.dataset.lang,t.value]));
+  document.querySelectorAll('[data-trsave]').forEach(b=>b.onclick=()=>act(()=>put('/api/translator/drafts/'+b.dataset.trsave,{outputs:outputs(b.dataset.trsave)}),'修改已保存，重新核对过了'));
+  document.querySelectorAll('[data-trpost]').forEach(b=>b.onclick=async()=>{const id=b.dataset.trpost,o=outputs(id);
+    if(!await confirmBox(`发出翻译 #${id}？`,Object.entries(o).map(([k,v])=>`<b>${esc(S.tr.languages[k]||k)}</b><br>${esc(v).replace(/\n/g,'<br>')}`).join('<hr style="border:0;border-top:1px solid var(--line)">'),'确认发出'))return;
+    try{await put('/api/translator/drafts/'+id,{outputs:o});await act(()=>post(`/api/translator/drafts/${id}/post`))}catch(e){toast(e.message,true)}});
+  document.querySelectorAll('[data-trdrop]').forEach(b=>b.onclick=async()=>{if(await confirmBox(`作废草稿 #${b.dataset.trdrop}？`,'作废后不能再发出，需要的话重新生成。','作废',true))act(()=>post(`/api/translator/drafts/${b.dataset.trdrop}/discard`),'已作废')});
+  $('#trSave').onclick=()=>act(()=>put('/api/translator/settings',{languages:langs(),tone:$('#trTone').value,project_name:$('#trName').value,notes:$('#trNotes').value,
+    glossary:collect('trGloss').filter(x=>x.term),chats:Object.fromEntries([...document.querySelectorAll('[data-trc]')].map(i=>[i.dataset.trc,i.value.trim()]))}),'翻译设置已保存')};
 
 // ---------- boot ----------
 function applyTheme(){const t=store.get('cs-theme','dark'),r=document.documentElement;r.removeAttribute('data-auto');

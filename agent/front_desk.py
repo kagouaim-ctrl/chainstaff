@@ -196,7 +196,11 @@ class FrontDesk:
             out = self.command(cmd, args, username, None, "", simulate=True) or Outgoing(None, "", "ignored")
         else:
             out = self.on_message(Incoming(text, username, None, display_name, mentioned=mentioned), simulate=True)
-        return out.to_dict()
+        d = out.to_dict()
+        m = self.team.get(out.employee)
+        if m:
+            d["employee_name"] = m.name  # the name the owner gave this employee
+        return d
 
     # ---- what the bot posts on its own ----
 

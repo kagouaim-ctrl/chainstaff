@@ -222,7 +222,7 @@ class ChainMonitor:
                         approvals += self.source.approvals(a, since)
                 status["transfers"], status["approvals"] = len(transfers), len(approvals)
                 known = list(self.known()) + [k["address"] for k in s.known_spenders]
-                for alert in check_transfers(transfers, addrs, known, self.thresholds()):
+                for alert in check_transfers(transfers, addrs, known, self.thresholds(), labels):
                     if alert.kind == "UNKNOWN_COUNTERPARTY" and not s.alert_unknown_counterparty:
                         continue
                     if alert.kind == "ADDRESS_POISONING" and not s.alert_poisoning:

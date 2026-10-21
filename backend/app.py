@@ -344,19 +344,25 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
                 "summary": spec.summary, "touches_money": spec.touches_money, "activity_7d": c}
         if m.role == "finance_ops":
             view["headline"] = {"label": "7 天付款请求", "value": paid}
+            view["todo"] = {"label": "待签字", "value": len(store.pending()), "href": "#approvals"}
             view["setup"] = [] if employee.owners else ["规则里还没写老板的 Telegram 用户名"]
         elif m.role == "community_support":
             st = desk.support.stats()
             ss = desk.support.settings
             view["headline"] = {"label": "7 天回答 / 拦截骗局", "value": f"{st['counts']['faq'] + st['counts']['tx']} / {st['counts']['scam']}"}
+            view["todo"] = {"label": "待处理工单", "value": st["tickets_open"], "href": "#support"}
             view["setup"] = [x for x, ok in (("还没写 FAQ", ss.faq), ("还没填管理员", ss.admins), ("还没填官方域名", ss.official_domains)) if not ok]
         elif m.role == "chain_monitor":
             st = desk.monitor.stats()
             view["headline"] = {"label": "7 天预警（高危）", "value": f"{st['total']}（{st['high']}）"}
+            day = desk.monitor.stats(days=1)
+            view["todo"] = {"label": "24 小时高危预警", "value": day["high"], "href": "#monitor"}
             view["setup"] = [x for x, ok in (("还没设要盯的地址", desk.monitor.watch()), ("没有 Etherscan API key，读不到链上转账", desk.monitor.source)) if not ok]
         else:
             drafts = [d for d in store.translations(200) if d["status"] == "draft"]
-            view["headline"] = {"label": "待确认草稿", "value": len(drafts)}
+            posted = sum(d["status"] == "posted" for d in store.translations(200))
+            view["headline"] = {"label": "已发出公告", "value": posted}
+            view["todo"] = {"label": "待确认草稿", "value": len(drafts), "href": "#translator"}
             view["setup"] = [] if desk.translator.configured else ["没有 ANTHROPIC_API_KEY，还不能翻译"]
         return view
 

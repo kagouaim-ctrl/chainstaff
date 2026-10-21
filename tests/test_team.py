@@ -379,6 +379,8 @@ def test_monitor_run_once_dedupes_and_logs(store):
     new = mon.run_once(NOW)
     kinds = sorted(a["kind"] for a in new)
     assert kinds == ["ADDRESS_POISONING", "LARGE_OUTFLOW", "LOW_BALANCE", "UNKNOWN_COUNTERPARTY", "UNLIMITED_APPROVAL"]
+    assert next(a for a in new if a["kind"] == "LARGE_OUTFLOW")["text"].startswith("🚨 国库 转出 5000 USDT")
+    assert "假地址 0xa11ce00000…00007e2d 冒充熟人地址" not in next(a for a in new if a["kind"] == "ADDRESS_POISONING")["text"]
     assert next(a for a in new if a["kind"] == "LARGE_OUTFLOW")["url"] == "https://bscscan.com/tx/0x" + "aa" * 32
     assert next(a for a in new if a["kind"] == "LOW_BALANCE")["tx_hash"] is None
     assert mon.run_once(NOW + timedelta(minutes=5)) == []  # same alerts are never sent twice
@@ -590,6 +592,8 @@ def test_front_desk_commands(desk):
 
 def test_front_desk_simulate_has_no_side_effects(desk):
     assert desk.simulate("付 Alice 300 USDT 设计费")["employee_name"] == "财务运营员"
+    desk.team.update("community_support", name="小客")
+    assert desk.simulate("/faq")["employee_name"] == "小客"
     assert desk.store.latest() == []
     assert desk.simulate("/pause")["action"] == "simulated" and not desk.store.paused
     assert desk.simulate("/faq")["reply"].startswith("KAGOU")
