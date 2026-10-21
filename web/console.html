@@ -6,63 +6,101 @@
 <title>KAGOU 控制台</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+/* ---- design tokens ----
+   KAGOU palette: near-black layers, one brand yellow, green/red for money states.
+   Yellow (--signal) is only for the main action, the selected state, the brand mark and things that need attention.
+   ok / review / block / info are business states only. Components never use raw colors. */
 :root{
-  --bg:#0b0b0c;--surface:#121214;--raise:#18181b;--line:#26262a;--line2:#33333a;--text:#ededed;--muted:#8a8a8f;
-  --signal:#f0b90b;--ok:#3ddc84;--review:#f0b90b;--block:#ff4d4d;--info:#7aa7ff;
-  --sans:"IBM Plex Sans","Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --bg:#0B0E11;--surface:#181A20;--raise:#1E2329;--elev:#1E2329;--hover:#2B3139;--line:#2B3139;--line2:#3C434E;
+  --text:#EAECEF;--text-2:#B7BDC6;--muted:#848E9C;
+  --signal:#F0B90B;--signal-fg:#181A20;--ok:#0ECB81;--review:#F0B90B;--block:#F6465D;--info:#6F9DFF;
+  --ok-bg:rgba(14,203,129,.12);--review-bg:rgba(240,185,11,.12);--block-bg:rgba(246,70,93,.12);--info-bg:rgba(111,157,255,.12);--signal-bg:rgba(240,185,11,.12);
+  --sans:Inter,"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  /* type scale */
+  --fs-xs:11px;--fs-sm:12px;--fs-md:13px;--fs-base:14px;--fs-lg:16px;--fs-xl:20px;--fs-2xl:26px;--fs-3xl:32px;
+  /* spacing: 4px steps */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;
+  --r-sm:4px;--r:6px;
+  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(240,185,11,.55);
+  --ctl-h:32px;
   color-scheme:dark;
 }
 :root[data-theme="light"]{
-  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
-  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light;
+  --bg:#F5F5F5;--surface:#FFFFFF;--raise:#F5F5F5;--elev:#FFFFFF;--hover:#EAECEF;--line:#EAECEF;--line2:#D5D9DE;
+  --text:#1E2329;--text-2:#474D57;--muted:#707A8A;
+  --signal:#C99400;--signal-fg:#1E2329;--ok:#03A66D;--review:#A87A00;--block:#CF304A;--info:#2F62D4;
+  --ok-bg:rgba(3,166,109,.1);--review-bg:rgba(168,122,0,.1);--block-bg:rgba(207,48,74,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light;
 }
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{
-  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
-  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light}}
+  --bg:#F5F5F5;--surface:#FFFFFF;--raise:#F5F5F5;--elev:#FFFFFF;--hover:#EAECEF;--line:#EAECEF;--line2:#D5D9DE;
+  --text:#1E2329;--text-2:#474D57;--muted:#707A8A;
+  --signal:#C99400;--signal-fg:#1E2329;--ok:#03A66D;--review:#A87A00;--block:#CF304A;--info:#2F62D4;
+  --ok-bg:rgba(3,166,109,.1);--review-bg:rgba(168,122,0,.1);--block-bg:rgba(207,48,74,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{background:var(--bg)}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--text);font:var(--fs-base)/1.55 var(--sans);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
 a{color:inherit}
 button,input,select,textarea{font:inherit;color:inherit}
 .mono,code,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)} .ok{color:var(--ok)} .review{color:var(--review)} .block{color:var(--block)} .info{color:var(--info)}
-.label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.label{font:500 var(--fs-sm)/1.4 var(--sans);color:var(--muted)}
 h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
-h1{font-size:20px} h2{font-size:15px} h3{font-size:13px}
+h1{font-size:var(--fs-xl)} h2{font-size:var(--fs-base)} h3{font-size:var(--fs-md)}
 
-/* buttons and inputs: radius 2px max, hairlines, no shadows */
-.btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:2px;padding:6px 12px;cursor:pointer;font-size:13px;line-height:1.4;text-decoration:none}
-.btn:hover{border-color:var(--muted)}
-.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav a:focus-visible,summary:focus-visible{outline:1px solid var(--signal);outline-offset:1px}
+/* buttons and inputs: small radius, hairlines; every control has hover, focus, active and disabled states */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:var(--r-sm);padding:5px 12px;min-height:var(--ctl-h);cursor:pointer;font-size:var(--fs-md);font-weight:500;line-height:1.4;text-decoration:none;transition:background-color .12s,border-color .12s,color .12s}
+.btn:hover{border-color:var(--muted);background:var(--hover)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav a:focus-visible,summary:focus-visible,[tabindex]:focus-visible,a:focus-visible{outline:0;box-shadow:var(--focus)}
 .btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
-.btn.signal{background:var(--signal);color:#0b0b0c;border-color:var(--signal);font-weight:600}
+.btn.primary:hover{opacity:.9;background:var(--text)}
+.btn.signal{background:var(--signal);color:var(--signal-fg);border-color:var(--signal);font-weight:600}
+.btn.signal:hover{filter:brightness(1.06);background:var(--signal)}
 .btn.danger{border-color:var(--block);color:var(--block)}
+.btn.danger:hover{background:var(--block-bg)}
 .btn.ok{border-color:var(--ok);color:var(--ok)}
+.btn.ok:hover{background:var(--ok-bg)}
 .btn.ghost{border-color:transparent;background:transparent}
-.btn.sm{padding:3px 8px;font-size:12px}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-input,select,textarea{background:var(--bg);border:1px solid var(--line2);border-radius:2px;padding:6px 8px;min-width:0;width:100%}
+.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 8px;min-height:26px;font-size:var(--fs-sm)}
+.btn:disabled,.btn[aria-busy="true"]{opacity:.5;cursor:not-allowed;transform:none}
+.btn[aria-busy="true"]::before{content:"";width:10px;height:10px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
+input,select,textarea{background:var(--raise);border:1px solid var(--line2);border-radius:var(--r-sm);padding:5px 10px;min-height:var(--ctl-h);min-width:0;width:100%;transition:border-color .12s}
+input:focus,select:focus,textarea:focus{border-color:var(--signal)}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--block)}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+input:hover,select:hover,textarea:hover{border-color:var(--muted)}
+input:disabled,select:disabled,textarea:disabled{opacity:.5;cursor:not-allowed}
 textarea{resize:vertical;min-height:72px}
-input[type=checkbox]{width:auto;accent-color:var(--signal)}
+input[type=checkbox],input[type=radio]{width:auto;min-height:0;accent-color:var(--signal)}
 label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
-label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase}
+label.f > span:first-child{font:500 var(--fs-sm)/1.4 var(--sans);color:var(--text-2)}
 .switch{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)}
 
 /* layout */
 .app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
 .side{border-right:1px solid var(--line);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:var(--bg)}
-.brand{display:flex;align-items:baseline;gap:8px;padding:18px 18px 14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px;padding:16px 18px 14px;border-bottom:1px solid var(--line)}
 .brand b{font:700 17px/1 var(--sans);letter-spacing:.02em;font-stretch:125%}
-.nav{display:flex;flex-direction:column;padding:8px 0;overflow:auto;flex:1}
-.nav a{display:flex;align-items:center;gap:10px;padding:8px 18px;text-decoration:none;color:var(--muted);font-size:13px;border-left:2px solid transparent}
-.nav a .n{font:500 11px var(--mono);color:var(--muted);width:22px}
-.nav a:hover{color:var(--text)}
-.nav a[aria-current="page"]{color:var(--text);border-left-color:var(--signal);background:var(--surface)}
-.nav a .badge{margin-left:auto}
+.nav{display:flex;flex-direction:column;padding:var(--s2) var(--s2) var(--s4);overflow-y:auto;flex:1;scrollbar-width:thin;overscroll-behavior:contain}
+.nav a{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:var(--r-sm);text-decoration:none;color:var(--text-2);font-size:var(--fs-md);line-height:20px;transition:background-color .12s,color .12s}
+.nav a svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--muted)}
+.nav a:hover{color:var(--text);background:var(--raise)}
+.nav a:hover svg{color:var(--text-2)}
+.nav a[aria-current="page"]{color:var(--text);background:var(--raise);font-weight:500;box-shadow:inset 2px 0 0 var(--signal)}
+.nav a[aria-current="page"] svg{color:var(--text)}
+.nav a .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav a .st{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
+.nav a .st.off{color:var(--review)}
+.nav a.idle .t{color:var(--muted)}
+.nav .ng{display:flex;align-items:center;gap:6px;padding:var(--s4) 10px var(--s1);font:500 var(--fs-xs)/1.4 var(--sans);color:var(--muted);letter-spacing:.02em}
+.nav .ng:first-child{padding-top:var(--s1)}
 .side-foot{border-top:1px solid var(--line);padding:12px 18px;display:grid;gap:6px;font-size:12px}
 .main{min-width:0;display:flex;flex-direction:column}
 .top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 24px;flex-wrap:wrap}
@@ -75,7 +113,7 @@ label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;te
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .span2{grid-column:span 2}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:2px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
 .card > .hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .card > .hd h2{margin-right:auto}
 .card > .bd{padding:14px 16px}
@@ -86,26 +124,28 @@ label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;te
 .kpi{padding:14px 16px;display:grid;gap:6px;align-content:start}
 .kpi .v{font:500 24px/1.15 var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;word-break:break-all}
 .kpi .s{font-size:12px;color:var(--muted)}
-.pill{display:inline-flex;align-items:center;gap:6px;font:500 11px/1 var(--mono);letter-spacing:.04em;padding:4px 7px;border:1px solid currentColor;border-radius:2px;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font:500 var(--fs-sm)/1 var(--sans);padding:4px 8px;border:1px solid transparent;border-radius:999px;white-space:nowrap;background:var(--raise)}
+.pill.ok{background:var(--ok-bg)} .pill.review{background:var(--review-bg)} .pill.block{background:var(--block-bg)} .pill.info{background:var(--info-bg)}
 .pill.muted{color:var(--muted)}
-.dot{width:6px;height:6px;display:inline-block;background:currentColor}
-.badge{font:500 11px/1 var(--mono);padding:3px 6px;background:var(--signal);color:#0b0b0c;border-radius:2px}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line2);border-radius:2px;white-space:nowrap}
+.dot{width:6px;height:6px;display:inline-block;background:currentColor;border-radius:50%}
+/* one badge: a count of things waiting on the owner */
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;font:600 var(--fs-xs)/1 var(--sans);font-variant-numeric:tabular-nums;background:var(--signal);color:var(--signal-fg);border-radius:9px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-sm);padding:2px 8px;border:1px solid var(--line2);border-radius:var(--r-sm);white-space:nowrap}
 .chip.block{border-color:var(--block)} .chip.review{border-color:var(--review)} .chip.ok{border-color:var(--ok)}
 .chip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 2px}
 .scroll{overflow-x:auto}
 #limits input{min-width:90px}
 .msg,.report{overflow-wrap:anywhere}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th{text-align:left;font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding:8px 12px;white-space:nowrap;background:var(--surface);position:sticky;top:0}
+th{text-align:left;font:500 var(--fs-sm)/1.4 var(--sans);color:var(--muted);border-bottom:1px solid var(--line);padding:8px 12px;white-space:nowrap;background:var(--surface);position:sticky;top:0}
 td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
 tr:last-child td{border-bottom:0}
 tbody tr.click{cursor:pointer}
 tbody tr.click:hover td{background:var(--raise)}
 td.r,th.r{text-align:right}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
-.bar{height:6px;background:var(--line);position:relative}
-.bar > i{position:absolute;inset:0 auto 0 0;background:var(--text)}
+.bar{height:6px;background:var(--line);position:relative;border-radius:3px;overflow:hidden}
+.bar > i{position:absolute;inset:0 auto 0 0;background:var(--text);border-radius:3px}
 .bar.warn > i{background:var(--review)} .bar.over > i{background:var(--block)}
 .addr{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px}
 .copy{border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font:11px var(--mono)}
@@ -161,13 +201,13 @@ pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:va
 .login{min-height:100vh;display:grid;place-items:center;padding:16px}
 .login .card{width:min(420px,100%)}
 
-.demo{background:var(--signal);color:#0b0b0c;font-size:12px;padding:6px 24px;display:flex;gap:8px;flex-wrap:wrap}
+.demo{background:var(--signal);color:var(--signal-fg);font-size:12px;padding:6px 24px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.demo .home{margin-left:auto;color:var(--signal-fg);font-weight:600;white-space:nowrap;border:1px solid var(--signal-fg);padding:2px 8px;text-decoration:none}
+.demo .home:hover{background:var(--signal-fg);color:var(--signal)}
+.brand .home{margin-left:auto;font-size:12px;color:var(--muted);text-decoration:none;white-space:nowrap}
+.brand .home:hover{color:var(--text)}
 
 /* team */
-.nav .ng{display:flex;align-items:center;gap:6px;padding:14px 18px 4px;font:500 10px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.nav .ng:first-child{padding-top:6px}
-.nav .ng em{font-style:normal;margin-left:auto;border:1px solid var(--line2);padding:0 4px;letter-spacing:.02em}
-.nav .ng em.off{color:var(--block);border-color:var(--block)}
 .av{width:34px;height:34px;flex:none;display:grid;place-items:center;border:1px solid var(--line2);font-weight:600;font-size:15px;background:var(--bg)}
 .av.on{border-color:var(--signal);color:var(--signal)}
 .emp .bd{display:grid;gap:12px}
@@ -190,16 +230,386 @@ details > summary{cursor:pointer;color:var(--muted);font-size:12px}
 .spin{display:inline-block;width:10px;height:10px;border:1px solid currentColor;border-right-color:transparent;animation:sp 0.8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
+/* ---- shared bits of the design system ---- */
+.money{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap}
+.money .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.money .unit{font-size:.78em;color:var(--muted);font-weight:500}
+.lnk{border:0;background:none;padding:0;color:var(--text-2);cursor:pointer;font:inherit;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:2px}
+.lnk:hover{color:var(--text);text-decoration-color:currentColor}
+.tip{position:relative;display:inline-grid;place-items:center;width:14px;height:14px;border-radius:50%;border:1px solid var(--line2);font:600 9px/1 var(--sans);color:var(--muted);cursor:help;vertical-align:1px;margin-left:2px}
+.tip:hover,.tip:focus-visible{color:var(--text);border-color:var(--muted)}
+.tip::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:240px;padding:6px 8px;border-radius:var(--r-sm);background:var(--elev);border:1px solid var(--line2);color:var(--text);font:400 var(--fs-sm)/1.5 var(--sans);box-shadow:0 6px 20px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .12s;z-index:30;white-space:normal}
+.tip:hover::after,.tip:focus-visible::after{opacity:1}
+.dot.ok{color:var(--ok)}
+/* skeleton while a page loads */
+.sk{display:grid;gap:var(--s4)}
+.sk i{display:block;border-radius:var(--r);background:linear-gradient(90deg,var(--surface) 0,var(--raise) 50%,var(--surface) 100%);background-size:200% 100%;animation:skm 1.4s ease-in-out infinite}
+@keyframes skm{from{background-position:100% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.sk i{animation:none}.btn,.nav a{transition:none}}
+
+/* ---- ledger ---- */
+.lg-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.lg-sum > div{padding:var(--s3) var(--s4);display:grid;gap:2px;align-content:start;min-width:0;border-left:1px solid var(--line)}
+.lg-sum > div:first-child{border-left:0}
+.lg-sum .k{font-size:var(--fs-sm);color:var(--muted)}
+.lg-sum .v{font:500 var(--fs-xl)/1.3 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em;overflow-wrap:anywhere}
+.lg-sum .v .unit{font:500 var(--fs-sm) var(--sans);color:var(--muted);margin-left:4px}
+.lg-sum .v.sm{font-size:var(--fs-lg)}
+.lg-sum .s{font-size:var(--fs-xs);color:var(--muted)}
+.lg-bar{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.lg-search{position:relative;flex:1 1 260px;min-width:200px;max-width:420px}
+.lg-search svg{position:absolute;left:10px;top:50%;width:14px;height:14px;transform:translateY(-50%);fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round;pointer-events:none}
+.lg-search input{padding-left:30px}
+.lg-bar select{width:auto;min-width:108px}
+.lg-range{display:inline-flex;align-items:center;gap:var(--s1);color:var(--muted);font-size:var(--fs-sm)}
+.lg-range input{width:142px}
+.lg-bar .end{margin-left:auto;display:flex;gap:var(--s2)}
+.lg-scroll{overflow:auto;max-height:calc(100vh - 290px);min-height:200px}
+table.lg{font-size:var(--fs-md)}
+table.lg th{z-index:1;padding:9px 12px}
+table.lg td{padding:10px 12px;vertical-align:middle}
+table.lg tbody tr.click:focus-visible{outline:0}
+table.lg tbody tr.click:focus-visible td{background:var(--raise);box-shadow:inset 0 1px 0 var(--signal),inset 0 -1px 0 var(--signal)}
+table.lg tbody tr.click:focus-visible td:first-child{box-shadow:inset 2px 0 0 var(--signal),inset 0 1px 0 var(--signal),inset 0 -1px 0 var(--signal)}
+.lg .t{font:var(--fs-sm)/1.4 var(--mono);color:var(--text-2);white-space:nowrap}
+.lg .id,.kv .id{display:inline-flex;align-items:center;gap:2px;font:var(--fs-sm)/1.4 var(--mono);color:var(--text-2);white-space:nowrap}
+.lg .who{display:grid;min-width:0;max-width:200px}
+.lg .who b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg .who span{font:var(--fs-xs)/1.4 var(--mono);color:var(--muted);white-space:nowrap}
+.lg .amt{white-space:nowrap}
+.lg .amt .num{font-weight:500}
+.trunc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg .memo{max-width:220px}
+.lg .why{max-width:260px;font-size:var(--fs-sm);color:var(--text-2)}
+.lg .why.block{color:var(--block)}
+.icopy{display:inline-grid;place-items:center;width:22px;height:22px;border:0;border-radius:var(--r-sm);background:none;color:var(--muted);cursor:pointer;padding:0;flex:none}
+.icopy svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.icopy:hover{color:var(--text);background:var(--hover)}
+.icopy:focus-visible{outline:0;box-shadow:var(--focus)}
+.lg-ft{display:flex;align-items:center;gap:var(--s3);padding:10px var(--s4);border-top:1px solid var(--line);font-size:var(--fs-sm);color:var(--muted);flex-wrap:wrap}
+.lg-ft .btn{margin-left:auto}
+.lg-dhead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);flex-wrap:wrap}
+.lg-dhead .money .num{font-size:var(--fs-2xl);font-weight:500}
+.lg-dhead .id{display:inline-flex;align-items:center;gap:2px;font-size:var(--fs-sm);color:var(--muted);overflow-wrap:anywhere}
+.lg-empty{padding:40px 16px;display:grid;gap:12px;justify-items:center;text-align:center;color:var(--muted)}
+@media (max-width:1240px){.lg .hide-md{display:none}}
+@media (max-width:1100px){.lg-sum{grid-template-columns:repeat(2,minmax(0,1fr))}.lg-sum > div:nth-child(3){border-left:0}.lg-sum > div:nth-child(n+3){border-top:1px solid var(--line)}}
+@media (max-width:860px){
+  .lg-scroll{max-height:none;min-height:0}
+  .lg-search{flex-basis:100%;max-width:none}
+  .lg-bar select{flex:1 1 0}
+  .lg-range{flex:1 1 100%}
+  .lg-range input{flex:1;width:auto}
+  .lg-bar .end{margin-left:0;flex:1 1 100%}
+  .lg-bar .end .btn{flex:1}
+  .lg .who{max-width:120px}
+  .lg .who span{display:none}
+  table.lg th,table.lg td{padding-left:10px;padding-right:10px}
+  table.lg td:first-child,table.lg th:first-child{padding-left:12px}
+}
+
+/* ---- finance overview ---- */
+.ov-period{display:flex;align-items:baseline;gap:var(--s3);font-size:var(--fs-md);color:var(--text-2);margin-bottom:calc(var(--s2) * -1)}
+.ov-period .muted{font-size:var(--fs-sm)}
+.ovs-label{font-size:var(--fs-md);color:var(--text-2);display:flex;align-items:center;gap:4px}
+/* the month band: one surface, three regions of different weight */
+.ovs{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.35fr) minmax(0,.85fr);background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.ovs > div{padding:var(--s5) var(--s6);min-width:0;display:flex;flex-direction:column;gap:var(--s2)}
+.ovs > div + div{border-left:1px solid var(--line)}
+.ovs-big{display:flex;flex-direction:column;gap:2px;margin:2px 0 var(--s2)}
+.ovs-big .money{font-size:var(--fs-3xl);font-weight:500;line-height:1.15}
+.ovs-big .money .unit{font-size:var(--fs-lg)}
+.ovs-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4);margin:auto 0 0;padding-top:var(--s3);border-top:1px solid var(--line)}
+.ovs-split dt{font-size:var(--fs-sm);color:var(--muted);display:flex;align-items:center;gap:6px}
+.ovs-split dt i,.ovs-legend i,.ovc-legend i,.ovc-tip i{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
+.ovs-split dd{margin:2px 0 0;font-size:var(--fs-lg);display:grid}
+.ovs-num{font:500 var(--fs-3xl)/1.15 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.ovs-num small{font:500 var(--fs-lg) var(--sans);color:var(--muted);margin-left:2px}
+.ovs-stack{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;background:var(--line);margin-top:var(--s1)}
+.ovs-stack i{min-width:3px}
+.ovs-legend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px var(--s3);font-size:var(--fs-sm);color:var(--text-2)}
+.ovs-legend li{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.ovs-legend li b{margin-left:auto;font-weight:500;color:var(--text)}
+.ovs-legend li.zero{color:var(--muted)} .ovs-legend li.zero b{color:var(--muted)}
+.ovs-foot{margin-top:auto;font-size:var(--fs-sm);color:var(--muted)}
+.ovs-foot b{color:var(--text-2);font-weight:500}
+.ovs-block.has{background:color-mix(in srgb,var(--block) 6%,transparent);border-radius:0 var(--r) var(--r) 0}
+.ovs-sub{font-size:var(--fs-md);color:var(--text-2);display:flex;flex-wrap:wrap;gap:4px}
+.ovs-block .btn{align-self:flex-start;margin-top:auto}
+.ovs-ok{display:flex;align-items:center;gap:var(--s2);padding:var(--s4) var(--s5);color:var(--text-2);font-size:var(--fs-md)}
+/* panels: a header line and content, no nested boxes */
+.ovpanel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0;display:flex;flex-direction:column}
+.ovpanel > header{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s5);min-height:48px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ovpanel > header h2{font-size:var(--fs-base);font-weight:600;display:flex;align-items:center;gap:var(--s2)}
+.ovpanel > header .ovh-sub{font-size:var(--fs-sm)}
+.ovpanel > header > :last-child:not(h2):not(.ovh-sub){margin-left:auto}
+.ovpanel > header .ovh-sub b{color:var(--text-2);font-weight:500}
+.ovq-panel.attn{border-color:color-mix(in srgb,var(--review) 45%,var(--line))}
+.ov-empty{padding:var(--s8) var(--s5);text-align:center;color:var(--muted);font-size:var(--fs-md)}
+.ov-empty a{color:var(--text-2)}
+.ov-note{margin:auto 0 0;padding:var(--s3) var(--s5);font-size:var(--fs-sm);color:var(--muted);border-top:1px solid var(--line)}
+.ov-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:var(--s4);align-items:stretch}
+.ov-row.b{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+/* approvals queue */
+.ovp{list-style:none;margin:0;padding:0}
+.ovp li + li{border-top:1px solid var(--line)}
+.ovp-row{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(0,2fr) 80px minmax(120px,auto);gap:var(--s4);align-items:center;width:100%;padding:10px var(--s5);border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ovp-row:hover{background:var(--raise)}
+.ovp-who{display:grid;min-width:0}
+.ovp-who b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovp-who .mono{font-size:var(--fs-xs)}
+.ovp-why{min-width:0;font-size:var(--fs-md);color:var(--text-2);display:flex;flex-direction:column;gap:2px}
+.ovp-reason{font-size:var(--fs-sm);color:var(--review);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovp-age{font-size:var(--fs-sm);color:var(--muted);white-space:nowrap}
+.ovp-amt{text-align:right;font-size:var(--fs-lg)}
+.ovp-more{padding:var(--s2) var(--s5);border-top:1px solid var(--line);font-size:var(--fs-sm);color:var(--muted)}
+.ovp-more a{color:var(--text-2)}
+/* 14-day chart: CSS columns so text stays crisp and every day is focusable */
+.ovc{padding:var(--s4) var(--s5) var(--s4);display:grid;gap:var(--s2)}
+.ovc-plot{display:grid;grid-template-columns:28px minmax(0,1fr);gap:var(--s2);height:196px}
+.ovc-y{display:flex;flex-direction:column;justify-content:space-between;text-align:right;font:var(--fs-xs)/1 var(--mono);color:var(--muted);margin:-5px 0}
+.ovc-area{position:relative;min-width:0}
+.ovc-grid{position:absolute;left:0;right:0;height:0;border-top:1px dashed var(--line)}
+.ovc-grid:last-of-type{border-top-style:solid;border-color:var(--line2)}
+.ovc-cols{position:absolute;inset:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px}
+.ovc-col{position:relative;display:flex;align-items:flex-end;justify-content:center;height:100%;padding:0;border:0;background:none;cursor:default;border-radius:var(--r-sm)}
+.ovc-col:hover,.ovc-col.on{background:color-mix(in srgb,var(--text) 5%,transparent)}
+.ovc-stack{display:flex;flex-direction:column;width:min(70%,28px);border-radius:3px 3px 0 0;overflow:hidden;gap:1px}
+.ovc-stack i{display:block;min-height:2px}
+.ovc-col.today .ovc-stack{outline:1px solid var(--line2);outline-offset:1px}
+.ovc-zero{position:absolute;bottom:0;width:min(70%,28px);height:2px;background:var(--line2)}
+.ovc-x{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;margin-left:36px;font:var(--fs-xs)/1 var(--mono);color:var(--muted);text-align:center;white-space:nowrap}
+.ovc-legend{display:flex;gap:var(--s5);flex-wrap:wrap;font-size:var(--fs-sm);color:var(--text-2);margin-left:36px;padding-top:var(--s2)}
+.ovc-legend span{display:inline-flex;align-items:center;gap:6px}
+.ovc-legend b{font-weight:500;color:var(--text)}
+.ovc-tip{position:absolute;top:0;z-index:5;display:grid;gap:3px;min-width:140px;padding:8px 10px;background:var(--elev);border:1px solid var(--line2);border-radius:var(--r-sm);box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:var(--fs-sm);pointer-events:none}
+.ovc-tip span{display:flex;align-items:center;gap:6px}
+.ovc-tip span b{margin-left:auto;padding-left:var(--s3);font-weight:500}
+.ovc-tip > b{font:500 var(--fs-sm) var(--mono)}
+/* quota */
+.ovq{list-style:none;margin:0;padding:var(--s2) var(--s5) var(--s4);display:grid;gap:var(--s4)}
+.ovq-hd{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s2);margin-bottom:6px}
+.ovq-hd b{font-weight:600;font-size:var(--fs-md)}
+.ovq-hd .num{font-size:var(--fs-md)}
+.ovq-ft{font-size:var(--fs-sm);margin-top:4px}
+.ovq .bar > i{background:var(--ok)}
+.ovq .bar.warn > i{background:var(--review)} .ovq .bar.over > i{background:var(--block)}
+/* payees table */
+.ovt td,.ovt th{padding:10px var(--s5)}
+.ovt th{background:transparent;position:static}
+.ovt th[aria-sort]{color:var(--text-2)}
+.ovt td{vertical-align:middle;font-size:var(--fs-md)}
+.ovt-who{display:grid}
+.ovt-who b{font-weight:500}
+.ovt-who .mono{font-size:var(--fs-xs)}
+.ovt tbody tr.click:focus-visible{outline:0;box-shadow:inset 2px 0 0 var(--signal)}
+.ovt tbody tr.click:focus-visible td{background:var(--raise)}
+.ovt .money{font-size:var(--fs-base)}
+/* activity */
+.ova{list-style:none;margin:0;padding:var(--s1) 0}
+.ova-it{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:var(--s3);padding:10px var(--s5);align-items:start}
+.ova-it + .ova-it{border-top:1px solid var(--line)}
+.ova-dot{width:7px;height:7px;border-radius:50%;background:var(--line2);margin-top:7px}
+.ova-it.warn .ova-dot{background:var(--review)} .ova-it.crit .ova-dot{background:var(--block)}
+.ova-main{min-width:0}
+.ova-t{font-size:var(--fs-md);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.ova-k{font-size:var(--fs-xs);font-weight:600;color:var(--review);margin-right:6px}
+.ova-it.crit .ova-k{color:var(--block)}
+.ova-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:2px;font-size:var(--fs-sm);color:var(--muted)}
+.ova-meta a,.ova-meta .lnk{color:var(--text-2);font-size:var(--fs-sm)}
+.ova-meta .mono{font-size:var(--fs-xs)}
+.ova-time{font-size:var(--fs-sm);color:var(--muted);white-space:nowrap;padding-top:1px}
+.ova-tg{margin-left:auto;border:0;background:none;padding:0 2px;color:var(--muted);font:inherit;font-size:var(--fs-xs);cursor:pointer;opacity:0;transition:opacity .12s}
+.ova-it:hover .ova-tg,.ova-tg:focus-visible,.ova-tg[aria-expanded="true"]{opacity:1}
+.ova-tg:hover{color:var(--text)}
+.ova-tg::after{content:" ▾"}
+.ova-tg[aria-expanded="true"]::after{content:" ▴"}
+@media (hover:none){.ova-tg{opacity:1}}
+.ova-more{margin-top:6px}
+.ova-more .kv{margin-top:6px;grid-template-columns:56px minmax(0,1fr);font-size:var(--fs-sm);gap:4px 10px;padding:8px 10px;background:var(--bg);border-radius:var(--r-sm)}
+.ova-json{font-size:var(--fs-xs);word-break:break-all}
+@media (max-width:1240px){
+  .ovs{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .ovs-block{grid-column:1 / -1;flex-direction:row!important;flex-wrap:wrap;align-items:center;border-left:0!important;border-top:1px solid var(--line);gap:var(--s2) var(--s5)!important;border-radius:0 0 var(--r) var(--r)!important}
+  .ovs-block .ovs-num{font-size:var(--fs-2xl)}
+  .ovs-block .btn{margin:0 0 0 auto}
+  .ov-row,.ov-row.b{grid-template-columns:minmax(0,1fr)}
+  .ov-quota .ovq{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+}
+@media (max-width:860px){
+  .ovs{grid-template-columns:minmax(0,1fr)}
+  .ovs > div{padding:var(--s4)}
+  .ovs > div + div{border-left:0;border-top:1px solid var(--line)}
+  .ovs-big .money,.ovs-num{font-size:var(--fs-2xl)}
+  .ovs-block{flex-direction:column!important;align-items:flex-start}
+  .ovs-block .btn{margin:0}
+  .ovpanel > header{padding:var(--s3) var(--s4)}
+  .ovp-row{grid-template-columns:minmax(0,1fr) auto;gap:4px var(--s3);padding:10px var(--s4)}
+  .ovp-why{grid-column:1 / -1;grid-row:2}
+  .ovp-age{display:none}
+  .ovc{padding:var(--s3) var(--s4)}
+  .ovc-plot{height:160px}
+  .ovt td,.ovt th{padding:10px var(--s4)}
+  .ova-it{padding:10px var(--s4)}
+  .ov-period{flex-wrap:wrap}
+}
+
+/* chat: a full-screen messenger, laid out like Telegram's web app */
+:root{--tg-side:#212121;--tg-head:#212121;--tg-bg:#0f0f0f;--tg-in:#212121;--tg-out:#766ac8;--tg-text:#fff;--tg-sub:#aaaaaa;--tg-out-sub:rgba(255,255,255,.6);
+  --tg-acc:#8774e1;--tg-sel:#766ac8;--tg-hover:#2c2c2c;--tg-line:#2f2f2f;--tg-input:#212121;--tg-pill:rgba(0,0,0,.35);--tg-link:#8774e1;--tg-out-link:#fff;--tg-check:#fff;--tg-out-text:#fff;--tg-pat-f:invert(1);
+  --tg-wall:radial-gradient(circle at 15% 20%,#1a2a1f 0,transparent 45%),radial-gradient(circle at 85% 30%,#1d1a2e 0,transparent 45%),radial-gradient(circle at 50% 90%,#16242c 0,transparent 50%),#0f0f0f;--tg-pat:.06}
+:root[data-theme="light"]{--tg-side:#fff;--tg-head:#fff;--tg-bg:#fff;--tg-in:#fff;--tg-out:#eeffde;--tg-text:#000;--tg-sub:#707579;--tg-out-sub:#4fae4e;
+  --tg-acc:#3390ec;--tg-sel:#3390ec;--tg-hover:#f4f4f5;--tg-line:#dadce0;--tg-input:#fff;--tg-pill:rgba(80,110,70,.45);--tg-link:#3390ec;--tg-out-link:#3390ec;--tg-check:#4fae4e;--tg-out-text:#000;--tg-pat-f:none;
+  --tg-wall:radial-gradient(circle at 15% 20%,#dbddbb 0,transparent 55%),radial-gradient(circle at 85% 25%,#6ba587 0,transparent 55%),radial-gradient(circle at 25% 85%,#d5d88d 0,transparent 55%),radial-gradient(circle at 80% 85%,#88b884 0,transparent 55%),#a9c99a;--tg-pat:.12}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{--tg-side:#fff;--tg-head:#fff;--tg-bg:#fff;--tg-in:#fff;--tg-out:#eeffde;--tg-text:#000;--tg-sub:#707579;--tg-out-sub:#4fae4e;
+  --tg-acc:#3390ec;--tg-sel:#3390ec;--tg-hover:#f4f4f5;--tg-line:#dadce0;--tg-input:#fff;--tg-pill:rgba(80,110,70,.45);--tg-link:#3390ec;--tg-out-link:#3390ec;--tg-check:#4fae4e;--tg-out-text:#000;--tg-pat-f:none;
+  --tg-wall:radial-gradient(circle at 15% 20%,#dbddbb 0,transparent 55%),radial-gradient(circle at 85% 25%,#6ba587 0,transparent 55%),radial-gradient(circle at 25% 85%,#d5d88d 0,transparent 55%),radial-gradient(circle at 80% 85%,#88b884 0,transparent 55%),#a9c99a;--tg-pat:.12}}
+body.tgmode .side,body.tgmode .top{display:none}
+body.tgmode .app{grid-template-columns:minmax(0,1fr)}
+body.tgmode .page{padding:0}
+.tg{position:fixed;left:0;right:0;bottom:0;top:var(--tg-top,0px);display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);background:var(--tg-bg);color:var(--tg-text);
+  font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC","PingFang SC","Helvetica Neue",Arial,sans-serif;z-index:20}
+.tg button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+.tg svg{display:block}
+.tg .ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--tg-sub);flex:none}
+.tg .ic:hover{background:var(--tg-hover)}
+.tg .ic svg{width:24px;height:24px;fill:currentColor}
+/* left column */
+.tg-side{background:var(--tg-side);border-right:1px solid var(--tg-line);display:flex;flex-direction:column;min-width:0}
+.tg-sh{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;height:56px}
+.tg-search{flex:1;display:flex;align-items:center;gap:10px;height:42px;border-radius:22px;background:var(--tg-hover);padding:0 14px;color:var(--tg-sub)}
+.tg-search svg{width:20px;height:20px;fill:currentColor;flex:none}
+.tg .tg-search input{flex:1;min-width:0;width:auto;padding:0;border:0;border-radius:0;background:none;outline:0;font-size:15px;color:var(--tg-text)}
+.tg-list{flex:1;overflow-y:auto;padding:0 8px 8px}
+.tg-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px;border-radius:12px;text-align:left}
+.tg-item:hover{background:var(--tg-hover)}
+.tg-item[aria-current="true"]{background:var(--tg-sel);color:#fff}
+.tg-item[aria-current="true"] .tg-prev,.tg-item[aria-current="true"] .tg-time{color:rgba(255,255,255,.8)}
+.tg-item .tx{flex:1;min-width:0}
+.tg-row{display:flex;align-items:center;gap:6px}
+.tg-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.tg-time{font-size:12px;color:var(--tg-sub);flex:none}
+.tg-prev{color:var(--tg-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;flex:1;min-width:0}
+.tg-prev b{font-weight:400;color:var(--tg-text)}
+.tg-item[aria-current="true"] .tg-prev b{color:#fff}
+.tg-badge{min-width:22px;height:22px;border-radius:11px;background:var(--tg-acc);color:#fff;font-size:12px;font-weight:600;display:grid;place-items:center;padding:0 6px}
+.tg-item[aria-current="true"] .tg-badge{background:#fff;color:var(--tg-sel)}
+.tg-kind{width:16px;height:16px;fill:currentColor;flex:none}
+.tg-av{width:54px;height:54px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:600;font-size:20px;background:linear-gradient(#72d5fd,#2a9ef1)}
+.tg-av.sm{width:42px;height:42px;font-size:17px}
+.tg-av.xs{width:34px;height:34px;font-size:14px}
+.tg-av svg{width:26px;height:26px;fill:#fff}
+.tgg0{background:linear-gradient(#ff885e,#ff516a)}.tgg1{background:linear-gradient(#ffcd6a,#ffa85c)}.tgg2{background:linear-gradient(#82b1ff,#665fff)}.tgg3{background:linear-gradient(#a0de7e,#54cb68)}
+.tgg4{background:linear-gradient(#53edd6,#28c9b7)}.tgg5{background:linear-gradient(#72d5fd,#2a9ef1)}.tgg6{background:linear-gradient(#e0a2f3,#d669ed)}
+.n0{color:#fc5c51}.n1{color:#fa790f}.n2{color:#895dd5}.n3{color:#0fb297}.n4{color:#0fc9d6}.n5{color:#3ca5ec}.n6{color:#d54fae}
+.tg-foot{padding:10px 16px;border-top:1px solid var(--tg-line);font-size:12px;color:var(--tg-sub);display:flex;gap:10px;align-items:center}
+.tg-foot a{color:var(--tg-link);text-decoration:none}
+/* conversation */
+.tg-conv{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--tg-wall)}
+.tg-conv::before{content:"";position:absolute;inset:0;opacity:var(--tg-pat);pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='24' cy='26' r='10'/%3E%3Cpath d='M20 26h8M24 22v8'/%3E%3Cpath d='M70 18l6 12 13 2-9 9 2 13-12-6-12 6 2-13-9-9 13-2z'/%3E%3Crect x='112' y='14' width='26' height='18' rx='4'/%3E%3Cpath d='M112 22h26'/%3E%3Cpath d='M18 92c8-10 22-10 30 0M26 100c4-4 10-4 14 0'/%3E%3Cpath d='M84 84l14 14M98 84L84 98'/%3E%3Ccircle cx='132' cy='92' r='12'/%3E%3Cpath d='M126 92l4 4 8-8'/%3E%3Cpath d='M22 140l10-10 10 10-10 10z'/%3E%3Cpath d='M70 134h26l-6-6M96 134l-6 6'/%3E%3Cpath d='M120 146c0-10 8-18 18-18'/%3E%3C/svg%3E");
+  background-size:160px 160px;filter:var(--tg-pat-f)}
+.tg-ch{position:relative;z-index:3;display:flex;align-items:center;gap:10px;height:56px;padding:0 8px 0 16px;background:var(--tg-head);border-left:0;flex:none;box-shadow:0 1px 0 var(--tg-line)}
+.tg-ch .back{display:none}
+.tg-ch .tx{flex:1;min-width:0;cursor:default}
+.tg-ch .tg-name{display:block;font-size:16px}
+.tg-sub{font-size:14px;color:var(--tg-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-sub.typing{color:var(--tg-acc)}
+.tg-msgs{position:relative;z-index:1;flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0 12px;min-height:0}
+.tg-col{max-width:728px;min-height:100%;margin:0 auto;padding:0 16px;display:flex;flex-direction:column;gap:2px}
+.tg-svc{align-self:center;margin:8px 0;padding:2px 10px;border-radius:12px;background:var(--tg-pill);color:#fff;font-size:14px;font-weight:500;text-align:center;max-width:80%}
+.tg-m{display:flex;align-items:flex-end;gap:8px;max-width:min(480px,86%)}
+.tg-m.out{align-self:flex-end;flex-direction:row-reverse}
+.tg-m .tg-av{visibility:hidden}
+.tg-m.last .tg-av{visibility:visible}
+.tg-m.last{margin-bottom:6px}
+.tg-b{position:relative;padding:6px 8px 6px 10px;border-radius:15px;background:var(--tg-in);box-shadow:0 1px 2px rgba(0,0,0,.18);white-space:pre-wrap;word-break:break-word;min-width:56px;font-size:15px;line-height:1.35}
+.tg-m.out .tg-b{background:var(--tg-out);color:var(--tg-out-text)}
+.tg-m.in.last .tg-b{border-bottom-left-radius:0}
+.tg-m.out.last .tg-b{border-bottom-right-radius:0}
+.tg-m.last .tg-b::before{content:"";position:absolute;bottom:0;width:9px;height:17px;background:inherit;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat}
+.tg-m.in.last .tg-b::before{left:-8.6px}
+.tg-m.out.last .tg-b::before{right:-8.6px;transform:scaleX(-1)}
+.tg-who{display:block;font-weight:600;font-size:14px;line-height:1.3;margin-bottom:1px}
+.tg-who em{font-style:normal;font-weight:400;font-size:12px;color:var(--tg-sub);margin-left:6px}
+.tg-meta{float:right;display:inline-flex;align-items:center;gap:3px;margin:8px -2px -5px 12px;font-size:12px;color:var(--tg-sub);white-space:nowrap;line-height:1}
+.tg-m.out .tg-meta{color:var(--tg-out-sub)}
+.tg-meta svg{width:16px;height:12px;fill:var(--tg-check)}
+.tg-b a,.tg-b .cmd{color:var(--tg-link);text-decoration:none;cursor:pointer}
+.tg-b a:hover,.tg-b .cmd:hover{text-decoration:underline}
+.tg-m.out .tg-b a,.tg-m.out .tg-b .cmd{color:var(--tg-out-link);text-decoration:underline}
+.tg-del{font-style:italic;color:var(--tg-sub)}
+.tg-dots{display:inline-flex;gap:4px;padding:6px 4px}
+.tg-dots i{width:7px;height:7px;border-radius:50%;background:var(--tg-sub);animation:tgd 1.2s infinite}
+.tg-dots i:nth-child(2){animation-delay:.2s}.tg-dots i:nth-child(3){animation-delay:.4s}
+@keyframes tgd{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+/* "what can this bot do" card in an empty private chat */
+.tg-intro{align-self:center;margin:auto 0;max-width:360px;background:var(--tg-in);border-radius:15px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.18);white-space:pre-wrap}
+.tg-intro b{display:block;margin-bottom:6px}
+/* composer */
+.tg-bottom{position:relative;z-index:2;flex:none;padding:0 16px 16px}
+.tg-comp{max-width:728px;margin:0 auto;display:flex;align-items:flex-end;gap:8px}
+.tg-pill{flex:1;min-width:0;display:flex;align-items:flex-end;gap:2px;background:var(--tg-input);border-radius:16px 16px 0 16px;padding:3px 4px 3px 6px;min-height:54px;box-shadow:0 1px 2px rgba(0,0,0,.18);position:relative}
+.tg-pill::after{content:"";position:absolute;right:-8.6px;bottom:0;width:9px;height:17px;background:var(--tg-input);transform:scaleX(-1);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat}
+.tg-pill .ic{width:44px;height:44px;margin-bottom:2px}
+.tg-pill .ic.on{color:var(--tg-acc)}
+.tg-menu-btn{height:32px;margin:0 2px 8px 2px;padding:0 12px!important;border-radius:16px;background:var(--tg-acc)!important;color:#fff!important;font-size:14px!important;font-weight:500;display:flex;align-items:center;gap:4px;flex:none}
+.tg-menu-btn svg{width:18px;height:18px;fill:#fff}
+.tg .tg-in{flex:1;min-width:0;width:auto;min-height:0;border:0;border-radius:0;outline:0;box-shadow:none;background:none;resize:none;font:inherit;color:var(--tg-text);padding:15px 6px 13px;max-height:180px;line-height:1.35;height:52px}
+.tg-in::placeholder{color:var(--tg-sub)}
+.tg-send{width:54px;height:54px;border-radius:50%!important;background:var(--tg-input)!important;color:var(--tg-acc)!important;display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.18);flex:none}
+.tg-send.go{background:var(--tg-acc)!important;color:#fff!important}
+.tg-send svg{width:26px;height:26px;fill:currentColor}
+.tg-send:disabled{cursor:default}
+.tg .tg-start{flex:1;height:54px;border-radius:12px;background:var(--tg-input);color:var(--tg-acc);font-weight:600;font-size:15px;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+.tg .tg-start:hover{background:var(--tg-hover)}
+.tg-ro{max-width:728px;margin:0 auto;text-align:center;padding:14px;border-radius:12px;background:var(--tg-input);color:var(--tg-sub);font-size:14px;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+/* bot keyboard and command menu */
+.tg-kb{max-width:728px;margin:0 auto 6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.tg-kb button{background:var(--tg-pill);color:#fff;border-radius:8px;padding:9px 8px;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-kb button:hover{filter:brightness(1.15)}
+.tg-pop{position:absolute;left:16px;right:16px;bottom:78px;max-width:728px;margin:0 auto;background:var(--tg-side);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.3);max-height:300px;overflow-y:auto;padding:6px 0;z-index:5}
+.tg-pop button{display:flex;align-items:center;gap:12px;width:100%;padding:8px 14px;text-align:left}
+.tg-pop button:hover,.tg-pop button.sel{background:var(--tg-hover)}
+.tg-pop .c{font-weight:600}
+.tg-pop .d{color:var(--tg-sub);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.tg-dd{position:absolute;right:8px;top:52px;background:var(--tg-side);border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.35);padding:6px 0;min-width:230px;z-index:6}
+.tg-dd button{display:flex;align-items:center;gap:14px;width:100%;padding:9px 16px;text-align:left;font-size:14px}
+.tg-dd button:hover{background:var(--tg-hover)}
+.tg-dd svg{width:20px;height:20px;fill:var(--tg-sub)}
+.tg-dd .chk{margin-left:auto;color:var(--tg-acc);font-weight:700}
+.tg-empty{margin:auto;text-align:center;color:var(--tg-sub);font-size:14px;padding:24px}
+@media (max-width:720px){
+  .tg{grid-template-columns:minmax(0,1fr)}
+  .tg .tg-conv{display:none}
+  .tg.open .tg-side{display:none}
+  .tg.open .tg-conv{display:flex}
+  .tg-ch{padding-left:4px}
+  .tg-ch .back{display:grid}
+  .tg-col{padding:0 8px}
+  .tg-bottom{padding:0 8px 8px}
+  .tg-m{max-width:88%}
+  .tg-pop{left:8px;right:8px;bottom:70px}
+  .tg-pill{min-height:48px}
+  .tg-send{width:48px;height:48px}
+  .tg .tg-in{padding:12px 6px 10px;height:46px}
+  body.tgmode .demo>span{display:none} /* keep the demo label and the way home, give the chat the room */
+  .tg-kb button{padding:7px 6px}
+}
+
 @media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:860px){
   .app{grid-template-columns:minmax(0,1fr)}
   .side{position:sticky;top:0;height:auto;z-index:30;border-right:0;border-bottom:1px solid var(--line)}
   .brand{padding:12px 16px}
   .nav{flex-direction:row;padding:0;overflow-x:auto;scrollbar-width:none}
-  .nav a{border-left:0;border-bottom:2px solid transparent;padding:10px 12px;white-space:nowrap}
-  .nav a .n,.nav .ng{display:none}
+  .nav{padding:var(--s1) var(--s2)}
+  .nav a{padding:8px 10px;white-space:nowrap}
+  .nav a .st,.nav .ng{display:none}
   .er.c2,.er.c3{grid-template-columns:minmax(0,1fr)}
-  .nav a[aria-current="page"]{border-bottom-color:var(--signal);background:none}
+  .nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 var(--signal)}
   .side-foot{display:none}
   .top{position:static;padding:12px 16px}
   .page{padding:16px 16px 80px}
@@ -309,30 +719,51 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').innerH
 function card(title,body,{right='',flush=false,id='',cls=''}={}){return `<section class="card ${cls}" ${id?`id="${id}"`:''}><div class="hd"><h2>${title}</h2>${right}</div><div class="bd${flush?' flush':''}">${body}</div></section>`}
 
 // ---------- state & routing ----------
-// [route, label, group, role that owns the page]
+// [route, label, nav group, role that owns the page]
 const PAGES=[
   ['team','团队总览','团队',''],
-  ['overview','财务总览','财务运营员','finance_ops'],['approvals','审批','财务运营员','finance_ops'],['ledger','账本','财务运营员','finance_ops'],
-  ['payees','收款人','财务运营员','finance_ops'],['rules','规则与试算','财务运营员','finance_ops'],['treasury','国库','财务运营员','finance_ops'],
-  ['reports','报告','财务运营员','finance_ops'],['employee','员工档案','财务运营员','finance_ops'],
-  ['support','社区客服','社区客服','community_support'],
-  ['monitor','链上监控','链上监控员','chain_monitor'],
-  ['translator','公告翻译','公告翻译员','announcement_translator'],
-  ['payouts','营销结算','营销结算员','campaign_payouts'],
-  ['sybil','空投反女巫','空投反女巫','airdrop_sybil'],
-  ['telegram','Telegram','通用',''],['audit','审计日志','通用',''],['settings','设置','通用','']];
+  ['overview','财务总览','财务','finance_ops'],['approvals','审批','财务','finance_ops'],['ledger','账本','财务','finance_ops'],
+  ['payees','收款人','财务','finance_ops'],['rules','规则与试算','财务','finance_ops'],['treasury','国库','财务','finance_ops'],
+  ['reports','报告','财务','finance_ops'],['employee','员工档案','财务','finance_ops'],
+  ['support','社区客服','AI 员工','community_support'],
+  ['monitor','链上监控','AI 员工','chain_monitor'],
+  ['translator','公告翻译','AI 员工','announcement_translator'],
+  ['payouts','营销结算','AI 员工','campaign_payouts'],
+  ['sybil','空投反女巫','AI 员工','airdrop_sybil'],
+  ['chat','群聊','通用',''],['telegram','Telegram','通用',''],['audit','审计日志','通用',''],['settings','设置','通用','']];
+// 16px line icons, drawn for this console
+const NAV_ICON={
+  team:'<circle cx="6" cy="6" r="2.5"/><circle cx="11.5" cy="7" r="2"/><path d="M1.5 14c.5-2.5 2.3-4 4.5-4s4 1.5 4.5 4M10 10.3c2 .1 3.6 1.4 4 3.7"/>',
+  overview:'<rect x="2" y="2" width="5" height="6" rx="1"/><rect x="9" y="2" width="5" height="3.5" rx="1"/><rect x="9" y="7.5" width="5" height="6.5" rx="1"/><rect x="2" y="10" width="5" height="4" rx="1"/>',
+  approvals:'<path d="M3 2.5h7l3 3V13.5H3z"/><path d="M5.5 9l2 2 3.5-4"/>',
+  ledger:'<path d="M3 2.5h10v11H3zM3 6h10M3 9.5h10M7 6v7.5"/>',
+  payees:'<circle cx="8" cy="5.5" r="2.5"/><path d="M3 14c.6-2.8 2.6-4.5 5-4.5s4.4 1.7 5 4.5"/>',
+  rules:'<path d="M2.5 4h6M11.5 4h2M2.5 8h2M7.5 8h6M2.5 12h7M12.5 12h1"/><circle cx="10" cy="4" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="11" cy="12" r="1.5"/>',
+  treasury:'<path d="M2 6.5 8 3l6 3.5M3.5 7v5M6.5 7v5M9.5 7v5M12.5 7v5M2 13.5h12"/>',
+  reports:'<path d="M2.5 13.5h11M4.5 11V7.5M8 11V4M11.5 11V9"/>',
+  employee:'<rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><circle cx="8" cy="7" r="2"/><path d="M5 12c.5-1.4 1.6-2.2 3-2.2s2.5.8 3 2.2"/>',
+  support:'<path d="M2.5 3.5h11v7.5H7l-3 2.5v-2.5H2.5z"/><path d="M5.5 6.5h5M5.5 8.5h3"/>',
+  monitor:'<path d="M1.5 8h3l2-4.5 3 9 2-4.5h3"/>',
+  translator:'<path d="M2 3.5h6M5 2v1.5M3.5 3.5c.4 2.4 2 4.2 4 5M6.5 3.5c-.4 2.4-2 4.2-4 5M8.5 14l2.5-6 2.5 6M9.3 12h3.4"/>',
+  payouts:'<rect x="2" y="4" width="12" height="8" rx="1.5"/><circle cx="8" cy="8" r="1.8"/><path d="M4.5 6.5v3M11.5 6.5v3"/>',
+  sybil:'<path d="M8 2 3 4v4c0 3 2.2 5 5 6 2.8-1 5-3 5-6V4z"/><path d="M6 8l1.5 1.5L10.5 6.5"/>',
+  chat:'<path d="M2.5 4.5c0-1 .8-2 2-2h7c1.2 0 2 1 2 2v5c0 1-.8 2-2 2H7l-3 2.5v-2.5h0c-.9-.2-1.5-1-1.5-2z"/>',
+  telegram:'<path d="M14 2.5 2 7.2l4.2 1.4M14 2.5l-2 11-5.8-4.9M14 2.5 6.2 8.6l.3 4.4 2-2.4"/>',
+  audit:'<path d="M4 2.5h6l2.5 2.5v8.5H4z"/><path d="M6 7h4.5M6 9.5h4.5M6 12h2.5"/>',
+  settings:'<circle cx="8" cy="8" r="2"/><path d="M8 1.8v1.7M8 12.5v1.7M14.2 8h-1.7M3.5 8H1.8M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2M12.4 12.4l-1.2-1.2M4.8 4.8 3.6 3.6"/>'};
 const EMP_PAGES=['support','monitor','translator','payouts','sybil'];
-const S={status:null,route:'team',team:null,ledger:{limit:100,f:{}},audit:{kind:'',items:[]},tgChat:[],dirtyRules:false};
+const S={status:null,route:'team',team:null,ledger:{limit:100,f:{}},audit:{kind:'',items:[]},dirtyRules:false};
 function route(){const r=(location.hash||'#team').slice(1).split('?')[0];return PAGES.some(p=>p[0]===r)?r:'team'}
 const member=role=>(S.team?.members||[]).find(m=>m.role===role);
 const roleName=role=>member(role)?.name||(S.team?.roles||[]).find(r=>r.id===role)?.name||role;
 function renderNav(){const pend=S.status?.pending||0;let g='',out='';
   const todo=Object.fromEntries((S.team?.members||[]).map(m=>[m.role,m.todo?.value||0]));
   for(const [k,l,grp,role] of PAGES){
-    if(grp!==g){g=grp;const m=role&&member(role);
-      out+=`<div class="ng">${esc(role&&m?m.name:grp)}${role?(m?(m.enabled?'':'<em class="off">停用</em>'):'<em>未雇佣</em>'):''}</div>`}
-    const badge=k==='approvals'?pend:(EMP_PAGES.includes(k)&&member(role)?todo[role]:0);
-    out+=`<a href="#${k}" ${S.route===k?'aria-current="page"':''}>${l}${badge?`<span class="badge">${badge}</span>`:''}</a>`}
+    if(grp!==g){g=grp;out+=`<div class="ng">${esc(grp==='财务'&&member('finance_ops')?member('finance_ops').name:grp)}</div>`}
+    const m=role&&member(role),emp=EMP_PAGES.includes(k);
+    const state=emp?(m?(m.enabled?'':'<span class="st off">停用</span>'):'<span class="st">未雇佣</span>'):'';
+    const badge=k==='approvals'?pend:(emp&&m?todo[role]:0);
+    out+=`<a href="#${k}" class="${emp&&!(m&&m.enabled)?'idle':''}" ${S.route===k?'aria-current="page"':''}><svg viewBox="0 0 16 16" aria-hidden="true">${NAV_ICON[k]||''}</svg><span class="t">${l}</span>${state}${badge?`<span class="badge" aria-label="${badge} 项待处理">${badge}</span>`:''}</a>`}
   $('#nav').innerHTML=out}
 function renderTop(){const s=S.status||{};
   const pg=PAGES.find(p=>p[0]===S.route);
@@ -361,50 +792,154 @@ window.addEventListener('hashchange',()=>{if(S.dirtyRules&&S.route==='rules'&&!c
 
 async function render(){
   const page=$('#page');
+  document.body.classList.toggle('tgmode',S.route==='chat');
+  if(S.painted!==S.route){S.painted=S.route;page.setAttribute('aria-busy','true');
+    const sk=setTimeout(()=>{if(page.getAttribute('aria-busy'))page.innerHTML=S.route==='overview'?'<div class="sk" aria-label="加载中"><i style="height:180px"></i><i style="height:120px"></i><div class="ov-row"><i style="height:300px"></i><i style="height:300px"></i></div></div>':'<div class="sk" aria-label="加载中"><i style="height:120px"></i><i style="height:320px"></i></div>'},120);
+    try{page.innerHTML=await VIEWS[S.route]();BIND[S.route]&&BIND[S.route]()}catch(e){page.innerHTML=`<div class="note block">这一页没加载出来：${esc(e.message)}<div style="margin-top:8px"><button class="btn sm" onclick="location.reload()">重新加载</button></div></div>`}
+    finally{clearTimeout(sk);page.removeAttribute('aria-busy')}return}
   try{page.innerHTML=await VIEWS[S.route]();BIND[S.route]&&BIND[S.route]()}
   catch(e){page.innerHTML=`<div class="note block">这一页没加载出来：${esc(e.message)}</div>`}
 }
 
 // ---------- 01 overview ----------
-function chart(series){
-  const W=720,H=180,P=24,n=series.length,bw=(W-P)/n;
-  const max=Math.max(1,...series.map(d=>d.auto+d.approval+d.block));
-  let bars='',labels='';
-  series.forEach((d,i)=>{let y=H-20;const x=P+i*bw+2,w=Math.max(2,bw-5);
-    for(const [k,c] of [['auto','var(--ok)'],['approval','var(--review)'],['block','var(--block)']]){const h=d[k]/max*(H-36);if(h>0){y-=h;bars+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"><title>${d.date} ${k==='auto'?'自动付':k==='approval'?'需签字':'拦截'} ${d[k]}</title></rect>`}}
-    if(i%Math.ceil(n/7)===0||i===n-1)labels+=`<text x="${x+w/2}" y="${H-4}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--mono)">${d.date.slice(5)}</text>`});
-  const grid=[0,.5,1].map(f=>{const y=H-20-f*(H-36);return `<line x1="${P}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="0" y="${y+3}" font-size="10" fill="var(--muted)" font-family="var(--mono)">${Math.round(max*f)}</text>`}).join('');
-  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="近 ${n} 天付款请求">${grid}${bars}${labels}</svg></div>
-  <div class="legend"><span><i style="background:var(--ok)"></i>自动付</span><span><i style="background:var(--review)"></i>需签字</span><span><i style="background:var(--block)"></i>拦截</span></div>`}
-function budgetBars(b){return b.length?b.map(x=>{const p=Number(x.limit)>0?Math.min(100,Number(x.spent)/Number(x.limit)*100):0;
-  return `<div class="stack" style="gap:4px"><div class="row"><span class="grow">${esc(x.token)}</span><span class="num">${fmtNum(x.spent)} / ${fmtNum(x.limit)}</span></div><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></div>`}).join(''):'<p class="muted">还没设每日上限。</p>'}
 function feed(items,empty='暂无记录',who=true){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="k ${esc(e.kind)}">${KIND[e.kind]||esc(e.kind)}</span><div>${esc(e.text).replace(/\n/g,'<br>')}${(e.actor&&e.actor!==e.employee)||(who&&e.employee)?`<div class="muted" style="font-size:12px">${esc(e.actor&&e.actor!==e.employee?e.actor:'')}${who&&e.employee?`<span class="who-tag">${esc(roleName(e.employee))}</span>`:''}</div>`:''}</div><span class="t">${fmtTime(e.at)}</span></div>`).join('')}</div>`:`<div class="empty">${empty}</div>`}
 const VIEWS={},BIND={};
+// Order follows what the owner needs first: money moved this month and how it was handled,
+// what is waiting on their signature, then the trend, today's room, who got paid and what happened.
+const OV_OUT=[ // month outcomes, in the order a request can end up; colors are business states
+  ['paid','员工自动付','var(--ok)'],['approved','老板已签','var(--info)'],['executing','执行中','var(--text-2)'],
+  ['pending_approval','等你签字','var(--review)'],['rejected','已驳回','var(--muted)'],['failed','失败','var(--block)'],['blocked','拦截','var(--block)']];
+const OV_SERIES=[['auto','自动付','var(--ok)'],['approval','需签字','var(--review)'],['block','拦截','var(--block)']];
+// Money as "15,699 USDT": integer digits carry the weight, the unit stays quiet.
+const ovMoney=(v,t,cls='')=>`<span class="money ${cls}"><span class="num">${fmtNum(v)}</span><span class="unit">${esc(t)}</span></span>`;
+const ovMoneyList=m=>{const e=Object.entries(m||{});return e.length?e.map(([t,v])=>ovMoney(v,t)).join(''):ovMoney(0,'')};
+function ovSub(a,b){const out={};for(const [t,v] of Object.entries(a||{})){const d=Number(v)-Number((b||{})[t]||0);if(Math.abs(d)>1e-9)out[t]=String(Math.round(d*1e6)/1e6)}return out}
+// Axis top: even, so the middle gridline is a whole number too.
+function ovNiceMax(n){if(n<=10)return Math.max(2,Math.ceil(n/2)*2);const u=Math.pow(10,Math.floor(Math.log10(n)))/5*2;return Math.ceil(n/u)*u}
+function ovChart(series){
+  const tot=series.map(d=>d.auto+d.approval+d.block),max=ovNiceMax(Math.max(...tot,0)),ticks=[max,max/2,0];
+  const sum=k=>series.reduce((a,d)=>a+d[k],0);
+  const step=Math.ceil(series.length/7),today=series.length-1;
+  return `<div class="ovc" role="group" aria-label="近 ${series.length} 天付款请求，按处理结果">
+    <div class="ovc-plot">
+      <div class="ovc-y" aria-hidden="true">${ticks.map(t=>`<span>${Number.isInteger(t)?t:t.toFixed(1)}</span>`).join('')}</div>
+      <div class="ovc-area">
+        ${ticks.map((t,i)=>`<i class="ovc-grid" style="top:${i*50}%"></i>`).join('')}
+        <div class="ovc-cols">${series.map((d,i)=>{const n=tot[i];
+          return `<button type="button" class="ovc-col${i===today?' today':''}" data-i="${i}" aria-label="${esc(d.date)}：自动付 ${d.auto}，需签字 ${d.approval}，拦截 ${d.block}">
+            <span class="ovc-stack" style="height:${n/max*100}%">${OV_SERIES.map(([k,,c])=>d[k]?`<i style="flex:${d[k]};background:${c}"></i>`:'').reverse().join('')}</span>
+            ${n?'':'<span class="ovc-zero"></span>'}</button>`}).join('')}</div>
+        <div class="ovc-tip" id="ovTip" role="status" hidden></div>
+      </div>
+    </div>
+    <div class="ovc-x" aria-hidden="true">${series.map((d,i)=>`<span>${i===today?'今天':i%step===0&&today-i>=step?esc(d.date.slice(5).replace('-','/')):''}</span>`).join('')}</div>
+    <div class="ovc-legend">${OV_SERIES.map(([k,l,c])=>`<span><i style="background:${c}"></i>${l}<b class="num">${sum(k)}</b></span>`).join('')}</div>
+  </div>`}
+function ovQuota(b){
+  if(!b.length)return `<div class="ov-empty">还没设每日自动付上限。<a href="#rules">去规则里设置</a></div>`;
+  return `<ul class="ovq">${b.map(x=>{const spent=Number(x.spent),lim=Number(x.limit);
+    const off=!(lim>0),p=off?0:Math.min(100,spent/lim*100),over=!off&&spent>lim,warn=!off&&!over&&p>=80;
+    const state=off?'<span class="muted">未开启自动付</span>':over?`<span class="block">超出 ${fmtNum(spent-lim)}</span>`:spent>=lim?'<span class="block">已用满</span>':warn?`<span class="review">已用 ${Math.round(p)}%</span>`:`<span class="muted">剩余 ${fmtNum(lim-spent)}</span>`;
+    return `<li><div class="ovq-hd"><b>${esc(x.token)}</b><span class="num"><span class="${spent?'':'muted'}">${fmtNum(spent)}</span><span class="muted"> / ${fmtNum(lim)}</span></span></div>
+      <div class="bar ${over||(!off&&spent>=lim)?'over':warn?'warn':''}" role="progressbar" aria-label="${esc(x.token)} 今日已自动付" aria-valuemin="0" aria-valuemax="${esc(x.limit)}" aria-valuenow="${esc(x.spent)}"><i style="width:${p}%"></i></div>
+      <div class="ovq-ft">${state}</div></li>`}).join('')}</ul>`}
+const OV_OBJ=[ // what an event is about, and where to look at it
+  ['request_id',v=>[`付款 ${short(String(v))}`,`data-detail="${esc(v)}"`]],
+  ['batch',v=>[`结算批次 #${v}`,'href="#payouts"']],['check',v=>[`反女巫检查 #${v}`,'href="#sybil"']],
+  ['role',v=>[roleName(v),'href="#team"']],['changes',()=>['规则','href="#rules"']]];
+function ovActivity(items){
+  if(!items.length)return '<div class="ov-empty">还没有操作或预警。员工付款、老板签字、规则修改都会出现在这里。</div>';
+  return `<ol class="ova">${items.map(e=>{const d=e.data||{};let obj='';
+    for(const [k,f] of OV_OBJ)if(d[k]!=null){const [l,attr]=f(d[k]);obj=attr.startsWith('href')?`<a ${attr}>${esc(l)}</a>`:`<button type="button" class="lnk" ${attr}>${esc(l)}</button>`;break}
+    if(!obj&&d.url)obj=`<a href="${esc(d.url)}" target="_blank" rel="noreferrer">链上交易</a>`;
+    const alert=e.kind==='alert',sev=d.severity==='high'||d.severity==='critical';
+    const who=e.actor==='console'?'控制台':e.actor||'';
+    const head=String(e.text).split('\n')[0];
+    return `<li class="ova-it ${alert?(sev?'crit':'warn'):''}">
+      <span class="ova-dot" aria-hidden="true"></span>
+      <div class="ova-main"><div class="ova-t">${alert?`<span class="ova-k">${sev?'高危预警':'预警'}</span>`:''}${esc(head)}</div>
+        <div class="ova-meta">${obj?`${obj}<span aria-hidden="true">·</span>`:''}${e.employee?`<span>${esc(roleName(e.employee))}</span>`:''}${who&&who!==e.employee?`<span aria-hidden="true">·</span><span class="mono">${esc(who)}</span>`:''}<button type="button" class="ova-tg" aria-expanded="false" aria-controls="ova${e.id}">详情</button></div>
+        <div class="ova-more" id="ova${e.id}" hidden><dl class="kv"><dt>时间</dt><dd class="mono">${esc(fmtTime(e.at))}</dd><dt>类型</dt><dd>${KIND[e.kind]||esc(e.kind)}</dd><dt>操作人</dt><dd class="mono">${esc(e.actor||'—')}</dd><dt>原文</dt><dd>${esc(e.text).replace(/\n/g,'<br>')}</dd>${Object.keys(d).length?`<dt>数据</dt><dd><code class="ova-json">${esc(JSON.stringify(d))}</code></dd>`:''}</dl></div></div>
+      <time class="ova-time" datetime="${esc(e.at)}" title="${esc(fmtTime(e.at))}">${ago(e.at)}</time></li>`}).join('')}</ol>`}
+function ovQueue(rows,total){
+  if(!total)return `<div class="ovs-ok"><span class="dot ok" aria-hidden="true"></span>没有等你签字的付款。员工遇到超额、需审批的类别或收款人时会排到这里。</div>`;
+  return `<ul class="ovp">${rows.map(r=>`<li><button type="button" class="ovp-row" data-detail="${esc(r.request_id)}">
+      <span class="ovp-who"><b>${r.payee_name?esc(r.payee_name):'<span class="block">白名单外</span>'}</b><span class="mono muted" title="${esc(r.payee)}">${esc(short(r.payee))}</span></span>
+      <span class="ovp-why">${esc(r.memo||'')}${r.messages&&r.messages.length?`<span class="ovp-reason">${esc(r.messages[0])}${r.messages.length>1?` 等 ${r.messages.length} 条`:''}</span>`:''}</span>
+      <span class="ovp-age" title="${esc(fmtTime(r.created_at))}">${ago(r.created_at)}</span>
+      <span class="ovp-amt">${ovMoney(r.amount,r.token)}</span></button></li>`).join('')}</ul>
+    ${total>rows.length?`<div class="ovp-more">还有 ${total-rows.length} 笔 · <a href="#approvals">全部审批</a></div>`:''}`}
 VIEWS.overview=async()=>{
   const o=await api('/api/overview');const m=o.month,c=m.counts;
-  const rate=m.automation_rate==null?'—':Math.round(m.automation_rate*100)+'%';
-  const blocked=c.blocked||0;
+  const pend=o.pending?await api('/api/payments?status=pending_approval&limit=4'):[];
+  S.ovSeries=o.series;
+  const rate=m.automation_rate,blocked=c.blocked||0,signed=ovSub(m.moved,m.auto_paid);
+  const outs=OV_OUT.filter(([k])=>c[k]),total=m.requests||0;
+  const monthName=`${Number(m.start.slice(5,7))} 月`;
   return `
   ${o.status.paused?'<div class="note block"><b>付款已暂停。</b> 所有新请求都会被拦截。点右上角「恢复付款」恢复。</div>':''}
   ${o.status.read_only?'<div class="note">试用只读模式：员工只记账、出报表和预警，所有付款都要老板确认。到 <a href="#rules">规则</a> 里关闭。</div>':''}
-  <div class="grid g4">
-    <section class="card kpi"><span class="label">本月经手资金</span><span class="v">${fmtMoved(m.moved)}</span><span class="s">自动付 + 老板签字 · ${esc(m.start)} 起</span></section>
-    <section class="card kpi"><span class="label">自动处理率</span><span class="v">${rate}</span><span class="s">没被拦截的请求里，员工自己办完的占比</span></section>
-    <section class="card kpi"><span class="label">等你签字</span><span class="v ${o.pending?'review':''}">${o.pending}</span><span class="s">${o.pending?'<a href="#approvals">去审批 →</a>':'没有待签字的付款'}</span></section>
-    <section class="card kpi"><span class="label">本月拦截</span><span class="v ${blocked?'block':''}">${blocked}</span><span class="s">涉及 ${Object.entries(m.blocked_value).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></section>
+  <div class="ov-period"><span>${monthName} · ${esc(m.start.slice(5).replace('-','/'))} 至今</span><span class="muted">时区 ${esc(TZ)}</span></div>
+  <section class="ovs" aria-label="本月概况">
+    <div class="ovs-main">
+      <div class="ovs-label">本月经手资金</div>
+      <div class="ovs-big">${ovMoneyList(m.moved)}</div>
+      <dl class="ovs-split">
+        <div><dt><i style="background:var(--ok)"></i>员工自动付</dt><dd>${Object.keys(m.auto_paid).length?Object.entries(m.auto_paid).map(([t,v])=>ovMoney(v,t)).join(''):'<span class="muted">0</span>'}</dd></div>
+        <div><dt><i style="background:var(--info)"></i>老板签字后付出</dt><dd>${Object.keys(signed).length?Object.entries(signed).map(([t,v])=>ovMoney(v,t)).join(''):'<span class="muted">0</span>'}</dd></div>
+      </dl>
+    </div>
+    <div class="ovs-rate">
+      <div class="ovs-label">自动处理率 <span class="tip" tabindex="0" aria-label="说明" data-tip="没被拦截的请求里，员工按规则自己办完、不用你签字的占比">?</span></div>
+      <div class="ovs-num">${rate==null?'<span class="muted">—</span>':Math.round(rate*100)+'<small>%</small>'}</div>
+      ${total?`<div class="ovs-stack" role="img" aria-label="本月 ${total} 笔请求的处理结果">${outs.map(([k,l,col])=>`<i style="flex:${c[k]};background:${col}" title="${l} ${c[k]}"></i>`).join('')}</div>
+      <ul class="ovs-legend">${OV_OUT.filter(([k])=>k!=='executing'||c[k]).map(([k,l,col])=>`<li class="${c[k]?'':'zero'}"><i style="background:${col}"></i>${l}<b class="num">${c[k]||0}</b></li>`).join('')}</ul>
+      <div class="ovs-foot">本月共 <b class="num">${total}</b> 笔请求</div>`:'<div class="ovs-foot">本月还没有付款请求。</div>'}
+    </div>
+    <div class="ovs-block ${blocked?'has':''}">
+      <div class="ovs-label">本月拦截</div>
+      <div class="ovs-num ${blocked?'block':''}">${blocked}<small> 笔</small></div>
+      <div class="ovs-sub">${blocked?`拦下 ${Object.entries(m.blocked_value).map(([t,v])=>ovMoney(v,t)).join('、')}`:'<span class="muted">没有触发拦截规则的请求</span>'}</div>
+      ${blocked?'<button type="button" class="btn sm" id="ovBlocked">查看拦截记录</button>':''}
+    </div>
+  </section>
+  <section class="ovpanel ovq-panel ${o.pending?'attn':''}">
+    <header><h2>等你签字${o.pending?`<span class="badge">${o.pending}</span>`:''}</h2><span class="muted ovh-sub">员工不能自己签多签，这些付款在等你</span>${o.pending?'<a class="btn sm signal" href="#approvals">去审批</a>':''}</header>
+    ${ovQueue(pend,o.pending)}
+  </section>
+  <div class="ov-row">
+    <section class="ovpanel ov-chart"><header><h2>近 ${o.series.length} 天付款请求</h2><span class="muted ovh-sub">共 <b class="num">${o.series.reduce((a,d)=>a+d.auto+d.approval+d.block,0)}</b> 笔 · 按规则判断结果</span></header>${ovChart(o.series)}</section>
+    <section class="ovpanel ov-quota"><header><h2>今日自动付额度</h2><span class="muted ovh-sub">今天 ${o.today.requests} 笔请求</span></header>${ovQuota(o.today.budget)}
+      <p class="ov-note">只算员工自己付出的金额，老板签字的不占额度。</p></section>
   </div>
-  <div class="grid g3">
-    ${card('近 14 天请求',chart(o.series),{cls:'span2',right:`<span class="label">共 ${o.series.reduce((a,d)=>a+d.auto+d.approval+d.block,0)} 笔</span>`})}
-    ${card('今日自动付额度',`<div class="stack">${budgetBars(o.today.budget)}<p class="muted" style="margin:0;font-size:12px">只算员工自己付的，老板签字的不占额度。今天 ${o.today.requests} 笔请求。</p></div>`)}
-  </div>
-  <div class="grid g2">
-    ${card('本月收款方 Top 5',o.top_payees.length?`<div class="scroll"><table><thead><tr><th>收款方</th><th class="r">经手</th><th class="r">笔数</th></tr></thead><tbody>${o.top_payees.map(p=>`<tr class="click" data-payee="${esc(p.payee)}"><td>${p.payee_name?esc(p.payee_name):'<span class="block">白名单外</span>'}<div class="muted mono" style="font-size:11px">${esc(short(p.payee))}</div></td><td class="r">${fmtMoved(p.moved)}</td><td class="r num">${p.requests}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">本月还没有付款请求</div>',{flush:true,right:'<a class="btn sm" href="#payees">全部收款人</a>'})}
-    ${card('最近动态',feed(o.recent,'还没有操作或预警'),{flush:true,right:'<a class="btn sm" href="#audit">审计日志</a>'})}
-  </div>
-  <div class="grid g4">
-    ${[['自动付',c.paid,'ok'],['老板已签',c.approved,'ok'],['已驳回',c.rejected,'muted'],['失败',c.failed,c.failed?'block':'muted']].map(([l,v,k])=>`<section class="card kpi"><span class="label">本月 · ${l}</span><span class="v ${k}">${v||0}</span></section>`).join('')}
+  <div class="ov-row b">
+    <section class="ovpanel ov-payees"><header><h2>本月收款方 Top 5</h2><a class="btn sm ghost" href="#payees">全部收款人</a></header>
+      ${o.top_payees.length?`<div class="scroll"><table class="ovt"><thead><tr><th>收款方</th><th class="r">笔数</th><th class="r hide-sm">拦截</th><th class="hide-sm">最近一笔</th><th class="r" aria-sort="descending">本月经手 <span aria-hidden="true">↓</span></th></tr></thead><tbody>
+        ${o.top_payees.map(p=>`<tr class="click" tabindex="0" data-payee="${esc(p.payee)}" aria-label="查看 ${esc(p.payee_name||p.payee)} 的账本">
+          <td><div class="ovt-who">${p.payee_name?`<b>${esc(p.payee_name)}</b>`:'<b class="block">白名单外</b>'}<span class="mono muted" title="${esc(p.payee)}">${esc(short(p.payee))}</span></div></td>
+          <td class="r num">${p.requests}</td><td class="r num hide-sm ${p.blocked?'block':'muted'}">${p.blocked||'—'}</td>
+          <td class="hide-sm muted" title="${esc(fmtTime(p.last_at))}">${ago(p.last_at)}</td>
+          <td class="r">${Object.keys(p.moved).length?Object.entries(p.moved).map(([t,v])=>ovMoney(v,t)).join('<br>'):'<span class="muted">0</span>'}</td></tr>`).join('')}
+      </tbody></table></div>`:'<div class="ov-empty">本月还没有付款请求。</div>'}</section>
+    <section class="ovpanel ov-act"><header><h2>最近动态</h2><span class="muted ovh-sub">操作和预警</span><a class="btn sm ghost" href="#audit">审计日志</a></header>${ovActivity(o.recent)}</section>
   </div>`};
-BIND.overview=()=>{document.querySelectorAll('[data-payee]').forEach(tr=>tr.onclick=()=>{S.ledger.f={payee:tr.dataset.payee};location.hash='#ledger'})};
+BIND.overview=()=>{
+  const go=tr=>{S.ledger.f={payee:tr.dataset.payee};location.hash='#ledger'};
+  document.querySelectorAll('[data-payee]').forEach(tr=>{tr.onclick=()=>go(tr);tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go(tr)}}});
+  const bl=$('#ovBlocked');if(bl)bl.onclick=()=>{S.ledger.f={status:'blocked'};location.hash='#ledger'};
+  bindDetail();
+  document.querySelectorAll('.ova-tg').forEach(b=>b.onclick=()=>{const el=document.getElementById(b.getAttribute('aria-controls'));const open=el.hidden;el.hidden=!open;b.setAttribute('aria-expanded',String(open))});
+  // chart tooltip: follows hover and keyboard focus
+  const tip=$('#ovTip'),area=document.querySelector('.ovc-area');
+  if(tip&&area){const show=col=>{const d=S.ovSeries[+col.dataset.i];if(!d)return;
+      const moved=Object.entries(d.moved||{});
+      tip.innerHTML=`<b>${esc(d.date)}</b>${OV_SERIES.map(([k,l,c])=>`<span><i style="background:${c}"></i>${l}<b class="num">${d[k]}</b></span>`).join('')}<span class="muted">付出 ${moved.length?moved.map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、'):'0'}</span>`;
+      tip.hidden=false;const a=area.getBoundingClientRect(),r=col.getBoundingClientRect();
+      const x=Math.min(Math.max(r.left-a.left+r.width/2-tip.offsetWidth/2,0),a.width-tip.offsetWidth);tip.style.left=x+'px';
+      area.querySelectorAll('.ovc-col').forEach(c=>c.classList.toggle('on',c===col))};
+    const hide=()=>{tip.hidden=true;area.querySelectorAll('.ovc-col.on').forEach(c=>c.classList.remove('on'))};
+    area.querySelectorAll('.ovc-col').forEach(col=>{col.onmouseenter=col.onfocus=()=>show(col);col.onblur=hide});
+    area.onmouseleave=hide}};
 
 // ---------- 02 approvals ----------
 VIEWS.approvals=async()=>{
@@ -423,17 +958,19 @@ BIND.approvals=()=>{
   document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=async()=>{if(await confirmBox('确认已签字？',`确认你已经在 Safe 里签字并执行了 <b class="mono">${esc(b.dataset.ap)}</b>。控制台只记账，不会再付一次。`,'已签字'))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.ap)}/approve`))});
   document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=async()=>{if(await confirmBox('驳回这笔付款？',`<b class="mono">${esc(b.dataset.rj)}</b> 会标记为已驳回，不会付款。之后可以让团队重新发请求。`,'驳回',true))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.rj)}/reject`))});
   bindDetail()};
-function bindDetail(){document.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.detail))}
+function bindDetail(){document.querySelectorAll('[data-detail]').forEach(b=>{
+  b.onclick=e=>{const t=e.target.closest('a,button,[data-copy]');if(t&&t!==b)return;showDetail(b.dataset.detail)};
+  if(b.tagName==='TR')b.onkeydown=e=>{if(e.key==='Enter'&&e.target===b)showDetail(b.dataset.detail)}})}
 async function showDetail(id){
   try{const d=await api('/api/payments/'+encodeURIComponent(id));const [ol,oc]=OUTCOME[d.outcome]||[d.outcome,'muted'];
-  drawer(id,`<div class="row">${st(d.status)}<span class="pill ${oc}">规则判断：${ol}</span></div>
+  drawer('付款详情',`<div class="row">${st(d.status)}<span class="pill ${oc}">规则判断：${ol}</span></div>
+    <div class="lg-dhead"><span class="money"><span class="num">${fmtNum(d.amount)}</span><span class="unit">${esc(d.token)}</span></span><span class="id mono" title="${esc(d.request_id)}">${esc(d.request_id)}${icopy(d.request_id,'编号')}</span></div>
     <dl class="kv">
       <dt>收款方</dt><dd>${d.payee_name?esc(d.payee_name)+'<br>':''}${addr(d.payee,d.payee_url)}</dd>
-      <dt>金额</dt><dd>${fmtAmt(d.amount,d.token)}</dd>
       <dt>用途</dt><dd>${esc(d.memo||'—')}</dd><dt>类别</dt><dd>${esc(d.category||'—')}</dd>
       <dt>谁发的</dt><dd>${esc(d.requester)}</dd>
       <dt>收到时间</dt><dd class="mono">${fmtTime(d.created_at)}</dd><dt>最后更新</dt><dd class="mono">${fmtTime(d.updated_at)}</dd>
-      ${d.tx_hash?`<dt>交易</dt><dd>${d.tx_url?`<a href="${esc(d.tx_url)}" target="_blank" rel="noreferrer" class="mono">${esc(short(d.tx_hash))}</a> `:`<span class="mono">${esc(d.tx_hash)}</span>`} <button class="copy" data-copy="${esc(d.tx_hash)}">复制</button></dd>`:''}
+      ${d.tx_hash?`<dt>交易</dt><dd>${!realTx(d.tx_hash)?`<span class="muted">测试模式，未上链</span>`:`<span class="id mono">${d.tx_url?`<a href="${esc(d.tx_url)}" target="_blank" rel="noreferrer" title="${esc(d.tx_hash)}">${esc(short(d.tx_hash))} ↗</a>`:`<span title="${esc(d.tx_hash)}">${esc(short(d.tx_hash))}</span>`}${icopy(d.tx_hash,'交易哈希')}</span>`}</dd>`:''}
       ${d.safe_tx_hash?`<dt>Safe 交易哈希</dt><dd>${addr(d.safe_tx_hash)}</dd>`:''}
       ${d.decided_by?`<dt>处理人</dt><dd>${esc(d.decided_by)}</dd>`:''}
       ${d.error?`<dt>错误</dt><dd class="block">${esc(d.error)}</dd>`:''}
@@ -448,37 +985,66 @@ async function showDetail(id){
     </ol></div>
     ${d.status==='pending_approval'?`<div class="row"><button class="btn ok" data-ap2>已签字</button><button class="btn danger" data-rj2>驳回</button></div>`:''}`);
   const ap=$('#overlay [data-ap2]'),rj=$('#overlay [data-rj2]');
-  if(ap)ap.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/approve`))};
-  if(rj)rj.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/reject`))};
+  if(ap)ap.onclick=async()=>{if(await confirmBox('确认已签字？',`确认你已经在 Safe 里签字并执行了 <b class="mono">${esc(id)}</b>。控制台只记账，不会再付一次。`,'已签字'))await act(()=>post(`/api/payments/${encodeURIComponent(id)}/approve`))};
+  if(rj)rj.onclick=async()=>{if(await confirmBox('驳回这笔付款？',`<b class="mono">${esc(id)}</b> 会标记为已驳回，不会付款。之后可以让团队重新发请求。`,'驳回',true))await act(()=>post(`/api/payments/${encodeURIComponent(id)}/reject`))};
   }catch(e){toast(e.message,true)}}
 
 // ---------- 03 ledger ----------
+const ICON_COPY='<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>';
+const icopy=(v,what)=>`<button class="icopy" data-copy="${esc(v)}" title="复制${what}" aria-label="复制${what}">${ICON_COPY}</button>`;
+const shortId=id=>id&&id.length>16?id.slice(0,8)+'…'+id.slice(-6):(id||'');
+// a "dry-run:" hash comes from test mode: nothing went on chain, so it never gets an explorer link
+const realTx=h=>!!h&&!/^dry-run:/.test(h);
 function ledgerQuery(extra){const f=S.ledger.f,q=new URLSearchParams();for(const k of ['status','token','payee','q','start','end'])if(f[k])q.set(k,f[k]);if(extra)for(const[k,v]of Object.entries(extra))q.set(k,v);return q.toString()}
+function ledgerWhy(r){
+  if(r.error)return `<span class="trunc why block" title="${esc(r.error)}">${esc(r.error)}</span>`;
+  if(r.messages.length){const all=r.messages.join('；');return `<span class="trunc why" title="${esc(all)}">${esc(r.messages[0])}${r.messages.length>1?` <span class="muted">+${r.messages.length-1}</span>`:''}</span>`}
+  if(r.tx_hash)return realTx(r.tx_hash)?`<span class="id">${esc(short(r.tx_hash))}${icopy(r.tx_hash,'交易哈希')}</span>`:'<span class="why muted">测试模式 · 未上链</span>';
+  return '<span class="muted">—</span>'}
 VIEWS.ledger=async()=>{
   const f=S.ledger.f,tokens=[...new Set([...Object.keys(S.rules.single_limit||{}),...Object.keys(S.rules.daily_limit||{})])];
   const rows=await api('/api/payments?'+ledgerQuery({limit:S.ledger.limit}));
-  const sum={};rows.forEach(r=>{if(r.status==='paid'||r.status==='approved')sum[r.token]=(sum[r.token]||0)+Number(r.amount)});
+  const sum={};let waiting=0,stopped=0;
+  rows.forEach(r=>{if(r.status==='paid'||r.status==='approved')sum[r.token]=(sum[r.token]||0)+Number(r.amount);
+    if(r.status==='pending_approval')waiting++;if(r.status==='blocked'||r.status==='failed')stopped++});
+  const full=rows.length>=S.ledger.limit,filtered=['status','token','payee','q','start','end'].some(k=>f[k]);
+  const sums=Object.entries(sum),scope=full?`最近 ${rows.length} 笔`:`共 ${rows.length} 笔`;
   return `
-  <section class="card"><div class="bd"><div class="grid g4" style="gap:10px">
-    <label class="f"><span>状态</span><select id="fStatus"><option value="">全部</option>${Object.entries(STATUS).map(([k,[l]])=>`<option value="${k}" ${f.status===k?'selected':''}>${l}</option>`).join('')}<option value="paid,approved" ${f.status==='paid,approved'?'selected':''}>已付出（自动 + 签字）</option></select></label>
-    <label class="f"><span>币种</span><select id="fToken"><option value="">全部</option>${tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
-    <label class="f"><span>从</span><input type="date" id="fStart" value="${esc((f.start||'').slice(0,10))}"></label>
-    <label class="f"><span>到（含）</span><input type="date" id="fEnd" value="${esc(f.endDay||'')}"></label>
+  <div class="lg-sum" aria-label="当前列表汇总">
+    <div><span class="k">记录${filtered?'（已筛选）':''}</span><span class="v">${fmtNum(rows.length)}${full?'<span class="unit">笔以上</span>':'<span class="unit">笔</span>'}</span><span class="s">${full?'只加载了最近 '+S.ledger.limit+' 笔':'当前条件下全部'}</span></div>
+    <div><span class="k">已付出</span>${sums.length?sums.map(([t,v])=>`<span class="v${sums.length>1?' sm':''}">${fmtNum(v)}<span class="unit">${esc(t)}</span></span>`).join(''):'<span class="v">0</span>'}<span class="s">自动付 + 老板已签，${scope}</span></div>
+    <div><span class="k">待签字</span><span class="v ${waiting?'review':''}">${waiting}</span><span class="s">${scope}</span></div>
+    <div><span class="k">拦截 / 失败</span><span class="v ${stopped?'block':''}">${stopped}</span><span class="s">${scope}</span></div>
   </div>
-  <div class="row" style="margin-top:10px"><input id="fQ" class="grow" style="width:auto" placeholder="搜索编号、用途、类别、发起人、地址" value="${esc(f.q||'')}">
-    ${f.payee?`<span class="chip">收款方 ${esc(short(f.payee))}<button data-clearpayee aria-label="清除">×</button></span>`:''}
-    <button class="btn" id="fApply">筛选</button><button class="btn ghost" id="fReset">清空</button><button class="btn" id="csv">导出 CSV</button></div></div></section>
-  <section class="card"><div class="hd"><h2>${rows.length} 笔${rows.length>=S.ledger.limit?'（只显示最近 '+S.ledger.limit+' 笔）':''}</h2><span class="muted" style="font-size:12px">已付出：${Object.entries(sum).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></div>
-  <div class="bd flush scroll">${rows.length?`<table><thead><tr><th>时间</th><th>编号</th><th>收款方</th><th class="r">金额</th><th class="hide-sm">用途</th><th>状态</th><th class="hide-sm">原因 / 交易</th></tr></thead><tbody>${rows.map(r=>`<tr class="click" data-detail="${esc(r.request_id)}"><td class="mono" style="white-space:nowrap">${fmtTime(r.created_at)}</td><td class="mono">${esc(r.request_id)}</td><td>${r.payee_name?esc(r.payee_name):`<span class="mono">${esc(short(r.payee))}</span>`}</td><td class="r" style="white-space:nowrap">${fmtAmt(r.amount,r.token)}</td><td class="hide-sm">${esc(r.memo||'—')}</td><td>${st(r.status)}</td><td class="hide-sm muted" style="font-size:12px">${r.messages.length?esc(r.messages.join('；')):(r.tx_hash?`<span class="mono">${esc(short(r.tx_hash))}</span>`:'')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">没有符合条件的记录</div>'}</div>
-  ${rows.length>=S.ledger.limit?`<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="more">再加载 ${S.ledger.limit} 笔</button></div>`:''}</section>`};
+  <div class="lg-bar" role="search">
+    <label class="lg-search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="fQ" type="search" placeholder="搜索编号、用途、类别、发起人、地址" aria-label="搜索账本" value="${esc(f.q||'')}"></label>
+    <select id="fStatus" aria-label="状态"><option value="">全部状态</option>${Object.entries(STATUS).map(([k,[l]])=>`<option value="${k}" ${f.status===k?'selected':''}>${l}</option>`).join('')}<option value="paid,approved" ${f.status==='paid,approved'?'selected':''}>已付出（自动 + 签字）</option></select>
+    <select id="fToken" aria-label="币种"><option value="">全部币种</option>${tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
+    <span class="lg-range"><input type="date" id="fStart" aria-label="开始日期" value="${esc((f.start||'').slice(0,10))}"><span aria-hidden="true">–</span><input type="date" id="fEnd" aria-label="结束日期（含）" value="${esc(f.endDay||'')}"></span>
+    ${f.payee?`<span class="chip">收款方 <span class="mono">${esc(short(f.payee))}</span><button data-clearpayee aria-label="清除收款方筛选">×</button></span>`:''}
+    <span class="end">${filtered?'<button class="btn ghost" id="fReset">清空筛选</button>':''}<button class="btn" id="csv">导出 CSV</button></span>
+  </div>
+  <section class="card">
+    ${rows.length?`<div class="lg-scroll"><table class="lg"><thead><tr><th>时间</th><th class="hide-sm">编号</th><th>收款方</th><th class="r">金额</th><th class="hide-sm">用途</th><th>状态</th><th class="hide-sm hide-md">原因 / 交易</th></tr></thead><tbody>${rows.map(r=>`<tr class="click" tabindex="0" data-detail="${esc(r.request_id)}" aria-label="付款 ${esc(r.request_id)}，查看详情">
+      <td class="t">${fmtTime(r.created_at)}</td>
+      <td class="hide-sm"><span class="id" title="${esc(r.request_id)}">${esc(shortId(r.request_id))}${icopy(r.request_id,'编号')}</span></td>
+      <td><span class="who">${r.payee_name?`<b>${esc(r.payee_name)}</b><span>${esc(short(r.payee))}</span>`:`<b class="mono">${esc(short(r.payee))}</b><span>白名单外</span>`}</span></td>
+      <td class="r amt"><span class="money"><span class="num">${fmtNum(r.amount)}</span><span class="unit">${esc(r.token)}</span></span></td>
+      <td class="hide-sm"><span class="trunc memo" title="${esc(r.memo||'')}">${esc(r.memo||'—')}</span></td>
+      <td>${st(r.status)}</td>
+      <td class="hide-sm hide-md">${ledgerWhy(r)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="lg-ft"><span>显示 ${rows.length} 笔，点任意一行看详情</span>${full?`<button class="btn sm" id="more">加载更多</button>`:''}</div>`
+    :`<div class="lg-empty">${filtered?'<span>没有符合条件的记录</span><button class="btn sm" id="fReset2">清空筛选</button>':'<span>还没有付款记录。团队在群里发付款请求后会出现在这里。</span>'}</div>`}
+  </section>`};
 BIND.ledger=()=>{
   const apply=()=>{const end=$('#fEnd').value;S.ledger.f={...S.ledger.f,status:$('#fStatus').value,token:$('#fToken').value,q:$('#fQ').value.trim(),start:$('#fStart').value,endDay:end,end:end?new Date(new Date(end+'T00:00:00Z').getTime()+864e5).toISOString().slice(0,10):''};S.ledger.limit=100;render()};
-  $('#fApply').onclick=apply;$('#fQ').onkeydown=e=>{if(e.key==='Enter')apply()};
+  $('#fQ').onkeydown=e=>{if(e.key==='Enter')apply()};
+  $('#fQ').onchange=()=>{if($('#fQ').value.trim()!==(S.ledger.f.q||''))apply()};
   ['#fStatus','#fToken','#fStart','#fEnd'].forEach(s=>$(s).onchange=apply);
-  $('#fReset').onclick=()=>{S.ledger.f={};render()};
+  document.querySelectorAll('#fReset,#fReset2').forEach(b=>b.onclick=()=>{S.ledger.f={};S.ledger.limit=100;render()});
   const cp=document.querySelector('[data-clearpayee]');if(cp)cp.onclick=()=>{delete S.ledger.f.payee;render()};
   const more=$('#more');if(more)more.onclick=()=>{S.ledger.limit+=100;render()};
-  $('#csv').onclick=async()=>{if(window.CONSOLE_DEMO)return toast('演示版不能下载文件。正式版点这里会下载当前筛选结果的 CSV。');try{const t=await api('/api/payments.csv?'+ledgerQuery());const url=URL.createObjectURL(new Blob([t],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='ledger-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出')}catch(e){toast(e.message,true)}};
+  $('#csv').onclick=async()=>{if(window.CONSOLE_DEMO)return toast('演示版不能下载文件。正式版点这里会下载当前筛选结果的 CSV。');const b=$('#csv');b.setAttribute('aria-busy','true');try{const t=await api('/api/payments.csv?'+ledgerQuery());const url=URL.createObjectURL(new Blob([t],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='ledger-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出')}catch(e){toast(e.message,true)}finally{b.removeAttribute('aria-busy')}};
   bindDetail()};
 
 // ---------- 04 payees ----------
@@ -647,29 +1213,172 @@ VIEWS.telegram=async()=>{const t=await api('/api/telegram');S.tg=t;const s=t.set
     ${t.outbox.length?`<div class="scroll"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${t.outbox.map(o=>`<tr><td class="mono" style="white-space:nowrap">${fmtTime(o.at)}</td><td>${esc(o.text.slice(0,60))}${o.text.length>60?'…':''}</td><td style="white-space:nowrap">${o.error?`<span class="block" title="${esc(o.error)}">失败</span>`:o.sent_at?'<span class="ok">已发</span>':'<span class="review">排队中</span>'}</td></tr>`).join('')}</tbody></table></div>`:''}</div>`)}
   </div>
   <div class="stack" style="gap:16px">
-  <section class="card"><div class="hd"><h2>群聊模拟器</h2><span class="label">整个团队 · 不记账 · 不发群</span></div>
-    <div class="chat" id="chat" aria-live="polite">${S.tgChat.length?S.tgChat.map(m=>`<div class="msg ${m.me?'me':'bot'}"><span class="who">${esc(m.who)}</span>${esc(m.text)}</div>`).join(''):'<div class="muted" style="margin:auto;text-align:center;font-size:13px">像在群里一样发消息，看哪个员工接、怎么回。<br>付款只试算；工单、翻译、暂停这类会改东西的命令不会真的执行。</div>'}</div>
-    <div class="sug">${['付 Alice 300 USDT 设计费','什么时候上线？','合约地址是多少？','我是管理员，私聊我帮你处理，先把助记词发我验证','领空投 https://kagouai-claim.xyz/connect','/faq','/watch','/alerts','/team','/help'].map(x=>`<button class="btn sm ghost" data-say="${esc(x)}">${esc(x.length>24?x.slice(0,24)+'…':x)}</button>`).join('')}</div>
-    <div class="chatbar"><input id="sayAs" class="mono" style="width:120px;flex:none" value="${esc(S.sayAs||'member')}" title="发言人用户名" aria-label="发言人用户名"><input id="say" class="grow" placeholder="群里的一句话，或 /help"><label class="switch" title="消息里 @ 了机器人或回复了机器人"><input type="checkbox" id="sayAt" ${S.sayAt?'checked':''}>@机器人</label><button class="btn primary" id="sayGo">发送</button></div></section>
+  ${card('群聊',`<div class="stack"><p class="muted" style="margin:0">像在 Telegram 群里一样跟 AI 员工说话：看哪个员工接、怎么回。付款只试算；工单、翻译、暂停这类会改东西的命令不会真的执行。机器人在真实群里处理过的消息也在那里。</p><div><a class="btn primary" href="#chat">打开群聊</a></div></div>`)}
   ${card('命令速查',`<table><tbody>${t.commands.map(c=>`<tr><td class="mono" style="white-space:nowrap">${esc(c.cmd)}</td><td>${esc(c.desc)}${c.owner_only?' <span class="chip review">仅老板</span>':''}${c.employee?`<span class="who-tag">${esc(c.employee)}</span>`:''}</td></tr>`).join('')}</tbody></table>`,{flush:true})}
-  ${card('群消息记录',t.messages.length?`<div class="chat" id="chatLog" style="height:360px">${t.messages.slice().reverse().map(m=>`<div class="msg ${m.kind==='telegram_in'?'me':'bot'}"><span class="who">${esc(m.kind==='telegram_in'?m.actor:(m.employee?roleName(m.employee):'KAGOU 机器人'))} · ${fmtTime(m.at)}</span>${esc(m.text)}</div>`).join('')}</div>`:'<div class="empty">机器人处理过的消息会出现在这里</div>',{flush:true})}
+  ${card('群消息记录',t.messages.length?`<div class="row"><span class="grow muted">最近 ${t.messages.length} 条，在群聊里按 Telegram 的样子显示。</span><a class="btn sm" href="#chat">查看</a></div>`:'<div class="empty">机器人处理过的消息会出现在这里</div>')}
   </div></div>`};
 BIND.telegram=()=>{
   $('#saveChat').onclick=()=>act(()=>put('/api/telegram/chat',{chat:$('#chatId').value.trim()}),'通知群已保存');
   $('#saveNotify').onclick=()=>act(()=>put('/api/telegram/settings',{weekly_report:$('#sWeekly').checked,report_weekday:+$('#sWeekday').value,report_hour:+$('#sHour').value,daily_digest:$('#sDigest').checked,digest_hour:+$('#sDigestHour').value,pending_reminder_hours:$('#sRemind').checked?+$('#sRemindH').value:0,treasury_alerts:$('#sAlerts').checked,quiet_auto_pay:$('#sQuiet').checked}),'通知设置已保存，机器人立即生效');
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.send})));
   $('#sendCustom').onclick=async()=>{const text=$('#customMsg').value.trim();if(!text)return toast('消息不能为空',true);if(await confirmBox('发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
-  for(const el of [$('#chat'),$('#chatLog')])if(el)el.scrollTop=el.scrollHeight;
-  const say=async text=>{text=text.trim();if(!text)return;S.sayAs=$('#sayAs').value.trim().replace(/^@/,'')||'member';S.sayAt=$('#sayAt').checked;
-    S.tgChat.push({me:true,text,who:'@'+S.sayAs+(S.sayAt?' · @机器人':'')});let reply,who='KAGOU 机器人';
-    try{const r=await post('/api/chat/simulate',{text,username:S.sayAs,mentioned:S.sayAt});
-      who=r.employee_name||who;
-      reply=r.reply?(r.delete?'（这条消息会被删除）\n':'')+r.reply:'（没有员工接这句话：普通闲聊不回复。勾选「@机器人」试试）'}
-    catch(e){reply=e.message}
-    S.tgChat.push({me:false,text:reply,who});S.tgChat=S.tgChat.slice(-40);render()};
-  $('#sayGo').onclick=()=>say($('#say').value);$('#say').onkeydown=e=>{if(e.key==='Enter')say($('#say').value)};
-  document.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>say(b.dataset.say));
-  setTimeout(()=>{const i=$('#say');if(i&&S.tgChat.length)i.focus()},0)};
+};
+// ---------- chat: talk to the team in a messenger laid out like Telegram ----------
+// Two simulated chats (the project group and a private chat with the bot) go through
+// /api/chat/simulate: payments are only test-run and commands that change things are not
+// executed. The third chat shows what the real bot handled in the group, read-only.
+const TG_ICON={
+  search:'<svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6a1 1 0 0 1-1.4 1.4l-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>',
+  back:'<svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>',
+  more:'<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+  send:'<svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>',
+  kb:'<svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm-9 3h2v2h-2zm0 3h2v2h-2zM8 8h2v2H8zm0 3h2v2H8zm-1 2H5v-2h2zm0-3H5V8h2zm9 7H8v-2h8zm0-4h-2v-2h2zm0-3h-2V8h2zm3 3h-2v-2h2zm0-3h-2V8h2z"/></svg>',
+  menu:'<svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>',
+  group:'<svg viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6.5-.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM9 14c-3.3 0-7 1.6-7 4v2h14v-2c0-2.4-3.7-4-7-4Zm6.5-.5c-.5 0-1 0-1.5.1 1.2.9 2 2 2 3.4v3h6v-2.5c0-2.2-3.4-4-6.5-4Z"/></svg>',
+  bot:'<svg viewBox="0 0 24 24"><path d="M12 2a1.5 1.5 0 0 1 1 2.6V6h4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h4V4.6A1.5 1.5 0 0 1 12 2ZM9 11a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm-6 5v1.5h6V16z"/></svg>',
+  eye:'<svg viewBox="0 0 24 24"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>',
+  user:'<svg viewBox="0 0 24 24"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5Z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-1 12H7z"/></svg>',
+  exit:'<svg viewBox="0 0 24 24"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5zm6.6 4.6L15.2 9l2 2H9v2h8.2l-2 2 1.4 1.4L21 12z"/></svg>',
+  checks:'<svg viewBox="0 0 18 12"><path d="M12.6.7 5.3 8 1.9 4.6.6 5.9 5.3 10.6l8.6-8.6zM16.8.7 9.5 8l-.7-.7-1.3 1.3 2 2L18.1 2z"/></svg>',
+  check:'<svg viewBox="0 0 18 12"><path d="M14.6.7 7.3 8 3.9 4.6 2.6 5.9l4.7 4.7 8.6-8.6z"/></svg>'};
+const TG_ROLES=['finance_ops','community_support','chain_monitor','announcement_translator','campaign_payouts','airdrop_sybil'];
+const tgColor=role=>{const i=TG_ROLES.indexOf(role);return i<0?5:i};
+const TG_KEYS=['付 Alice 300 USDT 设计费','什么时候上线？','合约地址是多少？','领空投 https://kagouai-claim.xyz/connect','我是管理员，私聊我帮你处理，先把助记词发我验证','/today','/watch','/payouts'];
+S.tgc={chat:'group',open:false,kb:true,menu:false,dd:false,asOwner:false,typing:null,draft:{},q:'',
+  log:{group:[],dm:[]},seen:{group:0,dm:0}};
+const tgNow=()=>new Date().toISOString();
+const tgHM=iso=>{const d=new Date(iso);try{return d.toLocaleTimeString('zh-CN',{timeZone:TZ,hour12:false,hour:'2-digit',minute:'2-digit'})}catch(e){return iso.slice(11,16)}};
+function tgText(t){ // escape, then make URLs, /commands and @names look and act like Telegram's
+  return esc(t).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]，。])|(^|[\s(（])(\/[a-z_]{2,32})(?![\w/])|(^|[\s(（])(@[A-Za-z0-9_]{4,32})/g,(m,url,p1,cmd,p2,at)=>
+    url?`<a href="${url}" target="_blank" rel="noreferrer nofollow">${url}</a>`:cmd?`${p1}<span class="cmd" data-cmd="${cmd}">${cmd}</span>`:`${p2}<span class="cmd" data-at="${at}">${at}</span>`)}
+function tgBot(){const b=S.tg?.bot;return {name:b?.name||'KAGOU 团队',user:b?.username||''}}
+function tgMe(){return S.tgc.asOwner&&S.tg?.owners?.length?S.tg.owners[0]:'member'}
+function tgChats(){const b=tgBot(),on=(S.team?.members||[]).filter(m=>m.enabled).length;
+  const real=(S.tg?.messages||[]).slice().reverse();
+  const last=a=>a[a.length-1];
+  return [
+    {id:'group',title:'KAGOU 项目群',av:'K',g:'tgg2',icon:'group',sub:`${on} 位 AI 员工 · 模拟群聊`,msgs:S.tgc.log.group,last:last(S.tgc.log.group)},
+    {id:'dm',title:b.name,av:'',g:'tgg5',icon:'bot',sub:'机器人',msgs:S.tgc.log.dm,last:last(S.tgc.log.dm)},
+    {id:'real',title:'群里的真实消息',av:'',g:'tgg3',icon:'eye',sub:S.tg?.online?'机器人在线 · 只读':'只读：机器人在群里处理过的消息',
+      msgs:real.map(m=>({out:false,who:m.kind==='telegram_in'?m.actor:(m.employee?roleName(m.employee):b.name),role:m.kind==='telegram_in'?'':m.employee||'',
+        text:m.text,at:m.at,user:m.kind==='telegram_in'})),last:null}]}
+function tgPreview(c){const m=c.msgs[c.msgs.length-1];if(!m)return c.id==='dm'?'发 /start 开始':c.id==='real'?'还没有消息':'点开就能跟 AI 员工说话';
+  if(m.svc)return esc(m.text);return (m.out?'<b>你：</b>':m.who&&c.id!=='dm'?`<b>${esc(m.who)}：</b>`:'')+esc(String(m.text).split('\n')[0])}
+function tgAv(name,g,icon,cls=''){return `<div class="tg-av ${cls} ${g}">${icon?TG_ICON[icon]:esc(Array.from(String(name||'?').replace(/^@/,''))[0]||'?')}</div>`}
+function tgMsgs(c){
+  if(!c.msgs.length){
+    if(c.id==='dm')return `<div class="tg-intro"><b>这个机器人能做什么？</b>${esc('我是 '+tgBot().name+'。项目群里的 AI 员工都通过我工作：付款、客服、链上监控、公告翻译、营销结算和空投反女巫。\n\n点下面的「开始」看看都有谁在岗。')}</div>`;
+    if(c.id==='real')return `<div class="tg-empty">机器人在群里处理过的消息会出现在这里。<br>先在「Telegram」页面把机器人接进群。</div>`;
+    return `<div class="tg-svc">今天</div><div class="tg-svc">你加入了群聊 · 这里是模拟，不记账、不发到真实群</div>`}
+  let out='',day='';
+  c.msgs.forEach((m,i)=>{
+    const d=(m.at||'').slice(0,10);if(d&&d!==day){day=d;out+=`<div class="tg-svc">${d===tgNow().slice(0,10)?'今天':esc(fmtTime(m.at).split(' ')[0])}</div>`}
+    if(m.svc){out+=`<div class="tg-svc">${esc(m.text)}</div>`;return}
+    const n=c.msgs[i+1],last=!n||n.svc||n.out!==m.out||n.who!==m.who;
+    const showName=!m.out&&c.id!=='dm'&&(i===0||c.msgs[i-1].svc||c.msgs[i-1].who!==m.who||c.msgs[i-1].out);
+    const col=m.user?6:tgColor(m.role);
+    const meta=`<span class="tg-meta">${tgHM(m.at)}${m.out?(m.pending?TG_ICON.check:TG_ICON.checks):''}</span>`;
+    const body=m.deleted?`<span class="tg-del">${esc(m.text)}</span>`:m.typing?'<span class="tg-dots"><i></i><i></i><i></i></span>':tgText(m.text);
+    out+=`<div class="tg-m ${m.out?'out':'in'} ${last?'last':''}">${m.out?'':tgAv(m.who,'tgg'+col,m.user?'':(!m.role?'bot':''),'xs')}
+      <div class="tg-b">${showName?`<span class="tg-who n${col}">${esc(m.who)}${m.tag?`<em>${esc(m.tag)}</em>`:''}</span>`:''}${body}${m.typing?'':meta}</div></div>`});
+  return out}
+function tgCmds(){return (S.tg?.commands||[]).filter(c=>c.cmd.startsWith('/'))}
+VIEWS.chat=async()=>{
+  if(!S.tg||Date.now()-(S.tgAt||0)>15000){S.tg=await api('/api/telegram');S.tgAt=Date.now()}
+  const cs=tgChats(),c=cs.find(x=>x.id===S.tgc.chat)||cs[0],q=S.tgc.q.trim().toLowerCase();
+  if(S.tgc.seen.real===undefined)S.tgc.seen.real=cs[2].msgs.length; // only messages that arrive while the console is open count as unread
+  const list=cs.filter(x=>!q||x.title.toLowerCase().includes(q)).map(x=>{const unread=x.msgs.length-(S.tgc.seen[x.id]||0);
+    return `<button class="tg-item" data-chat="${x.id}" aria-current="${x.id===c.id}">${tgAv(x.av,x.g,x.av?'':x.icon)}
+    <span class="tx"><span class="tg-row"><span class="tg-name">${esc(x.title)}</span><span class="tg-time">${x.msgs.length?tgHM(x.msgs[x.msgs.length-1].at):''}</span></span>
+    <span class="tg-row"><span class="tg-prev">${tgPreview(x)}</span>${unread>0&&x.id!==c.id?`<span class="tg-badge">${unread}</span>`:''}</span></span></button>`}).join('');
+  const sub=S.tgc.typing&&S.tgc.typing.chat===c.id?`<span class="tg-sub typing">${esc(S.tgc.typing.who)} 正在输入…</span>`:`<span class="tg-sub">${esc(c.sub)}</span>`;
+  const draft=S.tgc.draft[c.id]||'';
+  const ro=c.id==='real';
+  const showKb=!ro&&S.tgc.kb;
+  const cmds=tgCmds(),fq=draft.startsWith('/')&&!draft.includes(' ')?draft.slice(1).toLowerCase():null;
+  const pop=!ro&&(S.tgc.menu||fq!==null)?cmds.filter(x=>fq===null||x.cmd.slice(1).toLowerCase().startsWith(fq)):[];
+  const me=tgMe();
+  return `<div class="tg ${S.tgc.open?'open':''}" id="tg">
+  <aside class="tg-side">
+    <div class="tg-sh"><button class="ic" id="tgHome" title="返回控制台" aria-label="返回控制台">${TG_ICON.menu}</button>
+      <label class="tg-search">${TG_ICON.search}<input id="tgQ" placeholder="搜索" value="${esc(S.tgc.q)}" aria-label="搜索会话"></label></div>
+    <div class="tg-list" role="list">${list||'<div class="tg-empty">没有匹配的会话</div>'}</div>
+    <div class="tg-foot"><span style="flex:1">AI 员工在这里回复，跟真实群里一样。</span><a href="#team">返回控制台</a></div>
+  </aside>
+  <section class="tg-conv" aria-label="${esc(c.title)}">
+    <header class="tg-ch"><button class="ic back" id="tgBack" aria-label="返回会话列表">${TG_ICON.back}</button>
+      ${tgAv(c.av,c.g,c.av?'':c.icon,'sm')}<div class="tx"><span class="tg-name">${esc(c.title)}</span>${sub}</div>
+      ${ro?'':`<button class="ic" id="tgMore" aria-label="更多" aria-expanded="${S.tgc.dd}">${TG_ICON.more}</button>`}
+      ${S.tgc.dd?`<div class="tg-dd" role="menu">
+        <button data-dd="member" role="menuitemradio" aria-checked="${!S.tgc.asOwner}">${TG_ICON.user}以群成员 @member 发言${S.tgc.asOwner?'':'<span class="chk">✓</span>'}</button>
+        ${S.tg?.owners?.length?`<button data-dd="owner" role="menuitemradio" aria-checked="${S.tgc.asOwner}">${TG_ICON.user}以老板 @${esc(S.tg.owners[0])} 发言${S.tgc.asOwner?'<span class="chk">✓</span>':''}</button>`:''}
+        <button data-dd="clear" role="menuitem">${TG_ICON.trash}清空聊天记录</button>
+        <button data-dd="home" role="menuitem">${TG_ICON.exit}返回控制台</button></div>`:''}
+    </header>
+    <div class="tg-msgs" id="tgMsgs" aria-live="polite"><div class="tg-col">${tgMsgs(c)}</div></div>
+    <div class="tg-bottom">
+      ${pop.length?`<div class="tg-pop" role="listbox">${pop.map(x=>`<button data-pick="${esc(x.cmd)}" role="option"><span class="c">${esc(x.cmd)}</span><span class="d">${esc(x.desc)}${x.owner_only?' · 老板':''}</span></button>`).join('')}</div>`:''}
+      ${ro?`<div class="tg-ro">只读：这里是机器人在真实群里收发的消息</div>`:
+        c.id==='dm'&&!c.msgs.length?`<div class="tg-comp"><button class="tg-start" data-say="/start">开始</button></div>`:
+      `${showKb?`<div class="tg-kb">${TG_KEYS.map(k=>`<button data-say="${esc(k)}" title="${esc(k)}">${esc(k)}</button>`).join('')}</div>`:''}
+      <div class="tg-comp"><div class="tg-pill">
+        <button class="tg-menu-btn" id="tgMenu" aria-expanded="${S.tgc.menu}">${TG_ICON.menu}菜单</button>
+        <textarea class="tg-in" id="tgIn" rows="1" placeholder="${c.id==='group'?`以 @${esc(me)} 发消息`:'消息'}" aria-label="消息">${esc(draft)}</textarea>
+        <button class="ic ${showKb?'on':''}" id="tgKb" title="快捷消息" aria-label="快捷消息">${TG_ICON.kb}</button></div>
+        <button class="tg-send ${draft.trim()?'go':''}" id="tgSend" aria-label="发送" ${draft.trim()?'':'disabled'}>${TG_ICON.send}</button></div>`}
+    </div>
+  </section></div>`};
+function tgSeen(){const c=tgChats().find(x=>x.id===S.tgc.chat);if(c)S.tgc.seen[c.id]=c.msgs.length}
+async function tgSay(text){
+  const chat=S.tgc.chat;text=String(text||'').trim();if(!text||chat==='real'||S.tgc.typing)return;
+  const b=tgBot(),log=S.tgc.log[chat],me=tgMe();
+  // In the group the bot only hears commands and messages that @ it (or anything, for support's scans).
+  const mentioned=chat==='dm'||(!!b.user&&text.toLowerCase().includes('@'+b.user.toLowerCase()));
+  const mine={out:true,text,at:tgNow(),pending:true};log.push(mine);
+  S.tgc.draft[chat]='';S.tgc.menu=false;S.tgc.typing={chat,who:b.name};
+  const dots={out:false,who:b.name,role:'',typing:true,at:tgNow()};log.push(dots);
+  await render();
+  let r;try{r=await post('/api/chat/simulate',{text,username:me,mentioned});await new Promise(res=>setTimeout(res,450))}
+  catch(e){r={reply:e.message,employee:'',employee_name:''}}
+  log.splice(log.indexOf(dots),1);mine.pending=false;S.tgc.typing=null;
+  const who=r.employee_name||b.name;
+  if(r.delete){mine.deleted=true;mine.text='这条消息已被删除';log.push({svc:true,text:`${who} 删除了一条可疑消息`,at:tgNow()})}
+  if(r.reply)log.push({out:false,who,role:r.employee||'',tag:r.employee?'AI 员工':'机器人',text:r.reply,at:tgNow()});
+  else if(chat==='group'&&!log.some(m=>m.hint))log.push({svc:true,hint:true,text:`没有员工回复：普通闲聊不打扰群。用 / 命令，或 @${b.user||'机器人'} 试试`,at:tgNow()});
+  S.tgc.log[chat]=log.slice(-80);tgSeen();await render()}
+BIND.chat=()=>{
+  const tg=$('#tg');if(!tg)return;
+  const top=$('#demoBar');tg.style.setProperty('--tg-top',(top&&!top.hidden?top.offsetHeight:0)+'px');
+  const box=$('#tgMsgs');if(box)box.scrollTop=box.scrollHeight;tgSeen();
+  tg.querySelectorAll('[data-chat]').forEach(b=>b.onclick=()=>{S.tgc.chat=b.dataset.chat;S.tgc.open=true;S.tgc.dd=S.tgc.menu=false;tgSeen();render()});
+  const q=$('#tgQ');q.oninput=()=>{S.tgc.q=q.value;render().then(()=>{const i=$('#tgQ');i.focus();i.setSelectionRange(i.value.length,i.value.length)})};
+  $('#tgHome').onclick=()=>{location.hash='#team'};
+  const back=$('#tgBack');if(back)back.onclick=()=>{S.tgc.open=false;render()};
+  const more=$('#tgMore');if(more)more.onclick=e=>{e.stopPropagation();S.tgc.dd=!S.tgc.dd;render()};
+  tg.querySelectorAll('[data-dd]').forEach(b=>b.onclick=()=>{const k=b.dataset.dd;S.tgc.dd=false;
+    if(k==='member'||k==='owner')S.tgc.asOwner=k==='owner';
+    if(k==='clear'){S.tgc.log[S.tgc.chat]=[];S.tgc.seen[S.tgc.chat]=0}
+    if(k==='home'){location.hash='#team';return}
+    render()});
+  tg.onclick=e=>{if(S.tgc.dd&&!e.target.closest('.tg-dd,#tgMore')){S.tgc.dd=false;render()}};
+  tg.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>tgSay(b.dataset.say));
+  tg.querySelectorAll('.tg-b [data-cmd]').forEach(b=>b.onclick=()=>tgSay(b.dataset.cmd));
+  tg.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>tgSay(b.dataset.pick));
+  const kb=$('#tgKb');if(kb)kb.onclick=()=>{S.tgc.kb=!S.tgc.kb;render()};
+  const menu=$('#tgMenu');if(menu)menu.onclick=()=>{S.tgc.menu=!S.tgc.menu;render().then(()=>{const i=$('#tgIn');if(i)i.focus()})};
+  const inp=$('#tgIn'),send=$('#tgSend');
+  if(inp){
+    const fit=()=>{inp.style.height='auto';inp.style.height=Math.min(180,inp.scrollHeight)+'px'};fit();
+    inp.oninput=()=>{const was=S.tgc.draft[S.tgc.chat]||'';S.tgc.draft[S.tgc.chat]=inp.value;fit();
+      send.disabled=!inp.value.trim();send.classList.toggle('go',!!inp.value.trim());
+      // the command list follows a leading "/" the way Telegram's does
+      const slash=v=>v.startsWith('/')&&!v.includes(' ');
+      if(slash(inp.value)!==slash(was)||slash(inp.value)){const pos=inp.selectionStart;render().then(()=>{const i=$('#tgIn');if(i){i.focus();i.setSelectionRange(pos,pos)}})}};
+    inp.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();tgSay(inp.value)}
+      if(e.key==='Escape'&&S.tgc.menu){S.tgc.menu=false;render()}};
+    send.onclick=()=>tgSay(inp.value);
+    if(matchMedia('(min-width:721px)').matches||S.tgc.open)setTimeout(()=>{const i=$('#tgIn');if(i&&document.activeElement!==$('#tgQ'))i.focus()},0)}};
 
 // ---------- 09 reports ----------
 S.week=0;
@@ -1075,6 +1784,9 @@ async function connect(){token=$('#token').value.trim()||token;if(!token)return;
 $('#connect').onclick=connect;$('#token').onkeydown=e=>{if(e.key==='Enter')connect()};
 applyTheme();
 if(window.CONSOLE_DEMO){$('#demoBar').hidden=false;$('#demoBar').innerHTML=window.CONSOLE_DEMO}
+// Optional link back to the company site (set window.CONSOLE_HOME before this script).
+if(window.CONSOLE_HOME){const h=esc(window.CONSOLE_HOME);$('.brand').insertAdjacentHTML('beforeend',`<a class="home" href="${h}" target="_top">← 官网</a>`);
+  if(window.CONSOLE_DEMO)$('#demoBar').insertAdjacentHTML('beforeend',`<a class="home" href="${h}" target="_top">← 返回官网</a>`)}
 if(token)connect();
 })();
 </script>
