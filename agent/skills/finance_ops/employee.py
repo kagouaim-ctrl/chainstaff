@@ -187,21 +187,21 @@ class FinanceOpsEmployee:
         return next((str(i) for i in identities if i is not None), "owner")
 
     def _denied(self, action: str, identities) -> str:
-        self.store.log_event("audit", f"非老板尝试{action}，已拒绝", self._actor(identities))
+        self.store.log_event("audit", f"非老板尝试{action}，已拒绝", self._actor(identities), employee="finance_ops")
         return f"只有老板可以{action}。"
 
     def pause(self, *identities) -> str:
         if not self.is_owner(*identities):
             return self._denied("暂停付款", identities)
         self.store.set_paused(True)
-        self.store.log_event("audit", "暂停所有付款", self._actor(identities))
+        self.store.log_event("audit", "暂停所有付款", self._actor(identities), employee="finance_ops")
         return "⏸ 已暂停所有付款。之后的请求都会被拦截，直到老板发 /resume。"
 
     def resume(self, *identities) -> str:
         if not self.is_owner(*identities):
             return self._denied("恢复付款", identities)
         self.store.set_paused(False)
-        self.store.log_event("audit", "恢复付款", self._actor(identities))
+        self.store.log_event("audit", "恢复付款", self._actor(identities), employee="finance_ops")
         return "▶️ 已恢复付款，规则照旧生效。"
 
     def approve(self, request_id: str, *identities) -> str:
@@ -209,7 +209,7 @@ class FinanceOpsEmployee:
             return self._denied("确认审批", identities)
         by = self._actor(identities)
         if self.store.approve(request_id, by):
-            self.store.log_event("audit", f"签字确认 {request_id}", by, {"request_id": request_id})
+            self.store.log_event("audit", f"签字确认 {request_id}", by, {"request_id": request_id}, employee="finance_ops")
             return f"✅ {request_id} 已记为老板签字付款。"
         return self._not_pending(request_id)
 
@@ -218,7 +218,7 @@ class FinanceOpsEmployee:
             return self._denied("驳回付款", identities)
         by = self._actor(identities)
         if self.store.reject(request_id, by):
-            self.store.log_event("audit", f"驳回 {request_id}", by, {"request_id": request_id})
+            self.store.log_event("audit", f"驳回 {request_id}", by, {"request_id": request_id}, employee="finance_ops")
             return f"🚫 {request_id} 已驳回，不会付款。"
         return self._not_pending(request_id)
 

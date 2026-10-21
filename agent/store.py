@@ -63,6 +63,31 @@ CREATE TABLE IF NOT EXISTS events (
     data   TEXT                       -- optional JSON
 );
 CREATE INDEX IF NOT EXISTS events_kind ON events(kind, id);
+-- Community support hand-offs to a human admin.
+CREATE TABLE IF NOT EXISTS tickets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    at         TEXT NOT NULL,
+    chat       TEXT NOT NULL DEFAULT '',
+    user       TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    reason     TEXT NOT NULL DEFAULT '',
+    status     TEXT NOT NULL DEFAULT 'open',   -- open | closed
+    closed_at  TEXT,
+    closed_by  TEXT,
+    note       TEXT
+);
+-- Announcement translations: drafted by the translator, posted only after the owner approves.
+CREATE TABLE IF NOT EXISTS translations (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    source      TEXT NOT NULL,
+    outputs     TEXT NOT NULL,                 -- JSON {lang: text}
+    warnings    TEXT NOT NULL DEFAULT '[]',    -- JSON list
+    status      TEXT NOT NULL DEFAULT 'draft', -- draft | posted | discarded
+    created_by  TEXT NOT NULL DEFAULT '',
+    decided_by  TEXT,
+    decided_at  TEXT
+);
 -- Messages the console asks the bot to send; the bot drains it.
 CREATE TABLE IF NOT EXISTS outbox (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,6 +182,10 @@ class Store:
         self._db = _SerializedConnection(conn, self._lock)
         self._db.execute("PRAGMA journal_mode=WAL") if str(path) != ":memory:" else None
         self._db.executescript(SCHEMA)
+        # Databases created before the AI team existed have no employee column on events.
+        if "employee" not in {r["name"] for r in self._db.execute("PRAGMA table_info(events)").fetchall()}:
+            self._db.execute("ALTER TABLE events ADD COLUMN employee TEXT NOT NULL DEFAULT ''")
+            self._db.execute("CREATE INDEX IF NOT EXISTS events_employee ON events(employee, id)")
 
     # ---- writes ----
 
@@ -233,28 +262,107 @@ class Store:
 
     # ---- events and outbox ----
 
-    def log_event(self, kind: str, text: str, actor: str = "", data: dict | None = None, at: datetime | None = None) -> int:
+    def log_event(self, kind: str, text: str, actor: str = "", data: dict | None = None, at: datetime | None = None, employee: str = "") -> int:
         with self._lock:
             cur = self._db.execute(
-                "INSERT INTO events (at, kind, actor, text, data) VALUES (?, ?, ?, ?, ?)",
-                (_iso(at) if at else _now(), kind, actor or "", text[:4000], json.dumps(data, ensure_ascii=False) if data is not None else None),
+                "INSERT INTO events (at, kind, actor, text, data, employee) VALUES (?, ?, ?, ?, ?, ?)",
+                (_iso(at) if at else _now(), kind, actor or "", text[:4000], json.dumps(data, ensure_ascii=False) if data is not None else None, employee),
             )
         return int(cur.lastrowid)
 
-    def events(self, kinds: tuple[str, ...] = (), limit: int = 200, before_id: int | None = None) -> list[dict]:
+    def events(self, kinds: tuple[str, ...] = (), limit: int = 200, before_id: int | None = None,
+               employee: str | None = None, since: datetime | None = None) -> list[dict]:
         where, args = [], []
         if kinds:
             where.append(f"kind IN ({','.join('?' * len(kinds))})")
             args += list(kinds)
+        if employee is not None:
+            where.append("employee = ?")
+            args.append(employee)
+        if since:
+            where.append("at >= ?")
+            args.append(_iso(since))
         if before_id:
             where.append("id < ?")
             args.append(before_id)
         sql = "SELECT * FROM events" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY id DESC LIMIT ?"
         rows = self._db.execute(sql, (*args, limit)).fetchall()
         return [
-            {"id": r["id"], "at": r["at"], "kind": r["kind"], "actor": r["actor"], "text": r["text"], "data": json.loads(r["data"]) if r["data"] else None}
+            {"id": r["id"], "at": r["at"], "kind": r["kind"], "actor": r["actor"], "text": r["text"],
+             "data": json.loads(r["data"]) if r["data"] else None, "employee": r["employee"]}
             for r in rows
         ]
+
+    def event_counts(self, since: datetime) -> dict[str, dict[str, int]]:
+        """{employee: {kind: n}} since a time, for the team page."""
+        rows = self._db.execute(
+            "SELECT employee, kind, COUNT(*) AS n FROM events WHERE at >= ? GROUP BY employee, kind", (_iso(since),)
+        ).fetchall()
+        out: dict[str, dict[str, int]] = {}
+        for r in rows:
+            out.setdefault(r["employee"], {})[r["kind"]] = r["n"]
+        return out
+
+    # ---- support tickets ----
+
+    def open_ticket(self, user: str, text: str, reason: str = "", chat: str = "") -> int:
+        with self._lock:
+            cur = self._db.execute(
+                "INSERT INTO tickets (at, chat, user, text, reason) VALUES (?, ?, ?, ?, ?)", (_now(), str(chat), user, text[:2000], reason)
+            )
+        return int(cur.lastrowid)
+
+    def tickets(self, status: str | None = None, limit: int = 100) -> list[dict]:
+        sql = "SELECT * FROM tickets" + (" WHERE status = ?" if status else "") + " ORDER BY id DESC LIMIT ?"
+        return [dict(r) for r in self._db.execute(sql, ((status, limit) if status else (limit,))).fetchall()]
+
+    def close_ticket(self, ticket_id: int, by: str, note: str = "") -> bool:
+        with self._lock:
+            cur = self._db.execute(
+                "UPDATE tickets SET status = 'closed', closed_at = ?, closed_by = ?, note = ? WHERE id = ? AND status = 'open'",
+                (_now(), by, note[:500] or None, ticket_id),
+            )
+        return cur.rowcount == 1
+
+    # ---- translation drafts ----
+
+    def add_translation(self, source: str, outputs: dict[str, str], warnings: list[str], created_by: str) -> int:
+        with self._lock:
+            cur = self._db.execute(
+                "INSERT INTO translations (at, source, outputs, warnings, created_by) VALUES (?, ?, ?, ?, ?)",
+                (_now(), source[:8000], json.dumps(outputs, ensure_ascii=False), json.dumps(warnings, ensure_ascii=False), created_by),
+            )
+        return int(cur.lastrowid)
+
+    def translation(self, tid: int) -> dict | None:
+        row = self._db.execute("SELECT * FROM translations WHERE id = ?", (tid,)).fetchone()
+        return self._translation(row) if row else None
+
+    def translations(self, limit: int = 50) -> list[dict]:
+        return [self._translation(r) for r in self._db.execute("SELECT * FROM translations ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
+
+    def update_translation(self, tid: int, outputs: dict[str, str], warnings: list[str]) -> bool:
+        with self._lock:
+            cur = self._db.execute(
+                "UPDATE translations SET outputs = ?, warnings = ? WHERE id = ? AND status = 'draft'",
+                (json.dumps(outputs, ensure_ascii=False), json.dumps(warnings, ensure_ascii=False), tid),
+            )
+        return cur.rowcount == 1
+
+    def decide_translation(self, tid: int, status: str, by: str) -> bool:
+        with self._lock:
+            cur = self._db.execute(
+                "UPDATE translations SET status = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'draft'",
+                (status, by, _now(), tid),
+            )
+        return cur.rowcount == 1
+
+    @staticmethod
+    def _translation(r: sqlite3.Row) -> dict:
+        d = dict(r)
+        d["outputs"] = json.loads(d["outputs"])
+        d["warnings"] = json.loads(d["warnings"])
+        return d
 
     def enqueue(self, chat: str, text: str) -> int:
         with self._lock:

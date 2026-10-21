@@ -20,6 +20,48 @@ class Transfer:
     at: datetime
 
 
+APPROVE, INCREASE_ALLOWANCE, SET_APPROVAL_FOR_ALL = "0x095ea7b3", "0x39509351", "0xa22cb465"
+
+
+@dataclass(frozen=True)
+class Approval:
+    """An approve / increaseAllowance / setApprovalForAll sent from a watched address."""
+
+    tx_hash: str
+    owner: str
+    contract: str
+    spender: str
+    amount: int | None  # None for setApprovalForAll
+    at: datetime
+
+    @property
+    def unlimited(self) -> bool:
+        return self.amount is None or self.amount >= 2**255
+
+
+def decode_approval(row: Mapping[str, Any]) -> Approval | None:
+    from eth_abi import decode
+
+    data = str(row.get("input") or "")
+    selector = data[:10].lower()
+    if selector not in (APPROVE, INCREASE_ALLOWANCE, SET_APPROVAL_FOR_ALL) or row.get("isError") == "1":
+        return None
+    try:
+        if selector == SET_APPROVAL_FOR_ALL:
+            spender, approved = decode(["address", "bool"], bytes.fromhex(data[10:]))
+            if not approved:
+                return None  # revoking is good news
+            amount = None
+        else:
+            spender, amount = decode(["address", "uint256"], bytes.fromhex(data[10:]))
+            if amount == 0:
+                return None
+    except Exception:  # noqa: BLE001 - malformed calldata is not an approval we can judge
+        return None
+    return Approval(row["hash"], row["from"], row["to"], spender.lower(), amount,
+                    datetime.fromtimestamp(int(row["timeStamp"]), timezone.utc))
+
+
 @dataclass(frozen=True)
 class Alert:
     kind: str  # LARGE_OUTFLOW | UNKNOWN_COUNTERPARTY | ADDRESS_POISONING
@@ -83,6 +125,19 @@ class EtherscanV2Source:
         self.api_key = api_key
         self.tokens = {normalize_address(addr): sym for sym, addr in tokens.items() if addr}
         self.http_get = http_get
+
+    def approvals(self, address: str, since: datetime) -> list[Approval]:
+        data = self.http_get(self.api_url, {"module": "account", "action": "txlist", "address": address, "sort": "desc", "page": 1, "offset": 100, "apikey": self.api_key})
+        out = []
+        for row in data.get("result") or []:
+            if not isinstance(row, dict) or int(row["timeStamp"]) < since.timestamp():
+                continue
+            if normalize_address(row["from"]) != normalize_address(address):
+                continue
+            a = decode_approval(row)
+            if a:
+                out.append(a)
+        return out
 
     def transfers(self, address: str, since: datetime) -> list[Transfer]:
         out: list[Transfer] = []

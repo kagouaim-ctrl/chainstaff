@@ -275,14 +275,16 @@ class FakeBot:
 
 
 def test_tick_sends_scheduled_and_outbox(emp):
+    from agent.front_desk import FrontDesk
     from bot.main import report_chat, tick
 
+    desk = FrontDesk(emp)
     assert report_chat(emp, {}) is None
     emp.store.enqueue("-100", "来自控制台")
     emp.store.enqueue("-100", "坏消息")
     bot = FakeBot(fail_on="坏")
     TelegramSettings.validate({"weekly_report": False, "pending_reminder_hours": 1}).save(emp.store)
-    assert asyncio.run(tick(bot, emp, NOW, {"CHAINSTAFF_REPORT_CHAT": "-200"})) == 2
+    assert asyncio.run(tick(bot, desk, NOW, {"CHAINSTAFF_REPORT_CHAT": "-200"})) == 2
     assert bot.msgs[0][0] == -200 and "提醒" in bot.msgs[0][1] and bot.msgs[1] == (-100, "来自控制台")
     assert emp.store.outbox() == []
     assert emp.store.get_setting("telegram_heartbeat") == NOW.isoformat()
@@ -290,7 +292,7 @@ def test_tick_sends_scheduled_and_outbox(emp):
     assert len(out) == 2
     emp.store.set_setting("telegram_chat", "-300")
     assert report_chat(emp, {"CHAINSTAFF_REPORT_CHAT": "-200"}) == -300
-    assert asyncio.run(tick(bot, emp, NOW, {})) == 0
+    assert asyncio.run(tick(bot, desk, NOW, {})) == 0
 
 
 def test_preview_commands(c):
