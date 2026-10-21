@@ -6,63 +6,96 @@
 <title>KAGOU 控制台</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+/* ---- design tokens ----
+   Neutrals carry the interface; color is reserved for meaning.
+   accent (--signal) marks the one thing to act on; ok / review / block / info are business states only. */
 :root{
-  --bg:#0b0b0c;--surface:#121214;--raise:#18181b;--line:#26262a;--line2:#33333a;--text:#ededed;--muted:#8a8a8f;
-  --signal:#f0b90b;--ok:#3ddc84;--review:#f0b90b;--block:#ff4d4d;--info:#7aa7ff;
-  --sans:"IBM Plex Sans","Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --bg:#0e0f11;--surface:#141518;--raise:#1b1c20;--elev:#202126;--line:#24262b;--line2:#30333a;
+  --text:#e6e7e9;--text-2:#aeb1b8;--muted:#7d818a;
+  --signal:#f0b90b;--signal-fg:#141006;--ok:#3fbf7f;--review:#e3a72a;--block:#f0544f;--info:#6f9dff;
+  --ok-bg:rgba(63,191,127,.12);--review-bg:rgba(227,167,42,.12);--block-bg:rgba(240,84,79,.12);--info-bg:rgba(111,157,255,.12);--signal-bg:rgba(240,185,11,.12);
+  --sans:Inter,"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  /* type scale */
+  --fs-xs:11px;--fs-sm:12px;--fs-md:13px;--fs-base:14px;--fs-lg:16px;--fs-xl:20px;--fs-2xl:26px;--fs-3xl:32px;
+  /* spacing: 4px steps */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;
+  --r-sm:4px;--r:6px;
+  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(240,185,11,.55);
   color-scheme:dark;
 }
 :root[data-theme="light"]{
-  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
-  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light;
+  --bg:#f6f6f4;--surface:#ffffff;--raise:#f1f1ee;--elev:#ffffff;--line:#e4e4df;--line2:#d2d2cb;
+  --text:#16171a;--text-2:#484c54;--muted:#6b6f78;
+  --signal:#a87a00;--signal-fg:#ffffff;--ok:#13865a;--review:#a86f00;--block:#cc3a35;--info:#2f62d4;
+  --ok-bg:rgba(19,134,90,.1);--review-bg:rgba(168,111,0,.1);--block-bg:rgba(204,58,53,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light;
 }
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{
-  --bg:#f6f6f4;--surface:#ffffff;--raise:#f0f0ed;--line:#e1e1dc;--line2:#cfcfc8;--text:#111112;--muted:#64646b;
-  --signal:#b88a00;--ok:#13894f;--review:#a87400;--block:#d0302f;--info:#2f5fd0;color-scheme:light}}
+  --bg:#f6f6f4;--surface:#ffffff;--raise:#f1f1ee;--elev:#ffffff;--line:#e4e4df;--line2:#d2d2cb;
+  --text:#16171a;--text-2:#484c54;--muted:#6b6f78;
+  --signal:#a87a00;--signal-fg:#ffffff;--ok:#13865a;--review:#a86f00;--block:#cc3a35;--info:#2f62d4;
+  --ok-bg:rgba(19,134,90,.1);--review-bg:rgba(168,111,0,.1);--block-bg:rgba(204,58,53,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{background:var(--bg)}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--text);font:var(--fs-base)/1.55 var(--sans);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
 a{color:inherit}
 button,input,select,textarea{font:inherit;color:inherit}
 .mono,code,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)} .ok{color:var(--ok)} .review{color:var(--review)} .block{color:var(--block)} .info{color:var(--info)}
-.label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.label{font:500 var(--fs-sm)/1.4 var(--sans);color:var(--muted)}
 h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
-h1{font-size:20px} h2{font-size:15px} h3{font-size:13px}
+h1{font-size:var(--fs-xl)} h2{font-size:var(--fs-base)} h3{font-size:var(--fs-md)}
 
-/* buttons and inputs: radius 2px max, hairlines, no shadows */
-.btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:2px;padding:6px 12px;cursor:pointer;font-size:13px;line-height:1.4;text-decoration:none}
-.btn:hover{border-color:var(--muted)}
-.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav a:focus-visible,summary:focus-visible{outline:1px solid var(--signal);outline-offset:1px}
+/* buttons and inputs: small radius, hairlines; every control has hover, focus, active and disabled states */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:var(--r-sm);padding:6px 12px;cursor:pointer;font-size:var(--fs-md);font-weight:500;line-height:1.4;text-decoration:none;transition:background-color .12s,border-color .12s,color .12s}
+.btn:hover{border-color:var(--muted);background:var(--raise)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav a:focus-visible,summary:focus-visible,[tabindex]:focus-visible,a:focus-visible{outline:0;box-shadow:var(--focus)}
 .btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
-.btn.signal{background:var(--signal);color:#0b0b0c;border-color:var(--signal);font-weight:600}
+.btn.primary:hover{opacity:.9;background:var(--text)}
+.btn.signal{background:var(--signal);color:var(--signal-fg);border-color:var(--signal);font-weight:600}
+.btn.signal:hover{filter:brightness(1.06);background:var(--signal)}
 .btn.danger{border-color:var(--block);color:var(--block)}
+.btn.danger:hover{background:var(--block-bg)}
 .btn.ok{border-color:var(--ok);color:var(--ok)}
+.btn.ok:hover{background:var(--ok-bg)}
 .btn.ghost{border-color:transparent;background:transparent}
-.btn.sm{padding:3px 8px;font-size:12px}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-input,select,textarea{background:var(--bg);border:1px solid var(--line2);border-radius:2px;padding:6px 8px;min-width:0;width:100%}
+.btn.ghost:hover{background:var(--raise)}
+.btn.sm{padding:3px 8px;font-size:var(--fs-sm)}
+.btn:disabled,.btn[aria-busy="true"]{opacity:.5;cursor:not-allowed;transform:none}
+.btn[aria-busy="true"]::before{content:"";width:10px;height:10px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
+input,select,textarea{background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-sm);padding:6px 8px;min-width:0;width:100%;transition:border-color .12s}
+input:hover,select:hover,textarea:hover{border-color:var(--muted)}
+input:disabled,select:disabled,textarea:disabled{opacity:.5;cursor:not-allowed}
 textarea{resize:vertical;min-height:72px}
 input[type=checkbox]{width:auto;accent-color:var(--signal)}
 label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
-label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase}
+label.f > span:first-child{font:500 var(--fs-sm)/1.4 var(--sans);color:var(--text-2)}
 .switch{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)}
 
 /* layout */
 .app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
 .side{border-right:1px solid var(--line);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:var(--bg)}
-.brand{display:flex;align-items:baseline;gap:8px;padding:18px 18px 14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px;padding:16px 18px 14px;border-bottom:1px solid var(--line)}
 .brand b{font:700 17px/1 var(--sans);letter-spacing:.02em;font-stretch:125%}
-.nav{display:flex;flex-direction:column;padding:8px 0;overflow:auto;flex:1}
-.nav a{display:flex;align-items:center;gap:10px;padding:8px 18px;text-decoration:none;color:var(--muted);font-size:13px;border-left:2px solid transparent}
-.nav a .n{font:500 11px var(--mono);color:var(--muted);width:22px}
-.nav a:hover{color:var(--text)}
-.nav a[aria-current="page"]{color:var(--text);border-left-color:var(--signal);background:var(--surface)}
-.nav a .badge{margin-left:auto}
+.nav{display:flex;flex-direction:column;padding:var(--s2) var(--s2) var(--s4);overflow-y:auto;flex:1;scrollbar-width:thin;overscroll-behavior:contain}
+.nav a{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:var(--r-sm);text-decoration:none;color:var(--text-2);font-size:var(--fs-md);line-height:20px;transition:background-color .12s,color .12s}
+.nav a svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--muted)}
+.nav a:hover{color:var(--text);background:var(--raise)}
+.nav a:hover svg{color:var(--text-2)}
+.nav a[aria-current="page"]{color:var(--text);background:var(--raise);font-weight:500;box-shadow:inset 2px 0 0 var(--signal)}
+.nav a[aria-current="page"] svg{color:var(--text)}
+.nav a .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav a .st{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
+.nav a .st.off{color:var(--review)}
+.nav a.idle .t{color:var(--muted)}
+.nav .ng{display:flex;align-items:center;gap:6px;padding:var(--s4) 10px var(--s1);font:500 var(--fs-xs)/1.4 var(--sans);color:var(--muted);letter-spacing:.02em}
+.nav .ng:first-child{padding-top:var(--s1)}
 .side-foot{border-top:1px solid var(--line);padding:12px 18px;display:grid;gap:6px;font-size:12px}
 .main{min-width:0;display:flex;flex-direction:column}
 .top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:10px 24px;flex-wrap:wrap}
@@ -75,7 +108,7 @@ label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;te
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 .span2{grid-column:span 2}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:2px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
 .card > .hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .card > .hd h2{margin-right:auto}
 .card > .bd{padding:14px 16px}
@@ -86,26 +119,28 @@ label.f > span:first-child{font:500 11px/1.4 var(--mono);letter-spacing:.06em;te
 .kpi{padding:14px 16px;display:grid;gap:6px;align-content:start}
 .kpi .v{font:500 24px/1.15 var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;word-break:break-all}
 .kpi .s{font-size:12px;color:var(--muted)}
-.pill{display:inline-flex;align-items:center;gap:6px;font:500 11px/1 var(--mono);letter-spacing:.04em;padding:4px 7px;border:1px solid currentColor;border-radius:2px;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font:500 var(--fs-sm)/1 var(--sans);padding:4px 8px;border:1px solid transparent;border-radius:999px;white-space:nowrap;background:var(--raise)}
+.pill.ok{background:var(--ok-bg)} .pill.review{background:var(--review-bg)} .pill.block{background:var(--block-bg)} .pill.info{background:var(--info-bg)}
 .pill.muted{color:var(--muted)}
-.dot{width:6px;height:6px;display:inline-block;background:currentColor}
-.badge{font:500 11px/1 var(--mono);padding:3px 6px;background:var(--signal);color:#0b0b0c;border-radius:2px}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border:1px solid var(--line2);border-radius:2px;white-space:nowrap}
+.dot{width:6px;height:6px;display:inline-block;background:currentColor;border-radius:50%}
+/* one badge: a count of things waiting on the owner */
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;font:600 var(--fs-xs)/1 var(--sans);font-variant-numeric:tabular-nums;background:var(--signal);color:var(--signal-fg);border-radius:9px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-sm);padding:2px 8px;border:1px solid var(--line2);border-radius:var(--r-sm);white-space:nowrap}
 .chip.block{border-color:var(--block)} .chip.review{border-color:var(--review)} .chip.ok{border-color:var(--ok)}
 .chip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 2px}
 .scroll{overflow-x:auto}
 #limits input{min-width:90px}
 .msg,.report{overflow-wrap:anywhere}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th{text-align:left;font:500 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);padding:8px 12px;white-space:nowrap;background:var(--surface);position:sticky;top:0}
+th{text-align:left;font:500 var(--fs-sm)/1.4 var(--sans);color:var(--muted);border-bottom:1px solid var(--line);padding:8px 12px;white-space:nowrap;background:var(--surface);position:sticky;top:0}
 td{border-bottom:1px solid var(--line);padding:9px 12px;vertical-align:top}
 tr:last-child td{border-bottom:0}
 tbody tr.click{cursor:pointer}
 tbody tr.click:hover td{background:var(--raise)}
 td.r,th.r{text-align:right}
 .empty{padding:28px 16px;text-align:center;color:var(--muted)}
-.bar{height:6px;background:var(--line);position:relative}
-.bar > i{position:absolute;inset:0 auto 0 0;background:var(--text)}
+.bar{height:6px;background:var(--line);position:relative;border-radius:3px;overflow:hidden}
+.bar > i{position:absolute;inset:0 auto 0 0;background:var(--text);border-radius:3px}
 .bar.warn > i{background:var(--review)} .bar.over > i{background:var(--block)}
 .addr{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px}
 .copy{border:0;background:none;color:var(--muted);cursor:pointer;padding:0;font:11px var(--mono)}
@@ -168,10 +203,6 @@ pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:va
 .brand .home:hover{color:var(--text)}
 
 /* team */
-.nav .ng{display:flex;align-items:center;gap:6px;padding:14px 18px 4px;font:500 10px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.nav .ng:first-child{padding-top:6px}
-.nav .ng em{font-style:normal;margin-left:auto;border:1px solid var(--line2);padding:0 4px;letter-spacing:.02em}
-.nav .ng em.off{color:var(--block);border-color:var(--block)}
 .av{width:34px;height:34px;flex:none;display:grid;place-items:center;border:1px solid var(--line2);font-weight:600;font-size:15px;background:var(--bg)}
 .av.on{border-color:var(--signal);color:var(--signal)}
 .emp .bd{display:grid;gap:12px}
@@ -193,6 +224,169 @@ pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:va
 details > summary{cursor:pointer;color:var(--muted);font-size:12px}
 .spin{display:inline-block;width:10px;height:10px;border:1px solid currentColor;border-right-color:transparent;animation:sp 0.8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---- shared bits of the design system ---- */
+.money{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap}
+.money .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.money .unit{font-size:.78em;color:var(--muted);font-weight:500}
+.lnk{border:0;background:none;padding:0;color:var(--text-2);cursor:pointer;font:inherit;text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:2px}
+.lnk:hover{color:var(--text);text-decoration-color:currentColor}
+.tip{position:relative;display:inline-grid;place-items:center;width:14px;height:14px;border-radius:50%;border:1px solid var(--line2);font:600 9px/1 var(--sans);color:var(--muted);cursor:help;vertical-align:1px;margin-left:2px}
+.tip:hover,.tip:focus-visible{color:var(--text);border-color:var(--muted)}
+.tip::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:240px;padding:6px 8px;border-radius:var(--r-sm);background:var(--elev);border:1px solid var(--line2);color:var(--text);font:400 var(--fs-sm)/1.5 var(--sans);box-shadow:0 6px 20px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .12s;z-index:30;white-space:normal}
+.tip:hover::after,.tip:focus-visible::after{opacity:1}
+.dot.ok{color:var(--ok)}
+/* skeleton while a page loads */
+.sk{display:grid;gap:var(--s4)}
+.sk i{display:block;border-radius:var(--r);background:linear-gradient(90deg,var(--surface) 0,var(--raise) 50%,var(--surface) 100%);background-size:200% 100%;animation:skm 1.4s ease-in-out infinite}
+@keyframes skm{from{background-position:100% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.sk i{animation:none}.btn,.nav a{transition:none}}
+
+/* ---- finance overview ---- */
+.ov-period{display:flex;align-items:baseline;gap:var(--s3);font-size:var(--fs-md);color:var(--text-2);margin-bottom:calc(var(--s2) * -1)}
+.ov-period .muted{font-size:var(--fs-sm)}
+.ovs-label{font-size:var(--fs-md);color:var(--text-2);display:flex;align-items:center;gap:4px}
+/* the month band: one surface, three regions of different weight */
+.ovs{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.35fr) minmax(0,.85fr);background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.ovs > div{padding:var(--s5) var(--s6);min-width:0;display:flex;flex-direction:column;gap:var(--s2)}
+.ovs > div + div{border-left:1px solid var(--line)}
+.ovs-big{display:flex;flex-direction:column;gap:2px;margin:2px 0 var(--s2)}
+.ovs-big .money{font-size:var(--fs-3xl);font-weight:500;line-height:1.15}
+.ovs-big .money .unit{font-size:var(--fs-lg)}
+.ovs-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4);margin:auto 0 0;padding-top:var(--s3);border-top:1px solid var(--line)}
+.ovs-split dt{font-size:var(--fs-sm);color:var(--muted);display:flex;align-items:center;gap:6px}
+.ovs-split dt i,.ovs-legend i,.ovc-legend i,.ovc-tip i{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
+.ovs-split dd{margin:2px 0 0;font-size:var(--fs-lg);display:grid}
+.ovs-num{font:500 var(--fs-3xl)/1.15 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.ovs-num small{font:500 var(--fs-lg) var(--sans);color:var(--muted);margin-left:2px}
+.ovs-stack{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;background:var(--line);margin-top:var(--s1)}
+.ovs-stack i{min-width:3px}
+.ovs-legend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px var(--s3);font-size:var(--fs-sm);color:var(--text-2)}
+.ovs-legend li{display:flex;align-items:center;gap:6px;min-width:0;white-space:nowrap}
+.ovs-legend li b{margin-left:auto;font-weight:500;color:var(--text)}
+.ovs-legend li.zero{color:var(--muted)} .ovs-legend li.zero b{color:var(--muted)}
+.ovs-foot{margin-top:auto;font-size:var(--fs-sm);color:var(--muted)}
+.ovs-foot b{color:var(--text-2);font-weight:500}
+.ovs-block.has{background:color-mix(in srgb,var(--block) 6%,transparent);border-radius:0 var(--r) var(--r) 0}
+.ovs-sub{font-size:var(--fs-md);color:var(--text-2);display:flex;flex-wrap:wrap;gap:4px}
+.ovs-block .btn{align-self:flex-start;margin-top:auto}
+.ovs-ok{display:flex;align-items:center;gap:var(--s2);padding:var(--s4) var(--s5);color:var(--text-2);font-size:var(--fs-md)}
+/* panels: a header line and content, no nested boxes */
+.ovpanel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0;display:flex;flex-direction:column}
+.ovpanel > header{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s5);min-height:48px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ovpanel > header h2{font-size:var(--fs-base);font-weight:600;display:flex;align-items:center;gap:var(--s2)}
+.ovpanel > header .ovh-sub{font-size:var(--fs-sm)}
+.ovpanel > header > :last-child:not(h2):not(.ovh-sub){margin-left:auto}
+.ovpanel > header .ovh-sub b{color:var(--text-2);font-weight:500}
+.ovq-panel.attn{border-color:color-mix(in srgb,var(--review) 45%,var(--line))}
+.ov-empty{padding:var(--s8) var(--s5);text-align:center;color:var(--muted);font-size:var(--fs-md)}
+.ov-empty a{color:var(--text-2)}
+.ov-note{margin:auto 0 0;padding:var(--s3) var(--s5);font-size:var(--fs-sm);color:var(--muted);border-top:1px solid var(--line)}
+.ov-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:var(--s4);align-items:stretch}
+.ov-row.b{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+/* approvals queue */
+.ovp{list-style:none;margin:0;padding:0}
+.ovp li + li{border-top:1px solid var(--line)}
+.ovp-row{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(0,2fr) 80px minmax(120px,auto);gap:var(--s4);align-items:center;width:100%;padding:10px var(--s5);border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ovp-row:hover{background:var(--raise)}
+.ovp-who{display:grid;min-width:0}
+.ovp-who b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovp-who .mono{font-size:var(--fs-xs)}
+.ovp-why{min-width:0;font-size:var(--fs-md);color:var(--text-2);display:flex;flex-direction:column;gap:2px}
+.ovp-reason{font-size:var(--fs-sm);color:var(--review);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovp-age{font-size:var(--fs-sm);color:var(--muted);white-space:nowrap}
+.ovp-amt{text-align:right;font-size:var(--fs-lg)}
+.ovp-more{padding:var(--s2) var(--s5);border-top:1px solid var(--line);font-size:var(--fs-sm);color:var(--muted)}
+.ovp-more a{color:var(--text-2)}
+/* 14-day chart: CSS columns so text stays crisp and every day is focusable */
+.ovc{padding:var(--s4) var(--s5) var(--s4);display:grid;gap:var(--s2)}
+.ovc-plot{display:grid;grid-template-columns:28px minmax(0,1fr);gap:var(--s2);height:196px}
+.ovc-y{display:flex;flex-direction:column;justify-content:space-between;text-align:right;font:var(--fs-xs)/1 var(--mono);color:var(--muted);margin:-5px 0}
+.ovc-area{position:relative;min-width:0}
+.ovc-grid{position:absolute;left:0;right:0;height:0;border-top:1px dashed var(--line)}
+.ovc-grid:last-of-type{border-top-style:solid;border-color:var(--line2)}
+.ovc-cols{position:absolute;inset:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px}
+.ovc-col{position:relative;display:flex;align-items:flex-end;justify-content:center;height:100%;padding:0;border:0;background:none;cursor:default;border-radius:var(--r-sm)}
+.ovc-col:hover,.ovc-col.on{background:color-mix(in srgb,var(--text) 5%,transparent)}
+.ovc-stack{display:flex;flex-direction:column;width:min(70%,28px);border-radius:3px 3px 0 0;overflow:hidden;gap:1px}
+.ovc-stack i{display:block;min-height:2px}
+.ovc-col.today .ovc-stack{outline:1px solid var(--line2);outline-offset:1px}
+.ovc-zero{position:absolute;bottom:0;width:min(70%,28px);height:2px;background:var(--line2)}
+.ovc-x{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;margin-left:36px;font:var(--fs-xs)/1 var(--mono);color:var(--muted);text-align:center;white-space:nowrap}
+.ovc-legend{display:flex;gap:var(--s5);flex-wrap:wrap;font-size:var(--fs-sm);color:var(--text-2);margin-left:36px;padding-top:var(--s2)}
+.ovc-legend span{display:inline-flex;align-items:center;gap:6px}
+.ovc-legend b{font-weight:500;color:var(--text)}
+.ovc-tip{position:absolute;top:0;z-index:5;display:grid;gap:3px;min-width:140px;padding:8px 10px;background:var(--elev);border:1px solid var(--line2);border-radius:var(--r-sm);box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:var(--fs-sm);pointer-events:none}
+.ovc-tip span{display:flex;align-items:center;gap:6px}
+.ovc-tip span b{margin-left:auto;padding-left:var(--s3);font-weight:500}
+.ovc-tip > b{font:500 var(--fs-sm) var(--mono)}
+/* quota */
+.ovq{list-style:none;margin:0;padding:var(--s2) var(--s5) var(--s4);display:grid;gap:var(--s4)}
+.ovq-hd{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s2);margin-bottom:6px}
+.ovq-hd b{font-weight:600;font-size:var(--fs-md)}
+.ovq-hd .num{font-size:var(--fs-md)}
+.ovq-ft{font-size:var(--fs-sm);margin-top:4px}
+.ovq .bar > i{background:var(--ok)}
+.ovq .bar.warn > i{background:var(--review)} .ovq .bar.over > i{background:var(--block)}
+/* payees table */
+.ovt td,.ovt th{padding:10px var(--s5)}
+.ovt th{background:transparent;position:static}
+.ovt th[aria-sort]{color:var(--text-2)}
+.ovt td{vertical-align:middle;font-size:var(--fs-md)}
+.ovt-who{display:grid}
+.ovt-who b{font-weight:500}
+.ovt-who .mono{font-size:var(--fs-xs)}
+.ovt tbody tr.click:focus-visible{outline:0;box-shadow:inset 2px 0 0 var(--signal)}
+.ovt tbody tr.click:focus-visible td{background:var(--raise)}
+.ovt .money{font-size:var(--fs-base)}
+/* activity */
+.ova{list-style:none;margin:0;padding:var(--s1) 0}
+.ova-it{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:var(--s3);padding:10px var(--s5);align-items:start}
+.ova-it + .ova-it{border-top:1px solid var(--line)}
+.ova-dot{width:7px;height:7px;border-radius:50%;background:var(--line2);margin-top:7px}
+.ova-it.warn .ova-dot{background:var(--review)} .ova-it.crit .ova-dot{background:var(--block)}
+.ova-main{min-width:0}
+.ova-t{font-size:var(--fs-md);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.ova-k{font-size:var(--fs-xs);font-weight:600;color:var(--review);margin-right:6px}
+.ova-it.crit .ova-k{color:var(--block)}
+.ova-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:2px;font-size:var(--fs-sm);color:var(--muted)}
+.ova-meta a,.ova-meta .lnk{color:var(--text-2);font-size:var(--fs-sm)}
+.ova-meta .mono{font-size:var(--fs-xs)}
+.ova-time{font-size:var(--fs-sm);color:var(--muted);white-space:nowrap;padding-top:1px}
+.ova-tg{margin-left:auto;border:0;background:none;padding:0 2px;color:var(--muted);font:inherit;font-size:var(--fs-xs);cursor:pointer;opacity:0;transition:opacity .12s}
+.ova-it:hover .ova-tg,.ova-tg:focus-visible,.ova-tg[aria-expanded="true"]{opacity:1}
+.ova-tg:hover{color:var(--text)}
+.ova-tg::after{content:" ▾"}
+.ova-tg[aria-expanded="true"]::after{content:" ▴"}
+@media (hover:none){.ova-tg{opacity:1}}
+.ova-more{margin-top:6px}
+.ova-more .kv{margin-top:6px;grid-template-columns:56px minmax(0,1fr);font-size:var(--fs-sm);gap:4px 10px;padding:8px 10px;background:var(--bg);border-radius:var(--r-sm)}
+.ova-json{font-size:var(--fs-xs);word-break:break-all}
+@media (max-width:1240px){
+  .ovs{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .ovs-block{grid-column:1 / -1;flex-direction:row!important;flex-wrap:wrap;align-items:center;border-left:0!important;border-top:1px solid var(--line);gap:var(--s2) var(--s5)!important;border-radius:0 0 var(--r) var(--r)!important}
+  .ovs-block .ovs-num{font-size:var(--fs-2xl)}
+  .ovs-block .btn{margin:0 0 0 auto}
+  .ov-row,.ov-row.b{grid-template-columns:minmax(0,1fr)}
+  .ov-quota .ovq{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+}
+@media (max-width:860px){
+  .ovs{grid-template-columns:minmax(0,1fr)}
+  .ovs > div{padding:var(--s4)}
+  .ovs > div + div{border-left:0;border-top:1px solid var(--line)}
+  .ovs-big .money,.ovs-num{font-size:var(--fs-2xl)}
+  .ovs-block{flex-direction:column!important;align-items:flex-start}
+  .ovs-block .btn{margin:0}
+  .ovpanel > header{padding:var(--s3) var(--s4)}
+  .ovp-row{grid-template-columns:minmax(0,1fr) auto;gap:4px var(--s3);padding:10px var(--s4)}
+  .ovp-why{grid-column:1 / -1;grid-row:2}
+  .ovp-age{display:none}
+  .ovc{padding:var(--s3) var(--s4)}
+  .ovc-plot{height:160px}
+  .ovt td,.ovt th{padding:10px var(--s4)}
+  .ova-it{padding:10px var(--s4)}
+  .ov-period{flex-wrap:wrap}
+}
 
 /* chat: a full-screen messenger, laid out like Telegram's web app */
 :root{--tg-side:#212121;--tg-head:#212121;--tg-bg:#0f0f0f;--tg-in:#212121;--tg-out:#766ac8;--tg-text:#fff;--tg-sub:#aaaaaa;--tg-out-sub:rgba(255,255,255,.6);
@@ -345,10 +539,11 @@ body.tgmode .page{padding:0}
   .side{position:sticky;top:0;height:auto;z-index:30;border-right:0;border-bottom:1px solid var(--line)}
   .brand{padding:12px 16px}
   .nav{flex-direction:row;padding:0;overflow-x:auto;scrollbar-width:none}
-  .nav a{border-left:0;border-bottom:2px solid transparent;padding:10px 12px;white-space:nowrap}
-  .nav a .n,.nav .ng{display:none}
+  .nav{padding:var(--s1) var(--s2)}
+  .nav a{padding:8px 10px;white-space:nowrap}
+  .nav a .st,.nav .ng{display:none}
   .er.c2,.er.c3{grid-template-columns:minmax(0,1fr)}
-  .nav a[aria-current="page"]{border-bottom-color:var(--signal);background:none}
+  .nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 var(--signal)}
   .side-foot{display:none}
   .top{position:static;padding:12px 16px}
   .page{padding:16px 16px 80px}
@@ -458,18 +653,38 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#overlay').innerH
 function card(title,body,{right='',flush=false,id='',cls=''}={}){return `<section class="card ${cls}" ${id?`id="${id}"`:''}><div class="hd"><h2>${title}</h2>${right}</div><div class="bd${flush?' flush':''}">${body}</div></section>`}
 
 // ---------- state & routing ----------
-// [route, label, group, role that owns the page]
+// [route, label, nav group, role that owns the page]
 const PAGES=[
   ['team','团队总览','团队',''],
-  ['overview','财务总览','财务运营员','finance_ops'],['approvals','审批','财务运营员','finance_ops'],['ledger','账本','财务运营员','finance_ops'],
-  ['payees','收款人','财务运营员','finance_ops'],['rules','规则与试算','财务运营员','finance_ops'],['treasury','国库','财务运营员','finance_ops'],
-  ['reports','报告','财务运营员','finance_ops'],['employee','员工档案','财务运营员','finance_ops'],
-  ['support','社区客服','社区客服','community_support'],
-  ['monitor','链上监控','链上监控员','chain_monitor'],
-  ['translator','公告翻译','公告翻译员','announcement_translator'],
-  ['payouts','营销结算','营销结算员','campaign_payouts'],
-  ['sybil','空投反女巫','空投反女巫','airdrop_sybil'],
+  ['overview','财务总览','财务','finance_ops'],['approvals','审批','财务','finance_ops'],['ledger','账本','财务','finance_ops'],
+  ['payees','收款人','财务','finance_ops'],['rules','规则与试算','财务','finance_ops'],['treasury','国库','财务','finance_ops'],
+  ['reports','报告','财务','finance_ops'],['employee','员工档案','财务','finance_ops'],
+  ['support','社区客服','AI 员工','community_support'],
+  ['monitor','链上监控','AI 员工','chain_monitor'],
+  ['translator','公告翻译','AI 员工','announcement_translator'],
+  ['payouts','营销结算','AI 员工','campaign_payouts'],
+  ['sybil','空投反女巫','AI 员工','airdrop_sybil'],
   ['chat','群聊','通用',''],['telegram','Telegram','通用',''],['audit','审计日志','通用',''],['settings','设置','通用','']];
+// 16px line icons, drawn for this console
+const NAV_ICON={
+  team:'<circle cx="6" cy="6" r="2.5"/><circle cx="11.5" cy="7" r="2"/><path d="M1.5 14c.5-2.5 2.3-4 4.5-4s4 1.5 4.5 4M10 10.3c2 .1 3.6 1.4 4 3.7"/>',
+  overview:'<rect x="2" y="2" width="5" height="6" rx="1"/><rect x="9" y="2" width="5" height="3.5" rx="1"/><rect x="9" y="7.5" width="5" height="6.5" rx="1"/><rect x="2" y="10" width="5" height="4" rx="1"/>',
+  approvals:'<path d="M3 2.5h7l3 3V13.5H3z"/><path d="M5.5 9l2 2 3.5-4"/>',
+  ledger:'<path d="M3 2.5h10v11H3zM3 6h10M3 9.5h10M7 6v7.5"/>',
+  payees:'<circle cx="8" cy="5.5" r="2.5"/><path d="M3 14c.6-2.8 2.6-4.5 5-4.5s4.4 1.7 5 4.5"/>',
+  rules:'<path d="M2.5 4h6M11.5 4h2M2.5 8h2M7.5 8h6M2.5 12h7M12.5 12h1"/><circle cx="10" cy="4" r="1.5"/><circle cx="6" cy="8" r="1.5"/><circle cx="11" cy="12" r="1.5"/>',
+  treasury:'<path d="M2 6.5 8 3l6 3.5M3.5 7v5M6.5 7v5M9.5 7v5M12.5 7v5M2 13.5h12"/>',
+  reports:'<path d="M2.5 13.5h11M4.5 11V7.5M8 11V4M11.5 11V9"/>',
+  employee:'<rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><circle cx="8" cy="7" r="2"/><path d="M5 12c.5-1.4 1.6-2.2 3-2.2s2.5.8 3 2.2"/>',
+  support:'<path d="M2.5 3.5h11v7.5H7l-3 2.5v-2.5H2.5z"/><path d="M5.5 6.5h5M5.5 8.5h3"/>',
+  monitor:'<path d="M1.5 8h3l2-4.5 3 9 2-4.5h3"/>',
+  translator:'<path d="M2 3.5h6M5 2v1.5M3.5 3.5c.4 2.4 2 4.2 4 5M6.5 3.5c-.4 2.4-2 4.2-4 5M8.5 14l2.5-6 2.5 6M9.3 12h3.4"/>',
+  payouts:'<rect x="2" y="4" width="12" height="8" rx="1.5"/><circle cx="8" cy="8" r="1.8"/><path d="M4.5 6.5v3M11.5 6.5v3"/>',
+  sybil:'<path d="M8 2 3 4v4c0 3 2.2 5 5 6 2.8-1 5-3 5-6V4z"/><path d="M6 8l1.5 1.5L10.5 6.5"/>',
+  chat:'<path d="M2.5 4.5c0-1 .8-2 2-2h7c1.2 0 2 1 2 2v5c0 1-.8 2-2 2H7l-3 2.5v-2.5h0c-.9-.2-1.5-1-1.5-2z"/>',
+  telegram:'<path d="M14 2.5 2 7.2l4.2 1.4M14 2.5l-2 11-5.8-4.9M14 2.5 6.2 8.6l.3 4.4 2-2.4"/>',
+  audit:'<path d="M4 2.5h6l2.5 2.5v8.5H4z"/><path d="M6 7h4.5M6 9.5h4.5M6 12h2.5"/>',
+  settings:'<circle cx="8" cy="8" r="2"/><path d="M8 1.8v1.7M8 12.5v1.7M14.2 8h-1.7M3.5 8H1.8M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2M12.4 12.4l-1.2-1.2M4.8 4.8 3.6 3.6"/>'};
 const EMP_PAGES=['support','monitor','translator','payouts','sybil'];
 const S={status:null,route:'team',team:null,ledger:{limit:100,f:{}},audit:{kind:'',items:[]},dirtyRules:false};
 function route(){const r=(location.hash||'#team').slice(1).split('?')[0];return PAGES.some(p=>p[0]===r)?r:'team'}
@@ -478,10 +693,11 @@ const roleName=role=>member(role)?.name||(S.team?.roles||[]).find(r=>r.id===role
 function renderNav(){const pend=S.status?.pending||0;let g='',out='';
   const todo=Object.fromEntries((S.team?.members||[]).map(m=>[m.role,m.todo?.value||0]));
   for(const [k,l,grp,role] of PAGES){
-    if(grp!==g){g=grp;const m=role&&member(role);
-      out+=`<div class="ng">${esc(role&&m?m.name:grp)}${role?(m?(m.enabled?'':'<em class="off">停用</em>'):'<em>未雇佣</em>'):''}</div>`}
-    const badge=k==='approvals'?pend:(EMP_PAGES.includes(k)&&member(role)?todo[role]:0);
-    out+=`<a href="#${k}" ${S.route===k?'aria-current="page"':''}>${l}${badge?`<span class="badge">${badge}</span>`:''}</a>`}
+    if(grp!==g){g=grp;out+=`<div class="ng">${esc(grp==='财务'&&member('finance_ops')?member('finance_ops').name:grp)}</div>`}
+    const m=role&&member(role),emp=EMP_PAGES.includes(k);
+    const state=emp?(m?(m.enabled?'':'<span class="st off">停用</span>'):'<span class="st">未雇佣</span>'):'';
+    const badge=k==='approvals'?pend:(emp&&m?todo[role]:0);
+    out+=`<a href="#${k}" class="${emp&&!(m&&m.enabled)?'idle':''}" ${S.route===k?'aria-current="page"':''}><svg viewBox="0 0 16 16" aria-hidden="true">${NAV_ICON[k]||''}</svg><span class="t">${l}</span>${state}${badge?`<span class="badge" aria-label="${badge} 项待处理">${badge}</span>`:''}</a>`}
   $('#nav').innerHTML=out}
 function renderTop(){const s=S.status||{};
   const pg=PAGES.find(p=>p[0]===S.route);
@@ -511,50 +727,153 @@ window.addEventListener('hashchange',()=>{if(S.dirtyRules&&S.route==='rules'&&!c
 async function render(){
   const page=$('#page');
   document.body.classList.toggle('tgmode',S.route==='chat');
+  if(S.painted!==S.route){S.painted=S.route;page.setAttribute('aria-busy','true');
+    const sk=setTimeout(()=>{if(page.getAttribute('aria-busy'))page.innerHTML=S.route==='overview'?'<div class="sk" aria-label="加载中"><i style="height:180px"></i><i style="height:120px"></i><div class="ov-row"><i style="height:300px"></i><i style="height:300px"></i></div></div>':'<div class="sk" aria-label="加载中"><i style="height:120px"></i><i style="height:320px"></i></div>'},120);
+    try{page.innerHTML=await VIEWS[S.route]();BIND[S.route]&&BIND[S.route]()}catch(e){page.innerHTML=`<div class="note block">这一页没加载出来：${esc(e.message)}<div style="margin-top:8px"><button class="btn sm" onclick="location.reload()">重新加载</button></div></div>`}
+    finally{clearTimeout(sk);page.removeAttribute('aria-busy')}return}
   try{page.innerHTML=await VIEWS[S.route]();BIND[S.route]&&BIND[S.route]()}
   catch(e){page.innerHTML=`<div class="note block">这一页没加载出来：${esc(e.message)}</div>`}
 }
 
 // ---------- 01 overview ----------
-function chart(series){
-  const W=720,H=180,P=24,n=series.length,bw=(W-P)/n;
-  const max=Math.max(1,...series.map(d=>d.auto+d.approval+d.block));
-  let bars='',labels='';
-  series.forEach((d,i)=>{let y=H-20;const x=P+i*bw+2,w=Math.max(2,bw-5);
-    for(const [k,c] of [['auto','var(--ok)'],['approval','var(--review)'],['block','var(--block)']]){const h=d[k]/max*(H-36);if(h>0){y-=h;bars+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"><title>${d.date} ${k==='auto'?'自动付':k==='approval'?'需签字':'拦截'} ${d[k]}</title></rect>`}}
-    if(i%Math.ceil(n/7)===0||i===n-1)labels+=`<text x="${x+w/2}" y="${H-4}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--mono)">${d.date.slice(5)}</text>`});
-  const grid=[0,.5,1].map(f=>{const y=H-20-f*(H-36);return `<line x1="${P}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="0" y="${y+3}" font-size="10" fill="var(--muted)" font-family="var(--mono)">${Math.round(max*f)}</text>`}).join('');
-  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="近 ${n} 天付款请求">${grid}${bars}${labels}</svg></div>
-  <div class="legend"><span><i style="background:var(--ok)"></i>自动付</span><span><i style="background:var(--review)"></i>需签字</span><span><i style="background:var(--block)"></i>拦截</span></div>`}
-function budgetBars(b){return b.length?b.map(x=>{const p=Number(x.limit)>0?Math.min(100,Number(x.spent)/Number(x.limit)*100):0;
-  return `<div class="stack" style="gap:4px"><div class="row"><span class="grow">${esc(x.token)}</span><span class="num">${fmtNum(x.spent)} / ${fmtNum(x.limit)}</span></div><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></div>`}).join(''):'<p class="muted">还没设每日上限。</p>'}
 function feed(items,empty='暂无记录',who=true){return items.length?`<div class="feed">${items.map(e=>`<div class="it"><span class="k ${esc(e.kind)}">${KIND[e.kind]||esc(e.kind)}</span><div>${esc(e.text).replace(/\n/g,'<br>')}${(e.actor&&e.actor!==e.employee)||(who&&e.employee)?`<div class="muted" style="font-size:12px">${esc(e.actor&&e.actor!==e.employee?e.actor:'')}${who&&e.employee?`<span class="who-tag">${esc(roleName(e.employee))}</span>`:''}</div>`:''}</div><span class="t">${fmtTime(e.at)}</span></div>`).join('')}</div>`:`<div class="empty">${empty}</div>`}
 const VIEWS={},BIND={};
+// Order follows what the owner needs first: money moved this month and how it was handled,
+// what is waiting on their signature, then the trend, today's room, who got paid and what happened.
+const OV_OUT=[ // month outcomes, in the order a request can end up; colors are business states
+  ['paid','员工自动付','var(--ok)'],['approved','老板已签','var(--info)'],['executing','执行中','var(--text-2)'],
+  ['pending_approval','等你签字','var(--review)'],['rejected','已驳回','var(--muted)'],['failed','失败','var(--block)'],['blocked','拦截','var(--block)']];
+const OV_SERIES=[['auto','自动付','var(--ok)'],['approval','需签字','var(--review)'],['block','拦截','var(--block)']];
+// Money as "15,699 USDT": integer digits carry the weight, the unit stays quiet.
+const ovMoney=(v,t,cls='')=>`<span class="money ${cls}"><span class="num">${fmtNum(v)}</span><span class="unit">${esc(t)}</span></span>`;
+const ovMoneyList=m=>{const e=Object.entries(m||{});return e.length?e.map(([t,v])=>ovMoney(v,t)).join(''):ovMoney(0,'')};
+function ovSub(a,b){const out={};for(const [t,v] of Object.entries(a||{})){const d=Number(v)-Number((b||{})[t]||0);if(Math.abs(d)>1e-9)out[t]=String(Math.round(d*1e6)/1e6)}return out}
+// Axis top: even, so the middle gridline is a whole number too.
+function ovNiceMax(n){if(n<=10)return Math.max(2,Math.ceil(n/2)*2);const u=Math.pow(10,Math.floor(Math.log10(n)))/5*2;return Math.ceil(n/u)*u}
+function ovChart(series){
+  const tot=series.map(d=>d.auto+d.approval+d.block),max=ovNiceMax(Math.max(...tot,0)),ticks=[max,max/2,0];
+  const sum=k=>series.reduce((a,d)=>a+d[k],0);
+  const step=Math.ceil(series.length/7),today=series.length-1;
+  return `<div class="ovc" role="group" aria-label="近 ${series.length} 天付款请求，按处理结果">
+    <div class="ovc-plot">
+      <div class="ovc-y" aria-hidden="true">${ticks.map(t=>`<span>${Number.isInteger(t)?t:t.toFixed(1)}</span>`).join('')}</div>
+      <div class="ovc-area">
+        ${ticks.map((t,i)=>`<i class="ovc-grid" style="top:${i*50}%"></i>`).join('')}
+        <div class="ovc-cols">${series.map((d,i)=>{const n=tot[i];
+          return `<button type="button" class="ovc-col${i===today?' today':''}" data-i="${i}" aria-label="${esc(d.date)}：自动付 ${d.auto}，需签字 ${d.approval}，拦截 ${d.block}">
+            <span class="ovc-stack" style="height:${n/max*100}%">${OV_SERIES.map(([k,,c])=>d[k]?`<i style="flex:${d[k]};background:${c}"></i>`:'').reverse().join('')}</span>
+            ${n?'':'<span class="ovc-zero"></span>'}</button>`}).join('')}</div>
+        <div class="ovc-tip" id="ovTip" role="status" hidden></div>
+      </div>
+    </div>
+    <div class="ovc-x" aria-hidden="true">${series.map((d,i)=>`<span>${i===today?'今天':i%step===0&&today-i>=step?esc(d.date.slice(5).replace('-','/')):''}</span>`).join('')}</div>
+    <div class="ovc-legend">${OV_SERIES.map(([k,l,c])=>`<span><i style="background:${c}"></i>${l}<b class="num">${sum(k)}</b></span>`).join('')}</div>
+  </div>`}
+function ovQuota(b){
+  if(!b.length)return `<div class="ov-empty">还没设每日自动付上限。<a href="#rules">去规则里设置</a></div>`;
+  return `<ul class="ovq">${b.map(x=>{const spent=Number(x.spent),lim=Number(x.limit);
+    const off=!(lim>0),p=off?0:Math.min(100,spent/lim*100),over=!off&&spent>lim,warn=!off&&!over&&p>=80;
+    const state=off?'<span class="muted">未开启自动付</span>':over?`<span class="block">超出 ${fmtNum(spent-lim)}</span>`:spent>=lim?'<span class="block">已用满</span>':warn?`<span class="review">已用 ${Math.round(p)}%</span>`:`<span class="muted">剩余 ${fmtNum(lim-spent)}</span>`;
+    return `<li><div class="ovq-hd"><b>${esc(x.token)}</b><span class="num"><span class="${spent?'':'muted'}">${fmtNum(spent)}</span><span class="muted"> / ${fmtNum(lim)}</span></span></div>
+      <div class="bar ${over||(!off&&spent>=lim)?'over':warn?'warn':''}" role="progressbar" aria-label="${esc(x.token)} 今日已自动付" aria-valuemin="0" aria-valuemax="${esc(x.limit)}" aria-valuenow="${esc(x.spent)}"><i style="width:${p}%"></i></div>
+      <div class="ovq-ft">${state}</div></li>`}).join('')}</ul>`}
+const OV_OBJ=[ // what an event is about, and where to look at it
+  ['request_id',v=>[`付款 ${short(String(v))}`,`data-detail="${esc(v)}"`]],
+  ['batch',v=>[`结算批次 #${v}`,'href="#payouts"']],['check',v=>[`反女巫检查 #${v}`,'href="#sybil"']],
+  ['role',v=>[roleName(v),'href="#team"']],['changes',()=>['规则','href="#rules"']]];
+function ovActivity(items){
+  if(!items.length)return '<div class="ov-empty">还没有操作或预警。员工付款、老板签字、规则修改都会出现在这里。</div>';
+  return `<ol class="ova">${items.map(e=>{const d=e.data||{};let obj='';
+    for(const [k,f] of OV_OBJ)if(d[k]!=null){const [l,attr]=f(d[k]);obj=attr.startsWith('href')?`<a ${attr}>${esc(l)}</a>`:`<button type="button" class="lnk" ${attr}>${esc(l)}</button>`;break}
+    if(!obj&&d.url)obj=`<a href="${esc(d.url)}" target="_blank" rel="noreferrer">链上交易</a>`;
+    const alert=e.kind==='alert',sev=d.severity==='high'||d.severity==='critical';
+    const who=e.actor==='console'?'控制台':e.actor||'';
+    const head=String(e.text).split('\n')[0];
+    return `<li class="ova-it ${alert?(sev?'crit':'warn'):''}">
+      <span class="ova-dot" aria-hidden="true"></span>
+      <div class="ova-main"><div class="ova-t">${alert?`<span class="ova-k">${sev?'高危预警':'预警'}</span>`:''}${esc(head)}</div>
+        <div class="ova-meta">${obj?`${obj}<span aria-hidden="true">·</span>`:''}${e.employee?`<span>${esc(roleName(e.employee))}</span>`:''}${who&&who!==e.employee?`<span aria-hidden="true">·</span><span class="mono">${esc(who)}</span>`:''}<button type="button" class="ova-tg" aria-expanded="false" aria-controls="ova${e.id}">详情</button></div>
+        <div class="ova-more" id="ova${e.id}" hidden><dl class="kv"><dt>时间</dt><dd class="mono">${esc(fmtTime(e.at))}</dd><dt>类型</dt><dd>${KIND[e.kind]||esc(e.kind)}</dd><dt>操作人</dt><dd class="mono">${esc(e.actor||'—')}</dd><dt>原文</dt><dd>${esc(e.text).replace(/\n/g,'<br>')}</dd>${Object.keys(d).length?`<dt>数据</dt><dd><code class="ova-json">${esc(JSON.stringify(d))}</code></dd>`:''}</dl></div></div>
+      <time class="ova-time" datetime="${esc(e.at)}" title="${esc(fmtTime(e.at))}">${ago(e.at)}</time></li>`}).join('')}</ol>`}
+function ovQueue(rows,total){
+  if(!total)return `<div class="ovs-ok"><span class="dot ok" aria-hidden="true"></span>没有等你签字的付款。员工遇到超额、需审批的类别或收款人时会排到这里。</div>`;
+  return `<ul class="ovp">${rows.map(r=>`<li><button type="button" class="ovp-row" data-detail="${esc(r.request_id)}">
+      <span class="ovp-who"><b>${r.payee_name?esc(r.payee_name):'<span class="block">白名单外</span>'}</b><span class="mono muted" title="${esc(r.payee)}">${esc(short(r.payee))}</span></span>
+      <span class="ovp-why">${esc(r.memo||'')}${r.messages&&r.messages.length?`<span class="ovp-reason">${esc(r.messages[0])}${r.messages.length>1?` 等 ${r.messages.length} 条`:''}</span>`:''}</span>
+      <span class="ovp-age" title="${esc(fmtTime(r.created_at))}">${ago(r.created_at)}</span>
+      <span class="ovp-amt">${ovMoney(r.amount,r.token)}</span></button></li>`).join('')}</ul>
+    ${total>rows.length?`<div class="ovp-more">还有 ${total-rows.length} 笔 · <a href="#approvals">全部审批</a></div>`:''}`}
 VIEWS.overview=async()=>{
   const o=await api('/api/overview');const m=o.month,c=m.counts;
-  const rate=m.automation_rate==null?'—':Math.round(m.automation_rate*100)+'%';
-  const blocked=c.blocked||0;
+  const pend=o.pending?await api('/api/payments?status=pending_approval&limit=4'):[];
+  S.ovSeries=o.series;
+  const rate=m.automation_rate,blocked=c.blocked||0,signed=ovSub(m.moved,m.auto_paid);
+  const outs=OV_OUT.filter(([k])=>c[k]),total=m.requests||0;
+  const monthName=`${Number(m.start.slice(5,7))} 月`;
   return `
   ${o.status.paused?'<div class="note block"><b>付款已暂停。</b> 所有新请求都会被拦截。点右上角「恢复付款」恢复。</div>':''}
   ${o.status.read_only?'<div class="note">试用只读模式：员工只记账、出报表和预警，所有付款都要老板确认。到 <a href="#rules">规则</a> 里关闭。</div>':''}
-  <div class="grid g4">
-    <section class="card kpi"><span class="label">本月经手资金</span><span class="v">${fmtMoved(m.moved)}</span><span class="s">自动付 + 老板签字 · ${esc(m.start)} 起</span></section>
-    <section class="card kpi"><span class="label">自动处理率</span><span class="v">${rate}</span><span class="s">没被拦截的请求里，员工自己办完的占比</span></section>
-    <section class="card kpi"><span class="label">等你签字</span><span class="v ${o.pending?'review':''}">${o.pending}</span><span class="s">${o.pending?'<a href="#approvals">去审批 →</a>':'没有待签字的付款'}</span></section>
-    <section class="card kpi"><span class="label">本月拦截</span><span class="v ${blocked?'block':''}">${blocked}</span><span class="s">涉及 ${Object.entries(m.blocked_value).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></section>
+  <div class="ov-period"><span>${monthName} · ${esc(m.start.slice(5).replace('-','/'))} 至今</span><span class="muted">时区 ${esc(TZ)}</span></div>
+  <section class="ovs" aria-label="本月概况">
+    <div class="ovs-main">
+      <div class="ovs-label">本月经手资金</div>
+      <div class="ovs-big">${ovMoneyList(m.moved)}</div>
+      <dl class="ovs-split">
+        <div><dt><i style="background:var(--ok)"></i>员工自动付</dt><dd>${Object.keys(m.auto_paid).length?Object.entries(m.auto_paid).map(([t,v])=>ovMoney(v,t)).join(''):'<span class="muted">0</span>'}</dd></div>
+        <div><dt><i style="background:var(--info)"></i>老板签字后付出</dt><dd>${Object.keys(signed).length?Object.entries(signed).map(([t,v])=>ovMoney(v,t)).join(''):'<span class="muted">0</span>'}</dd></div>
+      </dl>
+    </div>
+    <div class="ovs-rate">
+      <div class="ovs-label">自动处理率 <span class="tip" tabindex="0" aria-label="说明" data-tip="没被拦截的请求里，员工按规则自己办完、不用你签字的占比">?</span></div>
+      <div class="ovs-num">${rate==null?'<span class="muted">—</span>':Math.round(rate*100)+'<small>%</small>'}</div>
+      ${total?`<div class="ovs-stack" role="img" aria-label="本月 ${total} 笔请求的处理结果">${outs.map(([k,l,col])=>`<i style="flex:${c[k]};background:${col}" title="${l} ${c[k]}"></i>`).join('')}</div>
+      <ul class="ovs-legend">${OV_OUT.filter(([k])=>k!=='executing'||c[k]).map(([k,l,col])=>`<li class="${c[k]?'':'zero'}"><i style="background:${col}"></i>${l}<b class="num">${c[k]||0}</b></li>`).join('')}</ul>
+      <div class="ovs-foot">本月共 <b class="num">${total}</b> 笔请求</div>`:'<div class="ovs-foot">本月还没有付款请求。</div>'}
+    </div>
+    <div class="ovs-block ${blocked?'has':''}">
+      <div class="ovs-label">本月拦截</div>
+      <div class="ovs-num ${blocked?'block':''}">${blocked}<small> 笔</small></div>
+      <div class="ovs-sub">${blocked?`拦下 ${Object.entries(m.blocked_value).map(([t,v])=>ovMoney(v,t)).join('、')}`:'<span class="muted">没有触发拦截规则的请求</span>'}</div>
+      ${blocked?'<button type="button" class="btn sm" id="ovBlocked">查看拦截记录</button>':''}
+    </div>
+  </section>
+  <section class="ovpanel ovq-panel ${o.pending?'attn':''}">
+    <header><h2>等你签字${o.pending?`<span class="badge">${o.pending}</span>`:''}</h2><span class="muted ovh-sub">员工不能自己签多签，这些付款在等你</span>${o.pending?'<a class="btn sm signal" href="#approvals">去审批</a>':''}</header>
+    ${ovQueue(pend,o.pending)}
+  </section>
+  <div class="ov-row">
+    <section class="ovpanel ov-chart"><header><h2>近 ${o.series.length} 天付款请求</h2><span class="muted ovh-sub">共 <b class="num">${o.series.reduce((a,d)=>a+d.auto+d.approval+d.block,0)}</b> 笔 · 按规则判断结果</span></header>${ovChart(o.series)}</section>
+    <section class="ovpanel ov-quota"><header><h2>今日自动付额度</h2><span class="muted ovh-sub">今天 ${o.today.requests} 笔请求</span></header>${ovQuota(o.today.budget)}
+      <p class="ov-note">只算员工自己付出的金额，老板签字的不占额度。</p></section>
   </div>
-  <div class="grid g3">
-    ${card('近 14 天请求',chart(o.series),{cls:'span2',right:`<span class="label">共 ${o.series.reduce((a,d)=>a+d.auto+d.approval+d.block,0)} 笔</span>`})}
-    ${card('今日自动付额度',`<div class="stack">${budgetBars(o.today.budget)}<p class="muted" style="margin:0;font-size:12px">只算员工自己付的，老板签字的不占额度。今天 ${o.today.requests} 笔请求。</p></div>`)}
-  </div>
-  <div class="grid g2">
-    ${card('本月收款方 Top 5',o.top_payees.length?`<div class="scroll"><table><thead><tr><th>收款方</th><th class="r">经手</th><th class="r">笔数</th></tr></thead><tbody>${o.top_payees.map(p=>`<tr class="click" data-payee="${esc(p.payee)}"><td>${p.payee_name?esc(p.payee_name):'<span class="block">白名单外</span>'}<div class="muted mono" style="font-size:11px">${esc(short(p.payee))}</div></td><td class="r">${fmtMoved(p.moved)}</td><td class="r num">${p.requests}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">本月还没有付款请求</div>',{flush:true,right:'<a class="btn sm" href="#payees">全部收款人</a>'})}
-    ${card('最近动态',feed(o.recent,'还没有操作或预警'),{flush:true,right:'<a class="btn sm" href="#audit">审计日志</a>'})}
-  </div>
-  <div class="grid g4">
-    ${[['自动付',c.paid,'ok'],['老板已签',c.approved,'ok'],['已驳回',c.rejected,'muted'],['失败',c.failed,c.failed?'block':'muted']].map(([l,v,k])=>`<section class="card kpi"><span class="label">本月 · ${l}</span><span class="v ${k}">${v||0}</span></section>`).join('')}
+  <div class="ov-row b">
+    <section class="ovpanel ov-payees"><header><h2>本月收款方 Top 5</h2><a class="btn sm ghost" href="#payees">全部收款人</a></header>
+      ${o.top_payees.length?`<div class="scroll"><table class="ovt"><thead><tr><th>收款方</th><th class="r">笔数</th><th class="r hide-sm">拦截</th><th class="hide-sm">最近一笔</th><th class="r" aria-sort="descending">本月经手 <span aria-hidden="true">↓</span></th></tr></thead><tbody>
+        ${o.top_payees.map(p=>`<tr class="click" tabindex="0" data-payee="${esc(p.payee)}" aria-label="查看 ${esc(p.payee_name||p.payee)} 的账本">
+          <td><div class="ovt-who">${p.payee_name?`<b>${esc(p.payee_name)}</b>`:'<b class="block">白名单外</b>'}<span class="mono muted" title="${esc(p.payee)}">${esc(short(p.payee))}</span></div></td>
+          <td class="r num">${p.requests}</td><td class="r num hide-sm ${p.blocked?'block':'muted'}">${p.blocked||'—'}</td>
+          <td class="hide-sm muted" title="${esc(fmtTime(p.last_at))}">${ago(p.last_at)}</td>
+          <td class="r">${Object.keys(p.moved).length?Object.entries(p.moved).map(([t,v])=>ovMoney(v,t)).join('<br>'):'<span class="muted">0</span>'}</td></tr>`).join('')}
+      </tbody></table></div>`:'<div class="ov-empty">本月还没有付款请求。</div>'}</section>
+    <section class="ovpanel ov-act"><header><h2>最近动态</h2><span class="muted ovh-sub">操作和预警</span><a class="btn sm ghost" href="#audit">审计日志</a></header>${ovActivity(o.recent)}</section>
   </div>`};
-BIND.overview=()=>{document.querySelectorAll('[data-payee]').forEach(tr=>tr.onclick=()=>{S.ledger.f={payee:tr.dataset.payee};location.hash='#ledger'})};
+BIND.overview=()=>{
+  const go=tr=>{S.ledger.f={payee:tr.dataset.payee};location.hash='#ledger'};
+  document.querySelectorAll('[data-payee]').forEach(tr=>{tr.onclick=()=>go(tr);tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go(tr)}}});
+  const bl=$('#ovBlocked');if(bl)bl.onclick=()=>{S.ledger.f={status:'blocked'};location.hash='#ledger'};
+  bindDetail();
+  document.querySelectorAll('.ova-tg').forEach(b=>b.onclick=()=>{const el=document.getElementById(b.getAttribute('aria-controls'));const open=el.hidden;el.hidden=!open;b.setAttribute('aria-expanded',String(open))});
+  // chart tooltip: follows hover and keyboard focus
+  const tip=$('#ovTip'),area=document.querySelector('.ovc-area');
+  if(tip&&area){const show=col=>{const d=S.ovSeries[+col.dataset.i];if(!d)return;
+      const moved=Object.entries(d.moved||{});
+      tip.innerHTML=`<b>${esc(d.date)}</b>${OV_SERIES.map(([k,l,c])=>`<span><i style="background:${c}"></i>${l}<b class="num">${d[k]}</b></span>`).join('')}<span class="muted">付出 ${moved.length?moved.map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、'):'0'}</span>`;
+      tip.hidden=false;const a=area.getBoundingClientRect(),r=col.getBoundingClientRect();
+      const x=Math.min(Math.max(r.left-a.left+r.width/2-tip.offsetWidth/2,0),a.width-tip.offsetWidth);tip.style.left=x+'px';
+      area.querySelectorAll('.ovc-col').forEach(c=>c.classList.toggle('on',c===col))};
+    const hide=()=>{tip.hidden=true;area.querySelectorAll('.ovc-col.on').forEach(c=>c.classList.remove('on'))};
+    area.querySelectorAll('.ovc-col').forEach(col=>{col.onmouseenter=col.onfocus=()=>show(col);col.onblur=hide});
+    area.onmouseleave=hide}};
 
 // ---------- 02 approvals ----------
 VIEWS.approvals=async()=>{
