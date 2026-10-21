@@ -9,14 +9,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 /* ---- design tokens ----
-   KAGOU palette: near-black layers, one brand yellow, green/red for money states.
-   Yellow (--signal) is only for the main action, the selected state, the brand mark and things that need attention.
-   ok / review / block / info are business states only. Components never use raw colors. */
+   KAGOU palette: calm neutral layers, one muted brand gold, low-saturation state colors.
+   Gold (--signal) is only for the brand mark, the primary action and things that need attention;
+   selection and navigation stay neutral. ok / review / block / info are business states only.
+   Components never use raw colors. */
 :root{
-  --bg:#0B0E11;--surface:#181A20;--raise:#1E2329;--elev:#1E2329;--hover:#2B3139;--line:#2B3139;--line2:#3C434E;
-  --text:#EAECEF;--text-2:#B7BDC6;--muted:#848E9C;
-  --signal:#F0B90B;--signal-fg:#181A20;--ok:#0ECB81;--review:#F0B90B;--block:#F6465D;--info:#6F9DFF;
-  --ok-bg:rgba(14,203,129,.12);--review-bg:rgba(240,185,11,.12);--block-bg:rgba(246,70,93,.12);--info-bg:rgba(111,157,255,.12);--signal-bg:rgba(240,185,11,.12);
+  --bg:#111317;--surface:#191C21;--raise:#22262D;--elev:#22262D;--hover:#272B31;--line:#272B31;--line2:#30343B;
+  --text:#F1F2F4;--text-2:#A1A6AF;--muted:#7D8590;
+  --signal:#E8B84B;--signal-hover:#F0C56A;--signal-fg:#111317;--ok:#35A77B;--review:#D6A64B;--block:#D65A68;--info:#6798C8;
+  --ok-bg:rgba(53,167,123,.14);--review-bg:rgba(214,166,75,.14);--block-bg:rgba(214,90,104,.14);--info-bg:rgba(103,152,200,.14);--signal-bg:rgba(232,184,75,.12);
+  --bubble-out:#2A3240;
   --sans:Inter,"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   /* type scale */
@@ -24,22 +26,22 @@
   /* spacing: 4px steps */
   --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;
   --r-sm:4px;--r:6px;
-  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(240,185,11,.55);
+  --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(232,184,75,.5);
   --ctl-h:32px;
   color-scheme:dark;
 }
 :root[data-theme="light"]{
-  --bg:#F5F5F5;--surface:#FFFFFF;--raise:#F5F5F5;--elev:#FFFFFF;--hover:#EAECEF;--line:#EAECEF;--line2:#D5D9DE;
-  --text:#1E2329;--text-2:#474D57;--muted:#707A8A;
-  --signal:#C99400;--signal-fg:#1E2329;--ok:#03A66D;--review:#A87A00;--block:#CF304A;--info:#2F62D4;
-  --ok-bg:rgba(3,166,109,.1);--review-bg:rgba(168,122,0,.1);--block-bg:rgba(207,48,74,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --bg:#F6F7F8;--surface:#FFFFFF;--raise:#F1F2F4;--elev:#FFFFFF;--hover:#ECEEF1;--line:#E6E8EB;--line2:#D3D7DD;--bubble-out:#E6EDF6;
+  --text:#1B1E23;--text-2:#4A505A;--muted:#69707B;
+  --signal:#B98A1E;--signal-hover:#A67A12;--signal-fg:#FFFFFF;--ok:#23845F;--review:#9A7215;--block:#B8424F;--info:#3F70A6;
+  --ok-bg:rgba(35,132,95,.1);--review-bg:rgba(154,114,21,.1);--block-bg:rgba(184,66,79,.08);--info-bg:rgba(63,112,166,.08);--signal-bg:rgba(185,138,30,.1);
   --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light;
 }
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{
-  --bg:#F5F5F5;--surface:#FFFFFF;--raise:#F5F5F5;--elev:#FFFFFF;--hover:#EAECEF;--line:#EAECEF;--line2:#D5D9DE;
-  --text:#1E2329;--text-2:#474D57;--muted:#707A8A;
-  --signal:#C99400;--signal-fg:#1E2329;--ok:#03A66D;--review:#A87A00;--block:#CF304A;--info:#2F62D4;
-  --ok-bg:rgba(3,166,109,.1);--review-bg:rgba(168,122,0,.1);--block-bg:rgba(207,48,74,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --bg:#F6F7F8;--surface:#FFFFFF;--raise:#F1F2F4;--elev:#FFFFFF;--hover:#ECEEF1;--line:#E6E8EB;--line2:#D3D7DD;--bubble-out:#E6EDF6;
+  --text:#1B1E23;--text-2:#4A505A;--muted:#69707B;
+  --signal:#B98A1E;--signal-hover:#A67A12;--signal-fg:#FFFFFF;--ok:#23845F;--review:#9A7215;--block:#B8424F;--info:#3F70A6;
+  --ok-bg:rgba(35,132,95,.1);--review-bg:rgba(154,114,21,.1);--block-bg:rgba(184,66,79,.08);--info-bg:rgba(63,112,166,.08);--signal-bg:rgba(185,138,30,.1);
   --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -61,7 +63,7 @@ h1{font-size:var(--fs-xl)} h2{font-size:var(--fs-base)} h3{font-size:var(--fs-md
 .btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
 .btn.primary:hover{opacity:.9;background:var(--text)}
 .btn.signal{background:var(--signal);color:var(--signal-fg);border-color:var(--signal);font-weight:600}
-.btn.signal:hover{filter:brightness(1.06);background:var(--signal)}
+.btn.signal:hover{background:var(--signal-hover);border-color:var(--signal-hover)}
 .btn.danger{border-color:var(--block);color:var(--block)}
 .btn.danger:hover{background:var(--block-bg)}
 .btn.ok{border-color:var(--ok);color:var(--ok)}
@@ -93,7 +95,7 @@ label.f > span:first-child{font:500 var(--fs-sm)/1.4 var(--sans);color:var(--tex
 .nav a svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--muted)}
 .nav a:hover{color:var(--text);background:var(--raise)}
 .nav a:hover svg{color:var(--text-2)}
-.nav a[aria-current="page"]{color:var(--text);background:var(--raise);font-weight:500;box-shadow:inset 2px 0 0 var(--signal)}
+.nav a[aria-current="page"]{color:var(--text);background:var(--raise);font-weight:500}
 .nav a[aria-current="page"] svg{color:var(--text)}
 .nav a .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav a .st{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
@@ -130,6 +132,7 @@ label.f > span:first-child{font:500 var(--fs-sm)/1.4 var(--sans);color:var(--tex
 .dot{width:6px;height:6px;display:inline-block;background:currentColor;border-radius:50%}
 /* one badge: a count of things waiting on the owner */
 .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;font:600 var(--fs-xs)/1 var(--sans);font-variant-numeric:tabular-nums;background:var(--signal);color:var(--signal-fg);border-radius:9px}
+.badge.quiet{background:var(--hover);color:var(--text)} /* counts that are not money waiting on a signature stay neutral */
 .chip{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-sm);padding:2px 8px;border:1px solid var(--line2);border-radius:var(--r-sm);white-space:nowrap}
 .chip.block{border-color:var(--block)} .chip.review{border-color:var(--review)} .chip.ok{border-color:var(--ok)}
 .chip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 2px}
@@ -454,149 +457,154 @@ table.lg tbody tr.click:focus-visible td:first-child{box-shadow:inset 2px 0 0 va
   .ov-period{flex-wrap:wrap}
 }
 
-/* chat: a full-screen messenger, laid out like Telegram's web app */
-:root{--tg-side:#212121;--tg-head:#212121;--tg-bg:#0f0f0f;--tg-in:#212121;--tg-out:#766ac8;--tg-text:#fff;--tg-sub:#aaaaaa;--tg-out-sub:rgba(255,255,255,.6);
-  --tg-acc:#8774e1;--tg-sel:#766ac8;--tg-hover:#2c2c2c;--tg-line:#2f2f2f;--tg-input:#212121;--tg-pill:rgba(0,0,0,.35);--tg-link:#8774e1;--tg-out-link:#fff;--tg-check:#fff;--tg-out-text:#fff;--tg-pat-f:invert(1);
-  --tg-wall:radial-gradient(circle at 15% 20%,#1a2a1f 0,transparent 45%),radial-gradient(circle at 85% 30%,#1d1a2e 0,transparent 45%),radial-gradient(circle at 50% 90%,#16242c 0,transparent 50%),#0f0f0f;--tg-pat:.06}
-:root[data-theme="light"]{--tg-side:#fff;--tg-head:#fff;--tg-bg:#fff;--tg-in:#fff;--tg-out:#eeffde;--tg-text:#000;--tg-sub:#707579;--tg-out-sub:#4fae4e;
-  --tg-acc:#3390ec;--tg-sel:#3390ec;--tg-hover:#f4f4f5;--tg-line:#dadce0;--tg-input:#fff;--tg-pill:rgba(80,110,70,.45);--tg-link:#3390ec;--tg-out-link:#3390ec;--tg-check:#4fae4e;--tg-out-text:#000;--tg-pat-f:none;
-  --tg-wall:radial-gradient(circle at 15% 20%,#dbddbb 0,transparent 55%),radial-gradient(circle at 85% 25%,#6ba587 0,transparent 55%),radial-gradient(circle at 25% 85%,#d5d88d 0,transparent 55%),radial-gradient(circle at 80% 85%,#88b884 0,transparent 55%),#a9c99a;--tg-pat:.12}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{--tg-side:#fff;--tg-head:#fff;--tg-bg:#fff;--tg-in:#fff;--tg-out:#eeffde;--tg-text:#000;--tg-sub:#707579;--tg-out-sub:#4fae4e;
-  --tg-acc:#3390ec;--tg-sel:#3390ec;--tg-hover:#f4f4f5;--tg-line:#dadce0;--tg-input:#fff;--tg-pill:rgba(80,110,70,.45);--tg-link:#3390ec;--tg-out-link:#3390ec;--tg-check:#4fae4e;--tg-out-text:#000;--tg-pat-f:none;
-  --tg-wall:radial-gradient(circle at 15% 20%,#dbddbb 0,transparent 55%),radial-gradient(circle at 85% 25%,#6ba587 0,transparent 55%),radial-gradient(circle at 25% 85%,#d5d88d 0,transparent 55%),radial-gradient(circle at 80% 85%,#88b884 0,transparent 55%),#a9c99a;--tg-pat:.12}}
+/* chat: a two-pane messenger (one pane at a time on phones), built from the console's tokens */
+.tg{--tg-side:var(--surface);--tg-bg:var(--bg);--tg-in:var(--raise);--tg-out:var(--bubble-out);--tg-text:var(--text);--tg-sub:var(--muted);--tg-line:var(--line);
+  --tg-sel:var(--raise);--tg-hover:var(--hover);--tg-ease:cubic-bezier(.22,.61,.36,1);--tg-dur:260ms;
+  position:fixed;left:0;right:0;top:var(--tg-top,0px);height:calc(100vh - var(--tg-top,0px));height:calc(100dvh - var(--tg-top,0px));
+  display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);background:var(--tg-bg);color:var(--tg-text);font:15px/1.4 var(--sans);z-index:20;overflow:hidden}
+body.tgmode{overflow:hidden}
 body.tgmode .side,body.tgmode .top{display:none}
 body.tgmode .app{grid-template-columns:minmax(0,1fr)}
 body.tgmode .page{padding:0}
-.tg{position:fixed;left:0;right:0;bottom:0;top:var(--tg-top,0px);display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);background:var(--tg-bg);color:var(--tg-text);
-  font:15px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC","PingFang SC","Helvetica Neue",Arial,sans-serif;z-index:20}
 .tg button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
 .tg svg{display:block}
-.tg .ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--tg-sub);flex:none}
-.tg .ic:hover{background:var(--tg-hover)}
-.tg .ic svg{width:24px;height:24px;fill:currentColor}
-/* left column */
-.tg-side{background:var(--tg-side);border-right:1px solid var(--tg-line);display:flex;flex-direction:column;min-width:0}
-.tg-sh{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;height:56px}
-.tg-search{flex:1;display:flex;align-items:center;gap:10px;height:42px;border-radius:22px;background:var(--tg-hover);padding:0 14px;color:var(--tg-sub)}
-.tg-search svg{width:20px;height:20px;fill:currentColor;flex:none}
-.tg .tg-search input{flex:1;min-width:0;width:auto;padding:0;border:0;border-radius:0;background:none;outline:0;font-size:15px;color:var(--tg-text)}
-.tg-list{flex:1;overflow-y:auto;padding:0 8px 8px}
-.tg-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px;border-radius:12px;text-align:left}
+.tg .ic{width:36px;height:36px;border-radius:var(--r);display:grid;place-items:center;color:var(--tg-sub);flex:none;transition:background-color .12s,color .12s}
+.tg .ic:hover{background:var(--tg-hover);color:var(--tg-text)}
+.tg .ic:focus-visible,.tg-item:focus-visible,.tg button:focus-visible{outline:0;box-shadow:var(--focus)}
+.tg .ic svg{width:20px;height:20px;fill:currentColor}
+/* conversation list */
+.tg-side{position:relative;background:var(--tg-side);border-right:1px solid var(--tg-line);display:flex;flex-direction:column;min-width:0;min-height:0}
+.tg-sh{display:flex;align-items:center;gap:6px;padding:10px 12px 8px 8px;flex:none}
+.tg-search{flex:1;display:flex;align-items:center;gap:8px;height:36px;border-radius:var(--r);background:var(--tg-bg);border:1px solid var(--tg-line);padding:0 10px;color:var(--tg-sub);transition:border-color .12s}
+.tg-search:focus-within{border-color:var(--line2)}
+.tg-search svg{width:16px;height:16px;fill:currentColor;flex:none}
+.tg .tg-search input{flex:1;min-width:0;width:auto;min-height:0;padding:0;border:0;border-radius:0;background:none;outline:0;box-shadow:none;font-size:14px;color:var(--tg-text)}
+.tg-list{flex:1;overflow-y:auto;padding:0 8px 8px;overscroll-behavior:contain}
+.tg .tg-item{display:flex;align-items:center;gap:12px;width:100%;padding:10px;border-radius:var(--r);text-align:left;transition:background-color .12s}
 .tg-item:hover{background:var(--tg-hover)}
-.tg-item[aria-current="true"]{background:var(--tg-sel);color:#fff}
-.tg-item[aria-current="true"] .tg-prev,.tg-item[aria-current="true"] .tg-time{color:rgba(255,255,255,.8)}
-.tg-item .tx{flex:1;min-width:0}
-.tg-row{display:flex;align-items:center;gap:6px}
-.tg-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
-.tg-time{font-size:12px;color:var(--tg-sub);flex:none}
-.tg-prev{color:var(--tg-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;flex:1;min-width:0}
-.tg-prev b{font-weight:400;color:var(--tg-text)}
-.tg-item[aria-current="true"] .tg-prev b{color:#fff}
-.tg-badge{min-width:22px;height:22px;border-radius:11px;background:var(--tg-acc);color:#fff;font-size:12px;font-weight:600;display:grid;place-items:center;padding:0 6px}
-.tg-item[aria-current="true"] .tg-badge{background:#fff;color:var(--tg-sel)}
-.tg-kind{width:16px;height:16px;fill:currentColor;flex:none}
-.tg-av{width:54px;height:54px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:600;font-size:20px;background:linear-gradient(#72d5fd,#2a9ef1)}
-.tg-av.sm{width:42px;height:42px;font-size:17px}
-.tg-av.xs{width:34px;height:34px;font-size:14px}
-.tg-av svg{width:26px;height:26px;fill:#fff}
-.tgg0{background:linear-gradient(#ff885e,#ff516a)}.tgg1{background:linear-gradient(#ffcd6a,#ffa85c)}.tgg2{background:linear-gradient(#82b1ff,#665fff)}.tgg3{background:linear-gradient(#a0de7e,#54cb68)}
-.tgg4{background:linear-gradient(#53edd6,#28c9b7)}.tgg5{background:linear-gradient(#72d5fd,#2a9ef1)}.tgg6{background:linear-gradient(#e0a2f3,#d669ed)}
-.n0{color:#fc5c51}.n1{color:#fa790f}.n2{color:#895dd5}.n3{color:#0fb297}.n4{color:#0fc9d6}.n5{color:#3ca5ec}.n6{color:#d54fae}
-.tg-foot{padding:10px 16px;border-top:1px solid var(--tg-line);font-size:12px;color:var(--tg-sub);display:flex;gap:10px;align-items:center}
-.tg-foot a{color:var(--tg-link);text-decoration:none}
+.tg-item[aria-current="true"]{background:var(--tg-sel)}
+.tg-item:active{background:var(--tg-hover)}
+.tg-item .tx{flex:1;min-width:0;display:grid;gap:2px}
+.tg-row{display:flex;align-items:center;gap:8px;min-width:0}
+.tg-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.tg-time{font-size:12px;color:var(--tg-sub);flex:none;font-variant-numeric:tabular-nums}
+.tg-prev{color:var(--tg-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;flex:1;min-width:0}
+.tg-prev b{font-weight:400;color:var(--text-2)}
+.tg-badge{min-width:20px;height:20px;border-radius:10px;background:var(--line2);color:var(--tg-text);font-size:12px;font-weight:500;display:grid;place-items:center;padding:0 6px;font-variant-numeric:tabular-nums}
+.tg-av{width:44px;height:44px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:500;font-size:17px;background:var(--av,#55698A)}
+.tg-av.sm{width:36px;height:36px;font-size:15px}
+.tg-av.xs{width:30px;height:30px;font-size:13px}
+.tg-av svg{width:22px;height:22px;fill:currentColor}
+.tg-av.sm svg{width:19px;height:19px}.tg-av.xs svg{width:16px;height:16px}
+/* one muted hue per sender, shared by avatar and name */
+.tgc0{--av:#8A5E5A;--nm:#D2958E}.tgc1{--av:#7F6A45;--nm:#CDAE74}.tgc2{--av:#5F5B85;--nm:#A9A4DA}.tgc3{--av:#4B7563;--nm:#7FBFA2}
+.tgc4{--av:#4A707A;--nm:#80B9C6}.tgc5{--av:#52668A;--nm:#90AAD6}.tgc6{--av:#7A5873;--nm:#C994BC}
+:root[data-theme="light"] .tg-who{color:var(--av)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"] .tg-who{color:var(--av)}}
+.tg-foot{padding:10px 16px;border-top:1px solid var(--tg-line);font-size:12px;color:var(--tg-sub);display:flex;gap:10px;align-items:center;flex:none}
+.tg-foot a{color:var(--text-2)}
 /* conversation */
-.tg-conv{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--tg-wall)}
-.tg-conv::before{content:"";position:absolute;inset:0;opacity:var(--tg-pat);pointer-events:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='24' cy='26' r='10'/%3E%3Cpath d='M20 26h8M24 22v8'/%3E%3Cpath d='M70 18l6 12 13 2-9 9 2 13-12-6-12 6 2-13-9-9 13-2z'/%3E%3Crect x='112' y='14' width='26' height='18' rx='4'/%3E%3Cpath d='M112 22h26'/%3E%3Cpath d='M18 92c8-10 22-10 30 0M26 100c4-4 10-4 14 0'/%3E%3Cpath d='M84 84l14 14M98 84L84 98'/%3E%3Ccircle cx='132' cy='92' r='12'/%3E%3Cpath d='M126 92l4 4 8-8'/%3E%3Cpath d='M22 140l10-10 10 10-10 10z'/%3E%3Cpath d='M70 134h26l-6-6M96 134l-6 6'/%3E%3Cpath d='M120 146c0-10 8-18 18-18'/%3E%3C/svg%3E");
-  background-size:160px 160px;filter:var(--tg-pat-f)}
-.tg-ch{position:relative;z-index:3;display:flex;align-items:center;gap:10px;height:56px;padding:0 8px 0 16px;background:var(--tg-head);border-left:0;flex:none;box-shadow:0 1px 0 var(--tg-line)}
+.tg-conv{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--tg-bg)}
+.tg-ch{position:relative;z-index:3;display:flex;align-items:center;gap:10px;height:56px;padding:0 8px 0 16px;background:var(--tg-side);flex:none;border-bottom:1px solid var(--tg-line)}
 .tg-ch .back{display:none}
-.tg-ch .tx{flex:1;min-width:0;cursor:default}
-.tg-ch .tg-name{display:block;font-size:16px}
-.tg-sub{font-size:14px;color:var(--tg-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tg-sub.typing{color:var(--tg-acc)}
-.tg-msgs{position:relative;z-index:1;flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 0 12px;min-height:0}
-.tg-col{max-width:728px;min-height:100%;margin:0 auto;padding:0 16px;display:flex;flex-direction:column;gap:2px}
-.tg-svc{align-self:center;margin:8px 0;padding:2px 10px;border-radius:12px;background:var(--tg-pill);color:#fff;font-size:14px;font-weight:500;text-align:center;max-width:80%}
-.tg-m{display:flex;align-items:flex-end;gap:8px;max-width:min(480px,86%)}
+.tg-ch .tx{flex:1;min-width:0;display:grid}
+.tg-ch .tg-name{font-size:15px}
+.tg-sub{font-size:13px;color:var(--tg-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-sub.typing{color:var(--text-2)}
+.tg-msgs{position:relative;z-index:1;flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 0;min-height:0;overscroll-behavior:contain}
+.tg-col{max-width:760px;min-height:100%;margin:0 auto;padding:0 20px;display:flex;flex-direction:column;gap:2px;justify-content:flex-end}
+.tg-svc{align-self:center;margin:10px 0 6px;padding:2px 10px;border-radius:10px;background:var(--raise);color:var(--tg-sub);font-size:12px;text-align:center;max-width:85%}
+.tg-day{background:none;color:var(--tg-sub);font-size:12px;font-weight:500}
+.tg-m{display:flex;align-items:flex-end;gap:8px;max-width:min(520px,82%)}
 .tg-m.out{align-self:flex-end;flex-direction:row-reverse}
 .tg-m .tg-av{visibility:hidden}
 .tg-m.last .tg-av{visibility:visible}
-.tg-m.last{margin-bottom:6px}
-.tg-b{position:relative;padding:6px 8px 6px 10px;border-radius:15px;background:var(--tg-in);box-shadow:0 1px 2px rgba(0,0,0,.18);white-space:pre-wrap;word-break:break-word;min-width:56px;font-size:15px;line-height:1.35}
-.tg-m.out .tg-b{background:var(--tg-out);color:var(--tg-out-text)}
-.tg-m.in.last .tg-b{border-bottom-left-radius:0}
-.tg-m.out.last .tg-b{border-bottom-right-radius:0}
-.tg-m.last .tg-b::before{content:"";position:absolute;bottom:0;width:9px;height:17px;background:inherit;
-  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat}
-.tg-m.in.last .tg-b::before{left:-8.6px}
-.tg-m.out.last .tg-b::before{right:-8.6px;transform:scaleX(-1)}
-.tg-who{display:block;font-weight:600;font-size:14px;line-height:1.3;margin-bottom:1px}
-.tg-who em{font-style:normal;font-weight:400;font-size:12px;color:var(--tg-sub);margin-left:6px}
-.tg-meta{float:right;display:inline-flex;align-items:center;gap:3px;margin:8px -2px -5px 12px;font-size:12px;color:var(--tg-sub);white-space:nowrap;line-height:1}
-.tg-m.out .tg-meta{color:var(--tg-out-sub)}
-.tg-meta svg{width:16px;height:12px;fill:var(--tg-check)}
-.tg-b a,.tg-b .cmd{color:var(--tg-link);text-decoration:none;cursor:pointer}
+.tg-m.last{margin-bottom:8px}
+.tg-b{position:relative;padding:6px 10px 7px;border-radius:12px;background:var(--tg-in);white-space:pre-wrap;overflow-wrap:anywhere;min-width:56px;font-size:15px;line-height:1.4}
+.tg-m.out .tg-b{background:var(--tg-out)}
+.tg-m.in.last .tg-b{border-bottom-left-radius:4px}
+.tg-m.out.last .tg-b{border-bottom-right-radius:4px}
+.tg-who{display:flex;align-items:baseline;gap:6px;font-weight:500;font-size:13px;line-height:1.35;margin-bottom:2px;color:var(--nm,var(--text-2))}
+.tg-who em{font-style:normal;font-weight:400;font-size:11px;color:var(--tg-sub);border:1px solid var(--line2);border-radius:4px;padding:0 4px;line-height:15px}
+.tg-meta{float:right;display:inline-flex;align-items:center;gap:3px;margin:8px -2px -4px 12px;font-size:11px;color:var(--tg-sub);white-space:nowrap;line-height:1;font-variant-numeric:tabular-nums}
+.tg-meta svg{width:15px;height:11px;fill:currentColor}
+.tg-meta.fail{color:var(--block)}
+.tg-meta .retry{color:var(--block);text-decoration:underline;font-size:11px}
+.tg-b a,.tg-b .cmd{color:var(--info);text-decoration:none;cursor:pointer}
 .tg-b a:hover,.tg-b .cmd:hover{text-decoration:underline}
-.tg-m.out .tg-b a,.tg-m.out .tg-b .cmd{color:var(--tg-out-link);text-decoration:underline}
 .tg-del{font-style:italic;color:var(--tg-sub)}
 .tg-dots{display:inline-flex;gap:4px;padding:6px 4px}
-.tg-dots i{width:7px;height:7px;border-radius:50%;background:var(--tg-sub);animation:tgd 1.2s infinite}
+.tg-dots i{width:6px;height:6px;border-radius:50%;background:var(--tg-sub);animation:tgd 1.2s infinite}
 .tg-dots i:nth-child(2){animation-delay:.2s}.tg-dots i:nth-child(3){animation-delay:.4s}
-@keyframes tgd{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
-/* "what can this bot do" card in an empty private chat */
-.tg-intro{align-self:center;margin:auto 0;max-width:360px;background:var(--tg-in);border-radius:15px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.18);white-space:pre-wrap}
-.tg-intro b{display:block;margin-bottom:6px}
-/* composer */
-.tg-bottom{position:relative;z-index:2;flex:none;padding:0 16px 16px}
-.tg-comp{max-width:728px;margin:0 auto;display:flex;align-items:flex-end;gap:8px}
-.tg-pill{flex:1;min-width:0;display:flex;align-items:flex-end;gap:2px;background:var(--tg-input);border-radius:16px 16px 0 16px;padding:3px 4px 3px 6px;min-height:54px;box-shadow:0 1px 2px rgba(0,0,0,.18);position:relative}
-.tg-pill::after{content:"";position:absolute;right:-8.6px;bottom:0;width:9px;height:17px;background:var(--tg-input);transform:scaleX(-1);
-  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='17'%3E%3Cpath d='M9 0v17H0c4.5-1.3 9-6 9-17z'/%3E%3C/svg%3E") no-repeat}
-.tg-pill .ic{width:44px;height:44px;margin-bottom:2px}
-.tg-pill .ic.on{color:var(--tg-acc)}
-.tg-menu-btn{height:32px;margin:0 2px 8px 2px;padding:0 12px!important;border-radius:16px;background:var(--tg-acc)!important;color:#fff!important;font-size:14px!important;font-weight:500;display:flex;align-items:center;gap:4px;flex:none}
-.tg-menu-btn svg{width:18px;height:18px;fill:#fff}
-.tg .tg-in{flex:1;min-width:0;width:auto;min-height:0;border:0;border-radius:0;outline:0;box-shadow:none;background:none;resize:none;font:inherit;color:var(--tg-text);padding:15px 6px 13px;max-height:180px;line-height:1.35;height:52px}
-.tg-in::placeholder{color:var(--tg-sub)}
-.tg-send{width:54px;height:54px;border-radius:50%!important;background:var(--tg-input)!important;color:var(--tg-acc)!important;display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.18);flex:none}
-.tg-send.go{background:var(--tg-acc)!important;color:#fff!important}
-.tg-send svg{width:26px;height:26px;fill:currentColor}
-.tg-send:disabled{cursor:default}
-.tg .tg-start{flex:1;height:54px;border-radius:12px;background:var(--tg-input);color:var(--tg-acc);font-weight:600;font-size:15px;box-shadow:0 1px 2px rgba(0,0,0,.18)}
-.tg .tg-start:hover{background:var(--tg-hover)}
-.tg-ro{max-width:728px;margin:0 auto;text-align:center;padding:14px;border-radius:12px;background:var(--tg-input);color:var(--tg-sub);font-size:14px;box-shadow:0 1px 2px rgba(0,0,0,.18)}
-/* bot keyboard and command menu */
-.tg-kb{max-width:728px;margin:0 auto 6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
-.tg-kb button{background:var(--tg-pill);color:#fff;border-radius:8px;padding:9px 8px;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tg-kb button:hover{filter:brightness(1.15)}
-.tg-pop{position:absolute;left:16px;right:16px;bottom:78px;max-width:728px;margin:0 auto;background:var(--tg-side);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.3);max-height:300px;overflow-y:auto;padding:6px 0;z-index:5}
-.tg-pop button{display:flex;align-items:center;gap:12px;width:100%;padding:8px 14px;text-align:left}
-.tg-pop button:hover,.tg-pop button.sel{background:var(--tg-hover)}
-.tg-pop .c{font-weight:600}
-.tg-pop .d{color:var(--tg-sub);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
-.tg-dd{position:absolute;right:8px;top:52px;background:var(--tg-side);border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.35);padding:6px 0;min-width:230px;z-index:6}
-.tg-dd button{display:flex;align-items:center;gap:14px;width:100%;padding:9px 16px;text-align:left;font-size:14px}
-.tg-dd button:hover{background:var(--tg-hover)}
-.tg-dd svg{width:20px;height:20px;fill:var(--tg-sub)}
-.tg-dd .chk{margin-left:auto;color:var(--tg-acc);font-weight:700}
+@keyframes tgd{0%,60%,100%{opacity:.3}30%{opacity:1}}
+.tg-intro{align-self:center;margin:auto 0;max-width:380px;background:var(--tg-in);border-radius:12px;padding:14px 16px;white-space:pre-wrap;color:var(--text-2);font-size:14px}
+.tg-intro b{display:block;margin-bottom:6px;color:var(--tg-text);font-weight:500}
 .tg-empty{margin:auto;text-align:center;color:var(--tg-sub);font-size:14px;padding:24px}
+/* jump to the newest message when reading history */
+.tg .tg-new{position:absolute;right:20px;bottom:calc(var(--tg-bh,72px) + 12px);z-index:4;height:36px;min-width:36px;padding:0 12px;border-radius:18px;background:var(--elev);border:1px solid var(--line2);
+  color:var(--tg-text);display:flex;align-items:center;gap:6px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.25);transition:opacity .15s,transform .15s}
+.tg-new[hidden]{display:flex!important;opacity:0;transform:translateY(8px);pointer-events:none}
+.tg-new svg{width:16px;height:16px;fill:currentColor}
+/* composer */
+.tg-bottom{position:relative;z-index:2;flex:none;padding:10px 20px 14px;border-top:1px solid var(--tg-line);background:var(--tg-side)}
+.tg-comp{max-width:760px;margin:0 auto;display:flex;align-items:flex-end;gap:8px}
+.tg-pill{flex:1;min-width:0;display:flex;align-items:flex-end;gap:2px;background:var(--tg-bg);border:1px solid var(--line2);border-radius:12px;padding:3px;transition:border-color .12s}
+.tg-pill:focus-within{border-color:var(--muted)}
+.tg-pill .ic{width:36px;height:36px}
+.tg-pill .ic[aria-expanded="true"]{background:var(--tg-hover);color:var(--tg-text)}
+.tg .tg-in{flex:1;min-width:0;width:auto;min-height:0;border:0;border-radius:0;outline:0;box-shadow:none;background:none;resize:none;font:inherit;color:var(--tg-text);padding:7px 6px;max-height:160px;line-height:1.45;height:36px;overflow-y:auto}
+.tg-in::placeholder{color:var(--tg-sub)}
+.tg-send{width:42px;height:42px;border-radius:12px!important;background:var(--raise)!important;color:var(--tg-sub)!important;display:grid;place-items:center;flex:none;transition:background-color .12s,color .12s}
+.tg-send.go{background:var(--signal)!important;color:var(--signal-fg)!important}
+.tg-send.go:hover{background:var(--signal-hover)!important}
+.tg-send svg{width:20px;height:20px;fill:currentColor}
+.tg-send:disabled{cursor:default}
+.tg .tg-start{flex:1;height:44px;border-radius:12px;background:var(--raise);color:var(--tg-text);font-weight:500;font-size:15px;border:1px solid var(--line2)}
+.tg .tg-start:hover{background:var(--tg-hover)}
+.tg-ro{max-width:760px;margin:0 auto;text-align:center;padding:10px;color:var(--tg-sub);font-size:13px}
+/* command menu: opens from the "/" button or a leading "/" */
+.tg-pop{position:absolute;left:20px;right:20px;bottom:calc(100% + 6px);max-width:760px;margin:0 auto;background:var(--elev);border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.28);max-height:min(320px,50vh);overflow-y:auto;padding:4px 0;z-index:5;overscroll-behavior:contain}
+.tg-pop .gh{padding:8px 14px 4px;font-size:11px;color:var(--tg-sub);letter-spacing:.02em}
+.tg-pop button{display:flex;align-items:center;gap:12px;width:100%;padding:8px 14px;text-align:left;font-size:14px}
+.tg-pop button:hover,.tg-pop button.sel{background:var(--tg-hover)}
+.tg-pop .c{font-family:var(--mono);font-size:13px;color:var(--tg-text)}
+.tg-pop .d{color:var(--tg-sub);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.tg-pop .ex{color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.tg-dd{position:absolute;right:8px;top:52px;background:var(--elev);border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.28);padding:4px 0;min-width:230px;z-index:6}
+.tg-dd button{display:flex;align-items:center;gap:12px;width:100%;padding:9px 14px;text-align:left;font-size:14px}
+.tg-dd button:hover{background:var(--tg-hover)}
+.tg-dd svg{width:18px;height:18px;fill:var(--tg-sub)}
+.tg-dd .chk{margin-left:auto;color:var(--text-2)}
+.tg-dim{display:none}
+/* phones: one pane at a time; the chat slides over the list like a pushed screen */
 @media (max-width:720px){
   .tg{grid-template-columns:minmax(0,1fr)}
-  .tg .tg-conv{display:none}
-  .tg.open .tg-side{display:none}
-  .tg.open .tg-conv{display:flex}
-  .tg-ch{padding-left:4px}
-  .tg-ch .back{display:grid}
-  .tg-col{padding:0 8px}
-  .tg-bottom{padding:0 8px 8px}
-  .tg-m{max-width:88%}
-  .tg-pop{left:8px;right:8px;bottom:70px}
-  .tg-pill{min-height:48px}
-  .tg-send{width:48px;height:48px}
-  .tg .tg-in{padding:12px 6px 10px;height:46px}
-  body.tgmode .demo>span{display:none} /* keep the demo label and the way home, give the chat the room */
-  .tg-kb button{padding:7px 6px}
+  .tg-side,.tg-conv{grid-area:1/1;will-change:transform}
+  .tg-conv{transform:translate3d(100%,0,0);visibility:hidden;transition:transform var(--tg-dur) var(--tg-ease),visibility 0s linear var(--tg-dur);box-shadow:-8px 0 24px rgba(0,0,0,.25);touch-action:pan-y}
+  .tg-side{transition:transform var(--tg-dur) var(--tg-ease)}
+  .tg.open .tg-conv{transform:none;visibility:visible;transition:transform var(--tg-dur) var(--tg-ease),visibility 0s}
+  .tg.open .tg-side{transform:translate3d(-25%,0,0)}
+  .tg-dim{display:block;position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity var(--tg-dur) var(--tg-ease);z-index:7}
+  .tg.open .tg-dim{opacity:.3}
+  .tg.drag .tg-conv,.tg.drag .tg-side,.tg.drag .tg-dim{transition:none}
+  .tg:not(.open) .tg-item[aria-current="true"]:not(:active){background:none}
+  .tg-ch{padding-left:4px;height:52px}
+  .tg-ch .back{display:grid;width:40px;height:40px}
+  .tg-sh{padding:8px 12px 8px 8px}
+  .tg .tg-item{padding:10px 8px}
+  .tg-col{padding:0 10px}
+  .tg-m{max-width:86%}
+  .tg-bottom{padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+  .tg-pop{left:8px;right:8px}
+  .tg-new{right:12px}
+  .tg .tg-in{font-size:16px} /* 16px stops iOS from zooming into the field */
+  .tg .tg-search input{font-size:16px}
+  .tg-foot{display:none}
+  body.tgmode .demo>span{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .tg{--tg-dur:1ms}
+  .tg-dots i{animation:none;opacity:.6}
 }
 
 @media (max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -609,7 +617,7 @@ body.tgmode .page{padding:0}
   .nav a{padding:8px 10px;white-space:nowrap}
   .nav a .st,.nav .ng{display:none}
   .er.c2,.er.c3{grid-template-columns:minmax(0,1fr)}
-  .nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 var(--signal)}
+  .nav a[aria-current="page"]{box-shadow:inset 0 -2px 0 var(--text-2)}
   .side-foot{display:none}
   .top{position:static;padding:12px 16px}
   .page{padding:16px 16px 80px}
@@ -763,7 +771,7 @@ function renderNav(){const pend=S.status?.pending||0;let g='',out='';
     const m=role&&member(role),emp=EMP_PAGES.includes(k);
     const state=emp?(m?(m.enabled?'':'<span class="st off">停用</span>'):'<span class="st">未雇佣</span>'):'';
     const badge=k==='approvals'?pend:(emp&&m?todo[role]:0);
-    out+=`<a href="#${k}" class="${emp&&!(m&&m.enabled)?'idle':''}" ${S.route===k?'aria-current="page"':''}><svg viewBox="0 0 16 16" aria-hidden="true">${NAV_ICON[k]||''}</svg><span class="t">${l}</span>${state}${badge?`<span class="badge" aria-label="${badge} 项待处理">${badge}</span>`:''}</a>`}
+    out+=`<a href="#${k}" class="${emp&&!(m&&m.enabled)?'idle':''}" ${S.route===k?'aria-current="page"':''}><svg viewBox="0 0 16 16" aria-hidden="true">${NAV_ICON[k]||''}</svg><span class="t">${l}</span>${state}${badge?`<span class="badge${k==='approvals'?'':' quiet'}" aria-label="${badge} 项待处理">${badge}</span>`:''}</a>`}
   $('#nav').innerHTML=out}
 function renderTop(){const s=S.status||{};
   const pg=PAGES.find(p=>p[0]===S.route);
@@ -793,6 +801,7 @@ window.addEventListener('hashchange',()=>{if(S.dirtyRules&&S.route==='rules'&&!c
 async function render(){
   const page=$('#page');
   document.body.classList.toggle('tgmode',S.route==='chat');
+  if(S.route==='chat'&&S.painted==='chat'&&$('#tg')){try{await tgRefresh()}catch(e){}return}
   if(S.painted!==S.route){S.painted=S.route;page.setAttribute('aria-busy','true');
     const sk=setTimeout(()=>{if(page.getAttribute('aria-busy'))page.innerHTML=S.route==='overview'?'<div class="sk" aria-label="加载中"><i style="height:180px"></i><i style="height:120px"></i><div class="ov-row"><i style="height:300px"></i><i style="height:300px"></i></div></div>':'<div class="sk" aria-label="加载中"><i style="height:120px"></i><i style="height:320px"></i></div>'},120);
     try{page.innerHTML=await VIEWS[S.route]();BIND[S.route]&&BIND[S.route]()}catch(e){page.innerHTML=`<div class="note block">这一页没加载出来：${esc(e.message)}<div style="margin-top:8px"><button class="btn sm" onclick="location.reload()">重新加载</button></div></div>`}
@@ -1229,11 +1238,12 @@ BIND.telegram=()=>{
 // executed. The third chat shows what the real bot handled in the group, read-only.
 const TG_ICON={
   search:'<svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6a1 1 0 0 1-1.4 1.4l-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>',
-  back:'<svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>',
-  more:'<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+  back:'<svg viewBox="0 0 24 24"><path d="M15.4 4.6 8 12l7.4 7.4L14 20.8 5.2 12 14 3.2z"/></svg>',
+  home:'<svg viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h18v2H3zm0 6h12v2H3z"/></svg>',
+  more:'<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>',
   send:'<svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>',
-  kb:'<svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm-9 3h2v2h-2zm0 3h2v2h-2zM8 8h2v2H8zm0 3h2v2H8zm-1 2H5v-2h2zm0-3H5V8h2zm9 7H8v-2h8zm0-4h-2v-2h2zm0-3h-2V8h2zm3 3h-2v-2h2zm0-3h-2V8h2z"/></svg>',
-  menu:'<svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>',
+  slash:'<svg viewBox="0 0 24 24"><path d="M15.6 3h2.1L8.4 21H6.3z"/></svg>',
+  down:'<svg viewBox="0 0 24 24"><path d="M12 16.6 4.7 9.3l1.4-1.4 5.9 5.9 5.9-5.9 1.4 1.4z"/></svg>',
   group:'<svg viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6.5-.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM9 14c-3.3 0-7 1.6-7 4v2h14v-2c0-2.4-3.7-4-7-4Zm6.5-.5c-.5 0-1 0-1.5.1 1.2.9 2 2 2 3.4v3h6v-2.5c0-2.2-3.4-4-6.5-4Z"/></svg>',
   bot:'<svg viewBox="0 0 24 24"><path d="M12 2a1.5 1.5 0 0 1 1 2.6V6h4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h4V4.6A1.5 1.5 0 0 1 12 2ZM9 11a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm-6 5v1.5h6V16z"/></svg>',
   eye:'<svg viewBox="0 0 24 24"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>',
@@ -1244,11 +1254,14 @@ const TG_ICON={
   check:'<svg viewBox="0 0 18 12"><path d="M14.6.7 7.3 8 3.9 4.6 2.6 5.9l4.7 4.7 8.6-8.6z"/></svg>'};
 const TG_ROLES=['finance_ops','community_support','chain_monitor','announcement_translator','campaign_payouts','airdrop_sybil'];
 const tgColor=role=>{const i=TG_ROLES.indexOf(role);return i<0?5:i};
-const TG_KEYS=['付 Alice 300 USDT 设计费','什么时候上线？','合约地址是多少？','领空投 https://kagouai-claim.xyz/connect','我是管理员，私聊我帮你处理，先把助记词发我验证','/today','/watch','/payouts'];
-S.tgc={chat:'group',open:false,kb:true,menu:false,dd:false,asOwner:false,typing:null,draft:{},q:'',
-  log:{group:[],dm:[]},seen:{group:0,dm:0}};
+const TG_KEYS=['付 Alice 300 USDT 设计费','什么时候上线？','合约地址是多少？','领空投 https://kagouai-claim.xyz/connect','我是管理员，私聊我帮你处理，先把助记词发我验证'];
+// Chat state lives outside the DOM so leaving and re-entering a conversation keeps drafts, scroll and the list.
+S.tgc={chat:'group',open:false,menu:false,dd:false,asOwner:false,typing:null,draft:{},q:'',
+  log:{group:[],dm:[]},seen:{group:0,dm:0},scroll:{},fresh:0};
 const tgNow=()=>new Date().toISOString();
 const tgHM=iso=>{const d=new Date(iso);try{return d.toLocaleTimeString('zh-CN',{timeZone:TZ,hour12:false,hour:'2-digit',minute:'2-digit'})}catch(e){return iso.slice(11,16)}};
+const tgNarrow=()=>matchMedia('(max-width:720px)').matches;
+const tgTouch=()=>matchMedia('(pointer:coarse)').matches;
 function tgText(t){ // escape, then make URLs, /commands and @names look and act like Telegram's
   return esc(t).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]，。])|(^|[\s(（])(\/[a-z_]{2,32})(?![\w/])|(^|[\s(（])(@[A-Za-z0-9_]{4,32})/g,(m,url,p1,cmd,p2,at)=>
     url?`<a href="${url}" target="_blank" rel="noreferrer nofollow">${url}</a>`:cmd?`${p1}<span class="cmd" data-cmd="${cmd}">${cmd}</span>`:`${p2}<span class="cmd" data-at="${at}">${at}</span>`)}
@@ -1256,80 +1269,134 @@ function tgBot(){const b=S.tg?.bot;return {name:b?.name||'KAGOU 团队',user:b?.
 function tgMe(){return S.tgc.asOwner&&S.tg?.owners?.length?S.tg.owners[0]:'member'}
 function tgChats(){const b=tgBot(),on=(S.team?.members||[]).filter(m=>m.enabled).length;
   const real=(S.tg?.messages||[]).slice().reverse();
-  const last=a=>a[a.length-1];
   return [
-    {id:'group',title:'KAGOU 项目群',av:'K',g:'tgg2',icon:'group',sub:`${on} 位 AI 员工 · 模拟群聊`,msgs:S.tgc.log.group,last:last(S.tgc.log.group)},
-    {id:'dm',title:b.name,av:'',g:'tgg5',icon:'bot',sub:'机器人',msgs:S.tgc.log.dm,last:last(S.tgc.log.dm)},
-    {id:'real',title:'群里的真实消息',av:'',g:'tgg3',icon:'eye',sub:S.tg?.online?'机器人在线 · 只读':'只读：机器人在群里处理过的消息',
+    {id:'group',title:'KAGOU 项目群',av:'K',g:'tgc2',icon:'group',sub:`${on} 位 AI 员工 · 模拟群聊`,msgs:S.tgc.log.group},
+    {id:'dm',title:b.name,av:'',g:'tgc5',icon:'bot',sub:'机器人',msgs:S.tgc.log.dm},
+    {id:'real',title:'群里的真实消息',av:'',g:'tgc3',icon:'eye',sub:S.tg?.online?'机器人在线 · 只读':'只读：机器人在群里处理过的消息',
       msgs:real.map(m=>({out:false,who:m.kind==='telegram_in'?m.actor:(m.employee?roleName(m.employee):b.name),role:m.kind==='telegram_in'?'':m.employee||'',
-        text:m.text,at:m.at,user:m.kind==='telegram_in'})),last:null}]}
+        tag:m.kind==='telegram_in'?'':(m.employee?'AI 员工':'机器人'),text:m.text,at:m.at,user:m.kind==='telegram_in'}))}]}
+const tgCur=()=>{const cs=tgChats();return cs.find(x=>x.id===S.tgc.chat)||cs[0]};
 function tgPreview(c){const m=c.msgs[c.msgs.length-1];if(!m)return c.id==='dm'?'发 /start 开始':c.id==='real'?'还没有消息':'点开就能跟 AI 员工说话';
-  if(m.svc)return esc(m.text);return (m.out?'<b>你：</b>':m.who&&c.id!=='dm'?`<b>${esc(m.who)}：</b>`:'')+esc(String(m.text).split('\n')[0])}
-function tgAv(name,g,icon,cls=''){return `<div class="tg-av ${cls} ${g}">${icon?TG_ICON[icon]:esc(Array.from(String(name||'?').replace(/^@/,''))[0]||'?')}</div>`}
+  if(m.svc)return esc(m.text);if(m.typing)return '正在输入…';
+  return (m.out?'<b>你：</b>':m.who&&c.id!=='dm'?`<b>${esc(m.who)}：</b>`:'')+esc(String(m.text).split('\n')[0])}
+function tgAv(name,g,icon,cls=''){return `<div class="tg-av ${cls} ${g}" aria-hidden="true">${icon?TG_ICON[icon]:esc(Array.from(String(name||'?').replace(/^@/,''))[0]||'?')}</div>`}
 function tgMsgs(c){
   if(!c.msgs.length){
     if(c.id==='dm')return `<div class="tg-intro"><b>这个机器人能做什么？</b>${esc('我是 '+tgBot().name+'。项目群里的 AI 员工都通过我工作：付款、客服、链上监控、公告翻译、营销结算和空投反女巫。\n\n点下面的「开始」看看都有谁在岗。')}</div>`;
     if(c.id==='real')return `<div class="tg-empty">机器人在群里处理过的消息会出现在这里。<br>先在「Telegram」页面把机器人接进群。</div>`;
-    return `<div class="tg-svc">今天</div><div class="tg-svc">你加入了群聊 · 这里是模拟，不记账、不发到真实群</div>`}
+    return `<div class="tg-svc">你加入了群聊 · 这里是模拟，不记账、不发到真实群</div>`}
   let out='',day='';
   c.msgs.forEach((m,i)=>{
-    const d=(m.at||'').slice(0,10);if(d&&d!==day){day=d;out+=`<div class="tg-svc">${d===tgNow().slice(0,10)?'今天':esc(fmtTime(m.at).split(' ')[0])}</div>`}
+    const d=(m.at||'').slice(0,10);if(d&&d!==day){day=d;out+=`<div class="tg-svc tg-day">${d===tgNow().slice(0,10)?'今天':esc(fmtTime(m.at).split(' ')[0])}</div>`}
     if(m.svc){out+=`<div class="tg-svc">${esc(m.text)}</div>`;return}
-    const n=c.msgs[i+1],last=!n||n.svc||n.out!==m.out||n.who!==m.who;
-    const showName=!m.out&&c.id!=='dm'&&(i===0||c.msgs[i-1].svc||c.msgs[i-1].who!==m.who||c.msgs[i-1].out);
-    const col=m.user?6:tgColor(m.role);
-    const meta=`<span class="tg-meta">${tgHM(m.at)}${m.out?(m.pending?TG_ICON.check:TG_ICON.checks):''}</span>`;
-    const body=m.deleted?`<span class="tg-del">${esc(m.text)}</span>`:m.typing?'<span class="tg-dots"><i></i><i></i><i></i></span>':tgText(m.text);
-    out+=`<div class="tg-m ${m.out?'out':'in'} ${last?'last':''}">${m.out?'':tgAv(m.who,'tgg'+col,m.user?'':(!m.role?'bot':''),'xs')}
-      <div class="tg-b">${showName?`<span class="tg-who n${col}">${esc(m.who)}${m.tag?`<em>${esc(m.tag)}</em>`:''}</span>`:''}${body}${m.typing?'':meta}</div></div>`});
+    const p=c.msgs[i-1],n=c.msgs[i+1];
+    const same=(a,b)=>a&&b&&!a.svc&&!b.svc&&a.out===b.out&&a.who===b.who&&(b.at||'').slice(0,10)===(a.at||'').slice(0,10);
+    const last=!same(m,n),first=!same(p,m);
+    const showName=!m.out&&c.id!=='dm'&&first;
+    const col='tgc'+(m.user?6:tgColor(m.role));
+    const tick=m.out?(m.failed?'':m.pending?TG_ICON.check:TG_ICON.checks):'';
+    const meta=m.failed?`<span class="tg-meta fail">未发送 <button class="retry" data-retry="${i}">重试</button></span>`:`<span class="tg-meta">${tgHM(m.at)}${tick}</span>`;
+    const body=m.deleted?`<span class="tg-del">${esc(m.text)}</span>`:m.typing?'<span class="tg-dots" aria-label="正在输入"><i></i><i></i><i></i></span>':tgText(m.text);
+    out+=`<div class="tg-m ${m.out?'out':'in'} ${last?'last':''}">${m.out?'':tgAv(m.who,col,m.user?'':(!m.role?'bot':''),'xs')}
+      <div class="tg-b ${col}">${showName?`<span class="tg-who">${esc(m.who)}${m.tag?`<em>${esc(m.tag)}</em>`:''}</span>`:''}${body}${m.typing?'':meta}</div></div>`});
   return out}
 function tgCmds(){return (S.tg?.commands||[]).filter(c=>c.cmd.startsWith('/'))}
-VIEWS.chat=async()=>{
-  if(!S.tg||Date.now()-(S.tgAt||0)>15000){S.tg=await api('/api/telegram');S.tgAt=Date.now()}
-  const cs=tgChats(),c=cs.find(x=>x.id===S.tgc.chat)||cs[0],q=S.tgc.q.trim().toLowerCase();
-  if(S.tgc.seen.real===undefined)S.tgc.seen.real=cs[2].msgs.length; // only messages that arrive while the console is open count as unread
-  const list=cs.filter(x=>!q||x.title.toLowerCase().includes(q)).map(x=>{const unread=x.msgs.length-(S.tgc.seen[x.id]||0);
-    return `<button class="tg-item" data-chat="${x.id}" aria-current="${x.id===c.id}">${tgAv(x.av,x.g,x.av?'':x.icon)}
-    <span class="tx"><span class="tg-row"><span class="tg-name">${esc(x.title)}</span><span class="tg-time">${x.msgs.length?tgHM(x.msgs[x.msgs.length-1].at):''}</span></span>
-    <span class="tg-row"><span class="tg-prev">${tgPreview(x)}</span>${unread>0&&x.id!==c.id?`<span class="tg-badge">${unread}</span>`:''}</span></span></button>`}).join('');
+// pieces of the screen, each repainted on its own so the composer (and the phone keyboard) never gets rebuilt
+function tgListHtml(){const cs=tgChats(),q=S.tgc.q.trim().toLowerCase(),cur=S.tgc.chat;
+  const rows=cs.filter(x=>!q||x.title.toLowerCase().includes(q)).map(x=>{const unread=x.msgs.length-(S.tgc.seen[x.id]||0);
+    const lm=x.msgs[x.msgs.length-1];
+    return `<button class="tg-item" data-chat="${x.id}" aria-current="${x.id===cur}">${tgAv(x.av,x.g,x.av?'':x.icon)}
+    <span class="tx"><span class="tg-row"><span class="tg-name">${esc(x.title)}</span><span class="tg-time">${lm?tgHM(lm.at):''}</span></span>
+    <span class="tg-row"><span class="tg-prev">${tgPreview(x)}</span>${unread>0&&!(x.id===cur&&(S.tgc.open||!tgNarrow()))?`<span class="tg-badge" aria-label="${unread} 条未读">${unread}</span>`:''}</span></span></button>`}).join('');
+  return rows||'<div class="tg-empty">没有匹配的会话</div>'}
+function tgHeadHtml(c){const ro=c.id==='real';
   const sub=S.tgc.typing&&S.tgc.typing.chat===c.id?`<span class="tg-sub typing">${esc(S.tgc.typing.who)} 正在输入…</span>`:`<span class="tg-sub">${esc(c.sub)}</span>`;
-  const draft=S.tgc.draft[c.id]||'';
-  const ro=c.id==='real';
-  const showKb=!ro&&S.tgc.kb;
-  const cmds=tgCmds(),fq=draft.startsWith('/')&&!draft.includes(' ')?draft.slice(1).toLowerCase():null;
-  const pop=!ro&&(S.tgc.menu||fq!==null)?cmds.filter(x=>fq===null||x.cmd.slice(1).toLowerCase().startsWith(fq)):[];
-  const me=tgMe();
-  return `<div class="tg ${S.tgc.open?'open':''}" id="tg">
-  <aside class="tg-side">
-    <div class="tg-sh"><button class="ic" id="tgHome" title="返回控制台" aria-label="返回控制台">${TG_ICON.menu}</button>
-      <label class="tg-search">${TG_ICON.search}<input id="tgQ" placeholder="搜索" value="${esc(S.tgc.q)}" aria-label="搜索会话"></label></div>
-    <div class="tg-list" role="list">${list||'<div class="tg-empty">没有匹配的会话</div>'}</div>
-    <div class="tg-foot"><span style="flex:1">AI 员工在这里回复，跟真实群里一样。</span><a href="#team">返回控制台</a></div>
-  </aside>
-  <section class="tg-conv" aria-label="${esc(c.title)}">
-    <header class="tg-ch"><button class="ic back" id="tgBack" aria-label="返回会话列表">${TG_ICON.back}</button>
-      ${tgAv(c.av,c.g,c.av?'':c.icon,'sm')}<div class="tx"><span class="tg-name">${esc(c.title)}</span>${sub}</div>
-      ${ro?'':`<button class="ic" id="tgMore" aria-label="更多" aria-expanded="${S.tgc.dd}">${TG_ICON.more}</button>`}
-      ${S.tgc.dd?`<div class="tg-dd" role="menu">
-        <button data-dd="member" role="menuitemradio" aria-checked="${!S.tgc.asOwner}">${TG_ICON.user}以群成员 @member 发言${S.tgc.asOwner?'':'<span class="chk">✓</span>'}</button>
-        ${S.tg?.owners?.length?`<button data-dd="owner" role="menuitemradio" aria-checked="${S.tgc.asOwner}">${TG_ICON.user}以老板 @${esc(S.tg.owners[0])} 发言${S.tgc.asOwner?'<span class="chk">✓</span>':''}</button>`:''}
-        <button data-dd="clear" role="menuitem">${TG_ICON.trash}清空聊天记录</button>
-        <button data-dd="home" role="menuitem">${TG_ICON.exit}返回控制台</button></div>`:''}
-    </header>
-    <div class="tg-msgs" id="tgMsgs" aria-live="polite"><div class="tg-col">${tgMsgs(c)}</div></div>
-    <div class="tg-bottom">
-      ${pop.length?`<div class="tg-pop" role="listbox">${pop.map(x=>`<button data-pick="${esc(x.cmd)}" role="option"><span class="c">${esc(x.cmd)}</span><span class="d">${esc(x.desc)}${x.owner_only?' · 老板':''}</span></button>`).join('')}</div>`:''}
-      ${ro?`<div class="tg-ro">只读：这里是机器人在真实群里收发的消息</div>`:
-        c.id==='dm'&&!c.msgs.length?`<div class="tg-comp"><button class="tg-start" data-say="/start">开始</button></div>`:
-      `${showKb?`<div class="tg-kb">${TG_KEYS.map(k=>`<button data-say="${esc(k)}" title="${esc(k)}">${esc(k)}</button>`).join('')}</div>`:''}
-      <div class="tg-comp"><div class="tg-pill">
-        <button class="tg-menu-btn" id="tgMenu" aria-expanded="${S.tgc.menu}">${TG_ICON.menu}菜单</button>
-        <textarea class="tg-in" id="tgIn" rows="1" placeholder="${c.id==='group'?`以 @${esc(me)} 发消息`:'消息'}" aria-label="消息">${esc(draft)}</textarea>
-        <button class="ic ${showKb?'on':''}" id="tgKb" title="快捷消息" aria-label="快捷消息">${TG_ICON.kb}</button></div>
-        <button class="tg-send ${draft.trim()?'go':''}" id="tgSend" aria-label="发送" ${draft.trim()?'':'disabled'}>${TG_ICON.send}</button></div>`}
-    </div>
-  </section></div>`};
-function tgSeen(){const c=tgChats().find(x=>x.id===S.tgc.chat);if(c)S.tgc.seen[c.id]=c.msgs.length}
+  return `<button class="ic back" id="tgBack" aria-label="返回会话列表">${TG_ICON.back}</button>
+    ${tgAv(c.av,c.g,c.av?'':c.icon,'sm')}<div class="tx"><span class="tg-name">${esc(c.title)}</span>${sub}</div>
+    ${ro?'':`<button class="ic" id="tgMore" aria-label="更多" aria-haspopup="menu" aria-expanded="${S.tgc.dd}">${TG_ICON.more}</button>`}
+    ${S.tgc.dd?`<div class="tg-dd" role="menu">
+      <button data-dd="member" role="menuitemradio" aria-checked="${!S.tgc.asOwner}">${TG_ICON.user}以群成员 @member 发言${S.tgc.asOwner?'':'<span class="chk">✓</span>'}</button>
+      ${S.tg?.owners?.length?`<button data-dd="owner" role="menuitemradio" aria-checked="${S.tgc.asOwner}">${TG_ICON.user}以老板 @${esc(S.tg.owners[0])} 发言${S.tgc.asOwner?'<span class="chk">✓</span>':''}</button>`:''}
+      <button data-dd="clear" role="menuitem">${TG_ICON.trash}清空聊天记录</button>
+      <button data-dd="home" role="menuitem">${TG_ICON.exit}返回控制台</button></div>`:''}`}
+function tgBottomKind(c){return c.id==='real'?'ro':c.id==='dm'&&!c.msgs.length?'start':'comp'}
+function tgBottomHtml(c){const k=tgBottomKind(c),draft=S.tgc.draft[c.id]||'';
+  if(k==='ro')return `<div class="tg-ro">只读：这里是机器人在真实群里收发的消息</div>`;
+  if(k==='start')return `<div class="tg-comp"><button class="tg-start" data-say="/start">开始</button></div>`;
+  return `<div class="tg-pop" id="tgPop" role="listbox" hidden></div>
+    <div class="tg-comp"><div class="tg-pill">
+      <button class="ic" id="tgMenu" aria-label="命令和示例消息" aria-haspopup="listbox" aria-expanded="false">${TG_ICON.slash}</button>
+      <textarea class="tg-in" id="tgIn" rows="1" placeholder="${c.id==='group'?`以 @${esc(tgMe())} 发消息`:'消息'}" aria-label="消息" enterkeyhint="${tgTouch()?'enter':'send'}">${esc(draft)}</textarea></div>
+      <button class="tg-send ${draft.trim()?'go':''}" id="tgSend" aria-label="发送" ${draft.trim()?'':'disabled'}>${TG_ICON.send}</button></div>`}
+function tgPopHtml(){const draft=S.tgc.draft[S.tgc.chat]||'',fq=draft.startsWith('/')&&!/\s/.test(draft)?draft.slice(1).toLowerCase():null;
+  if(!S.tgc.menu&&fq===null)return '';
+  const cmds=tgCmds().filter(x=>fq===null||x.cmd.slice(1).toLowerCase().startsWith(fq));
+  let h=cmds.length?`<div class="gh">命令</div>${cmds.map(x=>`<button data-pick="${esc(x.cmd)}" role="option"><span class="c">${esc(x.cmd)}</span><span class="d">${esc(x.desc)}${x.owner_only?' · 老板':''}</span></button>`).join('')}`:'';
+  if(fq===null)h+=`<div class="gh">示例消息</div>${TG_KEYS.map(k=>`<button data-pick="${esc(k)}" role="option"><span class="ex">${esc(k)}</span></button>`).join('')}`;
+  return h}
+// ---- scrolling: stay pinned to the newest message unless the reader has scrolled up
+const tgBox=()=>$('#tgMsgs');
+const tgAtBottom=b=>b.scrollHeight-b.scrollTop-b.clientHeight<64;
+function tgSaveScroll(){const b=tgBox();if(b)S.tgc.scroll[S.tgc.chat]=tgAtBottom(b)?null:b.scrollTop}
+function tgNewBtn(){const b=tgBox(),btn=$('#tgNew');if(!b||!btn)return;const show=!tgAtBottom(b);btn.hidden=!show;if(!show)S.tgc.fresh=0;
+  btn.querySelector('span').textContent=S.tgc.fresh?S.tgc.fresh+' 条新消息':'';btn.setAttribute('aria-label',S.tgc.fresh?S.tgc.fresh+' 条新消息，跳到最新':'跳到最新消息')}
+function tgPaintMsgs(mode){ // mode: 'enter' (restore saved position), 'keep' (follow only if at bottom), 'bottom'
+  const b=tgBox();if(!b)return;const c=tgCur(),col=b.firstElementChild;
+  const stick=mode==='bottom'||(mode==='keep'&&tgAtBottom(b)),top=b.scrollTop,before=b.querySelectorAll('.tg-m').length;
+  col.innerHTML=tgMsgs(c);
+  if(mode==='enter'){const s=S.tgc.scroll[c.id];b.scrollTop=s==null?b.scrollHeight:s;S.tgc.fresh=0}
+  else if(stick)b.scrollTop=b.scrollHeight;
+  else{b.scrollTop=top;S.tgc.fresh+=Math.max(0,b.querySelectorAll('.tg-m').length-before)}
+  tgNewBtn()}
+function tgPaint(parts){const tg=$('#tg');if(!tg)return;const c=tgCur();
+  if(parts.list)$('#tgList').innerHTML=tgListHtml();
+  if(parts.head)$('#tgHead').innerHTML=tgHeadHtml(c);
+  if(parts.bottom){const bt=$('#tgBottom');bt.dataset.kind=tgBottomKind(c);bt.dataset.for=c.id;bt.innerHTML=tgBottomHtml(c);tgFitInput();tgBottomH()}
+  if(parts.msgs)tgPaintMsgs(parts.msgs)}
+function tgPop(){const pop=$('#tgPop');if(!pop)return;const h=tgPopHtml();pop.innerHTML=h;pop.hidden=!h;
+  const m=$('#tgMenu');if(m)m.setAttribute('aria-expanded',String(!!h))}
+function tgFitInput(){const i=$('#tgIn');if(!i)return;i.style.height='auto';i.style.height=Math.min(160,i.scrollHeight)+'px'}
+function tgBottomH(){const tg=$('#tg'),bt=$('#tgBottom');if(tg&&bt)tg.style.setProperty('--tg-bh',bt.offsetHeight+'px')}
+// ---- the phone keyboard: size the messenger to the visual viewport so the composer stays above it
+function tgFit(){const tg=$('#tg');if(!tg)return;const bar=$('#demoBar'),bh=bar&&!bar.hidden?bar.offsetHeight:0,vv=window.visualViewport,b=tgBox();
+  const pinned=b&&tgAtBottom(b);
+  if(vv&&tgNarrow()){const top=Math.max(0,bh-vv.offsetTop);tg.style.top=(vv.offsetTop+top)+'px';tg.style.height=(vv.height-top)+'px'}
+  else{tg.style.top=bh+'px';tg.style.height=''}
+  tg.style.setProperty('--tg-top',bh+'px');
+  if(pinned&&b)b.scrollTop=b.scrollHeight}
+if(window.visualViewport){const vf=()=>{if(S.route==='chat')tgFit()};visualViewport.addEventListener('resize',vf);visualViewport.addEventListener('scroll',vf)}
+window.addEventListener('resize',()=>{if(S.route==='chat'&&$('#tg')){tgFit();if(!tgNarrow()&&S.tgc.open){S.tgc.open=false;$('#tg').classList.remove('open')}}});
+// ---- opening and closing a conversation; on phones it is a pushed screen with its own history entry
+function tgOpen(id,{push=true}={}){const tg=$('#tg');if(!tg)return;
+  const changed=id!==S.tgc.chat;tgSaveScroll();S.tgc.chat=id;S.tgc.dd=false;S.tgc.menu=false;
+  const c=tgCur(),bt=$('#tgBottom');
+  tgPaint({head:true,msgs:'enter',bottom:changed||bt.dataset.kind!==tgBottomKind(c)||bt.dataset.for!==c.id});
+  if(tgNarrow()){if(!S.tgc.open){S.tgc.open=true;tg.classList.add('open');if(push)history.pushState({tgChat:id},'',location.hash)}}
+  else{const i=$('#tgIn');if(i)i.focus()}
+  tgSeen();tgPaint({list:true})}
+function tgClose({fromHistory=false}={}){const tg=$('#tg');if(!tg||!S.tgc.open)return;
+  tgSaveScroll();const a=document.activeElement;if(a&&a.blur&&tg.contains(a))a.blur();
+  S.tgc.open=false;S.tgc.dd=false;tg.classList.remove('open');tgPaint({list:true});
+  if(!fromHistory&&history.state&&history.state.tgChat){S.tgc.skipPop=true;history.back()}}
+window.addEventListener('popstate',e=>{if(S.route!=='chat'||!$('#tg'))return;
+  if(S.tgc.skipPop){S.tgc.skipPop=false;return}
+  const st=e.state&&e.state.tgChat;
+  if(st&&!S.tgc.open&&tgNarrow())tgOpen(st,{push:false});else if(!st&&S.tgc.open)tgClose({fromHistory:true})});
+// ---- edge swipe back (phones): the chat follows the finger, then finishes or springs back
+function tgSwipe(tg){const conv=tg.querySelector('.tg-conv'),side=tg.querySelector('.tg-side'),dim=tg.querySelector('.tg-dim');let s=null;
+  const reset=()=>{conv.style.transform=side.style.transform=dim.style.opacity='';tg.classList.remove('drag');s=null};
+  conv.addEventListener('touchstart',e=>{if(!tgNarrow()||!S.tgc.open||e.touches.length!==1)return;const t=e.touches[0];
+    if(t.clientX>28)return;s={x:t.clientX,y:t.clientY,t:performance.now(),dx:0,on:false,w:conv.offsetWidth}},{passive:true});
+  conv.addEventListener('touchmove',e=>{if(!s)return;const t=e.touches[0],dx=t.clientX-s.x,dy=t.clientY-s.y;
+    if(!s.on){if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){s=null;return}if(dx<8)return;s.on=true;tg.classList.add('drag')}
+    s.dx=Math.max(0,dx);s.v=s.dx/Math.max(1,performance.now()-s.t);const p=s.dx/s.w;
+    conv.style.transform=`translate3d(${s.dx}px,0,0)`;side.style.transform=`translate3d(${-25*(1-p)}%,0,0)`;dim.style.opacity=String(.3*(1-p))},{passive:true});
+  const end=()=>{if(!s)return;const done=s.on&&(s.dx>s.w*.35||(s.v>.5&&s.dx>40));const wasOn=s.on;tg.classList.remove('drag');
+    if(!wasOn){s=null;return}
+    if(done){conv.style.transform=side.style.transform=dim.style.opacity='';s=null;tgClose()}
+    else{conv.style.transform=side.style.transform=dim.style.opacity='';s=null}};
+  conv.addEventListener('touchend',end);conv.addEventListener('touchcancel',()=>{if(s)reset()})}
+function tgSeen(){const c=tgCur();if(c&&(S.tgc.open||!tgNarrow()))S.tgc.seen[c.id]=c.msgs.length}
 async function tgSay(text){
   const chat=S.tgc.chat;text=String(text||'').trim();if(!text||chat==='real'||S.tgc.typing)return;
   const b=tgBot(),log=S.tgc.log[chat],me=tgMe();
@@ -1338,47 +1405,85 @@ async function tgSay(text){
   const mine={out:true,text,at:tgNow(),pending:true};log.push(mine);
   S.tgc.draft[chat]='';S.tgc.menu=false;S.tgc.typing={chat,who:b.name};
   const dots={out:false,who:b.name,role:'',typing:true,at:tgNow()};log.push(dots);
-  await render();
-  let r;try{r=await post('/api/chat/simulate',{text,username:me,mentioned});await new Promise(res=>setTimeout(res,450))}
-  catch(e){r={reply:e.message,employee:'',employee_name:''}}
+  const i=$('#tgIn');if(i&&S.tgc.chat===chat){i.value='';tgFitInput();const sd=$('#tgSend');sd.disabled=true;sd.classList.remove('go')}
+  tgPop();
+  const here=()=>S.route==='chat'&&$('#tg');
+  if(here())tgPaint({list:true,head:S.tgc.chat===chat,msgs:S.tgc.chat===chat?'bottom':false,bottom:S.tgc.chat===chat&&$('#tgBottom').dataset.kind!=='comp'});
+  let r,failed=false;
+  try{r=await post('/api/chat/simulate',{text,username:me,mentioned});await new Promise(res=>setTimeout(res,450))}
+  catch(e){failed=true;r={error:e.message}}
   log.splice(log.indexOf(dots),1);mine.pending=false;S.tgc.typing=null;
-  const who=r.employee_name||b.name;
-  if(r.delete){mine.deleted=true;mine.text='这条消息已被删除';log.push({svc:true,text:`${who} 删除了一条可疑消息`,at:tgNow()})}
-  if(r.reply)log.push({out:false,who,role:r.employee||'',tag:r.employee?'AI 员工':'机器人',text:r.reply,at:tgNow()});
-  else if(chat==='group'&&!log.some(m=>m.hint))log.push({svc:true,hint:true,text:`没有员工回复：普通闲聊不打扰群。用 / 命令，或 @${b.user||'机器人'} 试试`,at:tgNow()});
-  S.tgc.log[chat]=log.slice(-80);tgSeen();await render()}
+  if(failed){mine.failed=true;toast('没发出去：'+r.error,true)}
+  else{const who=r.employee_name||b.name;
+    if(r.delete){mine.deleted=true;mine.text='这条消息已被删除';log.push({svc:true,text:`${who} 删除了一条可疑消息`,at:tgNow()})}
+    if(r.reply)log.push({out:false,who,role:r.employee||'',tag:r.employee?'AI 员工':'机器人',text:r.reply,at:tgNow()});
+    else if(chat==='group'&&!log.some(m=>m.hint))log.push({svc:true,hint:true,text:`没有员工回复：普通闲聊不打扰群。用 / 命令，或 @${b.user||'机器人'} 试试`,at:tgNow()})}
+  S.tgc.log[chat]=log.slice(-80);
+  if(here()){const on=S.tgc.chat===chat;if(on)tgSeen();tgPaint({list:true,head:on,msgs:on?'keep':false,bottom:on&&$('#tgBottom').dataset.kind!=='comp'})}}
+async function tgRefresh(){ // called by the console's auto refresh: repaint in place, never rebuild the screen
+  if(!S.tg||Date.now()-(S.tgAt||0)>15000){S.tg=await api('/api/telegram');S.tgAt=Date.now()}
+  if(!$('#tg'))return;tgPaint({list:true,head:true,msgs:S.tgc.chat==='real'?'keep':false})}
+VIEWS.chat=async()=>{
+  if(!S.tg||Date.now()-(S.tgAt||0)>15000){S.tg=await api('/api/telegram');S.tgAt=Date.now()}
+  if(S.tgc.seen.real===undefined)S.tgc.seen.real=tgChats()[2].msgs.length; // only messages that arrive while the console is open count as unread
+  if(history.state&&history.state.tgChat)history.replaceState(null,'',location.hash); // a reload starts on the list
+  S.tgc.open=false;S.tgc.dd=false;S.tgc.menu=false;
+  return `<div class="tg" id="tg">
+  <aside class="tg-side" aria-label="会话">
+    <div class="tg-sh"><button class="ic" id="tgHome" title="返回控制台" aria-label="返回控制台">${TG_ICON.home}</button>
+      <label class="tg-search">${TG_ICON.search}<input id="tgQ" type="search" placeholder="搜索会话" value="${esc(S.tgc.q)}" aria-label="搜索会话" autocomplete="off"></label></div>
+    <div class="tg-list" id="tgList">${tgListHtml()}</div>
+    <div class="tg-foot"><span style="flex:1">AI 员工在这里回复，跟真实群里一样。</span><a href="#team">返回控制台</a></div>
+    <div class="tg-dim"></div>
+  </aside>
+  <section class="tg-conv" aria-label="聊天">
+    <header class="tg-ch" id="tgHead"></header>
+    <div class="tg-msgs" id="tgMsgs" aria-live="polite"><div class="tg-col"></div></div>
+    <button class="tg-new" id="tgNew" hidden aria-label="跳到最新消息"><span></span>${TG_ICON.down}</button>
+    <div class="tg-bottom" id="tgBottom"></div>
+  </section></div>`};
 BIND.chat=()=>{
-  const tg=$('#tg');if(!tg)return;
-  const top=$('#demoBar');tg.style.setProperty('--tg-top',(top&&!top.hidden?top.offsetHeight:0)+'px');
-  const box=$('#tgMsgs');if(box)box.scrollTop=box.scrollHeight;tgSeen();
-  tg.querySelectorAll('[data-chat]').forEach(b=>b.onclick=()=>{S.tgc.chat=b.dataset.chat;S.tgc.open=true;S.tgc.dd=S.tgc.menu=false;tgSeen();render()});
-  const q=$('#tgQ');q.oninput=()=>{S.tgc.q=q.value;render().then(()=>{const i=$('#tgQ');i.focus();i.setSelectionRange(i.value.length,i.value.length)})};
-  $('#tgHome').onclick=()=>{location.hash='#team'};
-  const back=$('#tgBack');if(back)back.onclick=()=>{S.tgc.open=false;render()};
-  const more=$('#tgMore');if(more)more.onclick=e=>{e.stopPropagation();S.tgc.dd=!S.tgc.dd;render()};
-  tg.querySelectorAll('[data-dd]').forEach(b=>b.onclick=()=>{const k=b.dataset.dd;S.tgc.dd=false;
-    if(k==='member'||k==='owner')S.tgc.asOwner=k==='owner';
-    if(k==='clear'){S.tgc.log[S.tgc.chat]=[];S.tgc.seen[S.tgc.chat]=0}
-    if(k==='home'){location.hash='#team';return}
-    render()});
-  tg.onclick=e=>{if(S.tgc.dd&&!e.target.closest('.tg-dd,#tgMore')){S.tgc.dd=false;render()}};
-  tg.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>tgSay(b.dataset.say));
-  tg.querySelectorAll('.tg-b [data-cmd]').forEach(b=>b.onclick=()=>tgSay(b.dataset.cmd));
-  tg.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>tgSay(b.dataset.pick));
-  const kb=$('#tgKb');if(kb)kb.onclick=()=>{S.tgc.kb=!S.tgc.kb;render()};
-  const menu=$('#tgMenu');if(menu)menu.onclick=()=>{S.tgc.menu=!S.tgc.menu;render().then(()=>{const i=$('#tgIn');if(i)i.focus()})};
-  const inp=$('#tgIn'),send=$('#tgSend');
-  if(inp){
-    const fit=()=>{inp.style.height='auto';inp.style.height=Math.min(180,inp.scrollHeight)+'px'};fit();
-    inp.oninput=()=>{const was=S.tgc.draft[S.tgc.chat]||'';S.tgc.draft[S.tgc.chat]=inp.value;fit();
-      send.disabled=!inp.value.trim();send.classList.toggle('go',!!inp.value.trim());
+  const tg=$('#tg');if(!tg)return;tgFit();
+  tgPaint({head:true,bottom:true,msgs:'enter'});
+  // one delegated handler per screen; the parts below are repainted, the handlers are not
+  tg.addEventListener('click',e=>{const t=e.target;
+    if(S.tgc.dd&&!t.closest('.tg-dd,#tgMore')){S.tgc.dd=false;tgPaint({head:true})}
+    if(S.tgc.menu&&!t.closest('#tgPop,#tgMenu')){S.tgc.menu=false;tgPop()}
+    const ch=t.closest('.tg-item[data-chat]');if(ch){tgOpen(ch.dataset.chat);return}
+    if(t.closest('#tgHome')){location.hash='#team';return}
+    if(t.closest('#tgBack')){tgClose();return}
+    if(t.closest('#tgMore')){e.stopPropagation();S.tgc.dd=!S.tgc.dd;tgPaint({head:true});return}
+    const dd=t.closest('[data-dd]');if(dd){const k=dd.dataset.dd;S.tgc.dd=false;
+      if(k==='home'){location.hash='#team';return}
+      if(k==='member'||k==='owner'){S.tgc.asOwner=k==='owner';const i=$('#tgIn');if(i&&S.tgc.chat==='group')i.placeholder=`以 @${tgMe()} 发消息`}
+      if(k==='clear'){S.tgc.log[S.tgc.chat]=[];S.tgc.seen[S.tgc.chat]=0;S.tgc.scroll[S.tgc.chat]=null;tgPaint({msgs:'bottom',list:true,bottom:S.tgc.chat==='dm'})}
+      tgPaint({head:true});return}
+    if(t.closest('#tgNew')){const b=tgBox();b.scrollTo({top:b.scrollHeight,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});return}
+    if(t.closest('#tgMenu')){S.tgc.menu=!S.tgc.menu;tgPop();if(!tgTouch()){const i=$('#tgIn');if(i)i.focus()}return}
+    const pk=t.closest('[data-pick]');if(pk){const v=pk.dataset.pick,i=$('#tgIn');
+      // a command that needs an argument ("/approve 编号") goes into the box for the owner to finish; the rest send at once
+      if(/^\/\S+\s/.test(v)&&i){i.value=v.split(/\s/)[0]+' ';S.tgc.draft[S.tgc.chat]=i.value;S.tgc.menu=false;tgPop();i.focus();i.setSelectionRange(i.value.length,i.value.length);
+        const sd=$('#tgSend');sd.disabled=false;sd.classList.add('go');return}
+      tgSay(v);return}
+    const say=t.closest('[data-say]');if(say){tgSay(say.dataset.say);return}
+    const cmd=t.closest('.tg-b [data-cmd]');if(cmd){tgSay(cmd.dataset.cmd);return}
+    const rt=t.closest('[data-retry]');if(rt){const log=S.tgc.log[S.tgc.chat],m=log[+rt.dataset.retry];if(m&&m.failed){log.splice(+rt.dataset.retry,1);tgSay(m.text)}return}
+    if(t.closest('#tgSend')){const i=$('#tgIn');if(i)tgSay(i.value)}});
+  tg.addEventListener('input',e=>{const t=e.target;
+    if(t.id==='tgQ'){S.tgc.q=t.value;tgPaint({list:true});return}
+    if(t.id==='tgIn'){const was=S.tgc.draft[S.tgc.chat]||'';S.tgc.draft[S.tgc.chat]=t.value;tgFitInput();tgBottomH();
+      const sd=$('#tgSend'),has=!!t.value.trim();sd.disabled=!has;sd.classList.toggle('go',has);
       // the command list follows a leading "/" the way Telegram's does
-      const slash=v=>v.startsWith('/')&&!v.includes(' ');
-      if(slash(inp.value)!==slash(was)||slash(inp.value)){const pos=inp.selectionStart;render().then(()=>{const i=$('#tgIn');if(i){i.focus();i.setSelectionRange(pos,pos)}})}};
-    inp.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();tgSay(inp.value)}
-      if(e.key==='Escape'&&S.tgc.menu){S.tgc.menu=false;render()}};
-    send.onclick=()=>tgSay(inp.value);
-    if(matchMedia('(min-width:721px)').matches||S.tgc.open)setTimeout(()=>{const i=$('#tgIn');if(i&&document.activeElement!==$('#tgQ'))i.focus()},0)}};
+      const slash=v=>v.startsWith('/')&&!/\s/.test(v);if(slash(t.value)||slash(was))tgPop()}});
+  tg.addEventListener('keydown',e=>{const t=e.target;
+    if(t.id==='tgIn'){
+      // Enter sends on a keyboard; on a phone the return key makes a new line and the send button sends
+      if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!tgTouch()){e.preventDefault();tgSay(t.value)}
+      if(e.key==='Escape'&&S.tgc.menu){S.tgc.menu=false;tgPop()}}
+    if(e.key==='Escape'&&S.tgc.open&&!t.closest('.tg-pill')&&!S.tgc.dd)tgClose()});
+  tgBox().addEventListener('scroll',()=>{tgNewBtn()},{passive:true});
+  tgSwipe(tg);tgSeen();
+  if(!tgNarrow()&&!tgTouch())setTimeout(()=>{const i=$('#tgIn');if(i&&document.activeElement!==$('#tgQ'))i.focus()},0)};
 
 // ---------- 09 reports ----------
 S.week=0;
