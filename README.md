@@ -15,7 +15,8 @@
 | `bot/` | Telegram 机器人：付款请求、`/rules` `/today` `/pending` `/report` `/approve` `/reject` `/pause` `/resume`，定时周报和预警 |
 | `backend/` + `web/` | 老板控制台：改规则、看账本、审批、一键暂停、周报 |
 | `scripts/register_agent.py` | 用 bnbagent SDK 注册 ERC-8004 链上工号（测试网免 gas） |
-| `tests/` | 195 个用例，覆盖率 99.9%；CI 跑测试、pip-audit、Semgrep |
+| `scripts/stage0_gate.py` | 读阶段 0 访谈记录表，算漏斗、中位数和关卡 A 是否通过 |
+| `tests/` | 210 个用例，覆盖率 99.9%；CI 跑测试、pip-audit、Semgrep |
 
 没配置钱包时一切都在测试模式，不碰链。
 
