@@ -9,13 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 /* ---- design tokens ----
-   Neutrals carry the interface; color is reserved for meaning.
-   accent (--signal) marks the one thing to act on; ok / review / block / info are business states only. */
+   KAGOU palette: near-black layers, one brand yellow, green/red for money states.
+   Yellow (--signal) is only for the main action, the selected state, the brand mark and things that need attention.
+   ok / review / block / info are business states only. Components never use raw colors. */
 :root{
-  --bg:#0e0f11;--surface:#141518;--raise:#1b1c20;--elev:#202126;--line:#24262b;--line2:#30333a;
-  --text:#e6e7e9;--text-2:#aeb1b8;--muted:#7d818a;
-  --signal:#f0b90b;--signal-fg:#141006;--ok:#3fbf7f;--review:#e3a72a;--block:#f0544f;--info:#6f9dff;
-  --ok-bg:rgba(63,191,127,.12);--review-bg:rgba(227,167,42,.12);--block-bg:rgba(240,84,79,.12);--info-bg:rgba(111,157,255,.12);--signal-bg:rgba(240,185,11,.12);
+  --bg:#0B0E11;--surface:#181A20;--raise:#1E2329;--elev:#1E2329;--hover:#2B3139;--line:#2B3139;--line2:#3C434E;
+  --text:#EAECEF;--text-2:#B7BDC6;--muted:#848E9C;
+  --signal:#F0B90B;--signal-fg:#181A20;--ok:#0ECB81;--review:#F0B90B;--block:#F6465D;--info:#6F9DFF;
+  --ok-bg:rgba(14,203,129,.12);--review-bg:rgba(240,185,11,.12);--block-bg:rgba(246,70,93,.12);--info-bg:rgba(111,157,255,.12);--signal-bg:rgba(240,185,11,.12);
   --sans:Inter,"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   /* type scale */
@@ -24,20 +25,21 @@
   --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;
   --r-sm:4px;--r:6px;
   --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(240,185,11,.55);
+  --ctl-h:32px;
   color-scheme:dark;
 }
 :root[data-theme="light"]{
-  --bg:#f6f6f4;--surface:#ffffff;--raise:#f1f1ee;--elev:#ffffff;--line:#e4e4df;--line2:#d2d2cb;
-  --text:#16171a;--text-2:#484c54;--muted:#6b6f78;
-  --signal:#a87a00;--signal-fg:#ffffff;--ok:#13865a;--review:#a86f00;--block:#cc3a35;--info:#2f62d4;
-  --ok-bg:rgba(19,134,90,.1);--review-bg:rgba(168,111,0,.1);--block-bg:rgba(204,58,53,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --bg:#F5F5F5;--surface:#FFFFFF;--raise:#F5F5F5;--elev:#FFFFFF;--hover:#EAECEF;--line:#EAECEF;--line2:#D5D9DE;
+  --text:#1E2329;--text-2:#474D57;--muted:#707A8A;
+  --signal:#C99400;--signal-fg:#1E2329;--ok:#03A66D;--review:#A87A00;--block:#CF304A;--info:#2F62D4;
+  --ok-bg:rgba(3,166,109,.1);--review-bg:rgba(168,122,0,.1);--block-bg:rgba(207,48,74,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
   --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light;
 }
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"])[data-auto="1"]{
-  --bg:#f6f6f4;--surface:#ffffff;--raise:#f1f1ee;--elev:#ffffff;--line:#e4e4df;--line2:#d2d2cb;
-  --text:#16171a;--text-2:#484c54;--muted:#6b6f78;
-  --signal:#a87a00;--signal-fg:#ffffff;--ok:#13865a;--review:#a86f00;--block:#cc3a35;--info:#2f62d4;
-  --ok-bg:rgba(19,134,90,.1);--review-bg:rgba(168,111,0,.1);--block-bg:rgba(204,58,53,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
+  --bg:#F5F5F5;--surface:#FFFFFF;--raise:#F5F5F5;--elev:#FFFFFF;--hover:#EAECEF;--line:#EAECEF;--line2:#D5D9DE;
+  --text:#1E2329;--text-2:#474D57;--muted:#707A8A;
+  --signal:#C99400;--signal-fg:#1E2329;--ok:#03A66D;--review:#A87A00;--block:#CF304A;--info:#2F62D4;
+  --ok-bg:rgba(3,166,109,.1);--review-bg:rgba(168,122,0,.1);--block-bg:rgba(207,48,74,.08);--info-bg:rgba(47,98,212,.08);--signal-bg:rgba(168,122,0,.1);
   --focus:0 0 0 2px var(--bg),0 0 0 4px rgba(168,122,0,.5);color-scheme:light}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -52,8 +54,8 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em}
 h1{font-size:var(--fs-xl)} h2{font-size:var(--fs-base)} h3{font-size:var(--fs-md)}
 
 /* buttons and inputs: small radius, hairlines; every control has hover, focus, active and disabled states */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:var(--r-sm);padding:6px 12px;cursor:pointer;font-size:var(--fs-md);font-weight:500;line-height:1.4;text-decoration:none;transition:background-color .12s,border-color .12s,color .12s}
-.btn:hover{border-color:var(--muted);background:var(--raise)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;border:1px solid var(--line2);background:var(--surface);border-radius:var(--r-sm);padding:5px 12px;min-height:var(--ctl-h);cursor:pointer;font-size:var(--fs-md);font-weight:500;line-height:1.4;text-decoration:none;transition:background-color .12s,border-color .12s,color .12s}
+.btn:hover{border-color:var(--muted);background:var(--hover)}
 .btn:active{transform:translateY(1px)}
 .btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav a:focus-visible,summary:focus-visible,[tabindex]:focus-visible,a:focus-visible{outline:0;box-shadow:var(--focus)}
 .btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
@@ -65,15 +67,18 @@ h1{font-size:var(--fs-xl)} h2{font-size:var(--fs-base)} h3{font-size:var(--fs-md
 .btn.ok{border-color:var(--ok);color:var(--ok)}
 .btn.ok:hover{background:var(--ok-bg)}
 .btn.ghost{border-color:transparent;background:transparent}
-.btn.ghost:hover{background:var(--raise)}
-.btn.sm{padding:3px 8px;font-size:var(--fs-sm)}
+.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 8px;min-height:26px;font-size:var(--fs-sm)}
 .btn:disabled,.btn[aria-busy="true"]{opacity:.5;cursor:not-allowed;transform:none}
 .btn[aria-busy="true"]::before{content:"";width:10px;height:10px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite}
-input,select,textarea{background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-sm);padding:6px 8px;min-width:0;width:100%;transition:border-color .12s}
+input,select,textarea{background:var(--raise);border:1px solid var(--line2);border-radius:var(--r-sm);padding:5px 10px;min-height:var(--ctl-h);min-width:0;width:100%;transition:border-color .12s}
+input:focus,select:focus,textarea:focus{border-color:var(--signal)}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--block)}
+input::placeholder,textarea::placeholder{color:var(--muted)}
 input:hover,select:hover,textarea:hover{border-color:var(--muted)}
 input:disabled,select:disabled,textarea:disabled{opacity:.5;cursor:not-allowed}
 textarea{resize:vertical;min-height:72px}
-input[type=checkbox]{width:auto;accent-color:var(--signal)}
+input[type=checkbox],input[type=radio]{width:auto;min-height:0;accent-color:var(--signal)}
 label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 label.f > span:first-child{font:500 var(--fs-sm)/1.4 var(--sans);color:var(--text-2)}
 .switch{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text)}
@@ -196,9 +201,9 @@ pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:va
 .login{min-height:100vh;display:grid;place-items:center;padding:16px}
 .login .card{width:min(420px,100%)}
 
-.demo{background:var(--signal);color:#0b0b0c;font-size:12px;padding:6px 24px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.demo .home{margin-left:auto;color:#0b0b0c;font-weight:600;white-space:nowrap;border:1px solid #0b0b0c;padding:2px 8px;text-decoration:none}
-.demo .home:hover{background:#0b0b0c;color:var(--signal)}
+.demo{background:var(--signal);color:var(--signal-fg);font-size:12px;padding:6px 24px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.demo .home{margin-left:auto;color:var(--signal-fg);font-weight:600;white-space:nowrap;border:1px solid var(--signal-fg);padding:2px 8px;text-decoration:none}
+.demo .home:hover{background:var(--signal-fg);color:var(--signal)}
 .brand .home{margin-left:auto;font-size:12px;color:var(--muted);text-decoration:none;white-space:nowrap}
 .brand .home:hover{color:var(--text)}
 
@@ -241,6 +246,67 @@ details > summary{cursor:pointer;color:var(--muted);font-size:12px}
 .sk i{display:block;border-radius:var(--r);background:linear-gradient(90deg,var(--surface) 0,var(--raise) 50%,var(--surface) 100%);background-size:200% 100%;animation:skm 1.4s ease-in-out infinite}
 @keyframes skm{from{background-position:100% 0}to{background-position:-100% 0}}
 @media (prefers-reduced-motion:reduce){.sk i{animation:none}.btn,.nav a{transition:none}}
+
+/* ---- ledger ---- */
+.lg-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.lg-sum > div{padding:var(--s3) var(--s4);display:grid;gap:2px;align-content:start;min-width:0;border-left:1px solid var(--line)}
+.lg-sum > div:first-child{border-left:0}
+.lg-sum .k{font-size:var(--fs-sm);color:var(--muted)}
+.lg-sum .v{font:500 var(--fs-xl)/1.3 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em;overflow-wrap:anywhere}
+.lg-sum .v .unit{font:500 var(--fs-sm) var(--sans);color:var(--muted);margin-left:4px}
+.lg-sum .v.sm{font-size:var(--fs-lg)}
+.lg-sum .s{font-size:var(--fs-xs);color:var(--muted)}
+.lg-bar{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.lg-search{position:relative;flex:1 1 260px;min-width:200px;max-width:420px}
+.lg-search svg{position:absolute;left:10px;top:50%;width:14px;height:14px;transform:translateY(-50%);fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round;pointer-events:none}
+.lg-search input{padding-left:30px}
+.lg-bar select{width:auto;min-width:108px}
+.lg-range{display:inline-flex;align-items:center;gap:var(--s1);color:var(--muted);font-size:var(--fs-sm)}
+.lg-range input{width:142px}
+.lg-bar .end{margin-left:auto;display:flex;gap:var(--s2)}
+.lg-scroll{overflow:auto;max-height:calc(100vh - 290px);min-height:200px}
+table.lg{font-size:var(--fs-md)}
+table.lg th{z-index:1;padding:9px 12px}
+table.lg td{padding:10px 12px;vertical-align:middle}
+table.lg tbody tr.click:focus-visible{outline:0}
+table.lg tbody tr.click:focus-visible td{background:var(--raise);box-shadow:inset 0 1px 0 var(--signal),inset 0 -1px 0 var(--signal)}
+table.lg tbody tr.click:focus-visible td:first-child{box-shadow:inset 2px 0 0 var(--signal),inset 0 1px 0 var(--signal),inset 0 -1px 0 var(--signal)}
+.lg .t{font:var(--fs-sm)/1.4 var(--mono);color:var(--text-2);white-space:nowrap}
+.lg .id,.kv .id{display:inline-flex;align-items:center;gap:2px;font:var(--fs-sm)/1.4 var(--mono);color:var(--text-2);white-space:nowrap}
+.lg .who{display:grid;min-width:0;max-width:200px}
+.lg .who b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg .who span{font:var(--fs-xs)/1.4 var(--mono);color:var(--muted);white-space:nowrap}
+.lg .amt{white-space:nowrap}
+.lg .amt .num{font-weight:500}
+.trunc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg .memo{max-width:220px}
+.lg .why{max-width:260px;font-size:var(--fs-sm);color:var(--text-2)}
+.lg .why.block{color:var(--block)}
+.icopy{display:inline-grid;place-items:center;width:22px;height:22px;border:0;border-radius:var(--r-sm);background:none;color:var(--muted);cursor:pointer;padding:0;flex:none}
+.icopy svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.icopy:hover{color:var(--text);background:var(--hover)}
+.icopy:focus-visible{outline:0;box-shadow:var(--focus)}
+.lg-ft{display:flex;align-items:center;gap:var(--s3);padding:10px var(--s4);border-top:1px solid var(--line);font-size:var(--fs-sm);color:var(--muted);flex-wrap:wrap}
+.lg-ft .btn{margin-left:auto}
+.lg-dhead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);flex-wrap:wrap}
+.lg-dhead .money .num{font-size:var(--fs-2xl);font-weight:500}
+.lg-dhead .id{display:inline-flex;align-items:center;gap:2px;font-size:var(--fs-sm);color:var(--muted);overflow-wrap:anywhere}
+.lg-empty{padding:40px 16px;display:grid;gap:12px;justify-items:center;text-align:center;color:var(--muted)}
+@media (max-width:1240px){.lg .hide-md{display:none}}
+@media (max-width:1100px){.lg-sum{grid-template-columns:repeat(2,minmax(0,1fr))}.lg-sum > div:nth-child(3){border-left:0}.lg-sum > div:nth-child(n+3){border-top:1px solid var(--line)}}
+@media (max-width:860px){
+  .lg-scroll{max-height:none;min-height:0}
+  .lg-search{flex-basis:100%;max-width:none}
+  .lg-bar select{flex:1 1 0}
+  .lg-range{flex:1 1 100%}
+  .lg-range input{flex:1;width:auto}
+  .lg-bar .end{margin-left:0;flex:1 1 100%}
+  .lg-bar .end .btn{flex:1}
+  .lg .who{max-width:120px}
+  .lg .who span{display:none}
+  table.lg th,table.lg td{padding-left:10px;padding-right:10px}
+  table.lg td:first-child,table.lg th:first-child{padding-left:12px}
+}
 
 /* ---- finance overview ---- */
 .ov-period{display:flex;align-items:baseline;gap:var(--s3);font-size:var(--fs-md);color:var(--text-2);margin-bottom:calc(var(--s2) * -1)}
@@ -892,17 +958,19 @@ BIND.approvals=()=>{
   document.querySelectorAll('[data-ap]').forEach(b=>b.onclick=async()=>{if(await confirmBox('确认已签字？',`确认你已经在 Safe 里签字并执行了 <b class="mono">${esc(b.dataset.ap)}</b>。控制台只记账，不会再付一次。`,'已签字'))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.ap)}/approve`))});
   document.querySelectorAll('[data-rj]').forEach(b=>b.onclick=async()=>{if(await confirmBox('驳回这笔付款？',`<b class="mono">${esc(b.dataset.rj)}</b> 会标记为已驳回，不会付款。之后可以让团队重新发请求。`,'驳回',true))act(()=>post(`/api/payments/${encodeURIComponent(b.dataset.rj)}/reject`))});
   bindDetail()};
-function bindDetail(){document.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.detail))}
+function bindDetail(){document.querySelectorAll('[data-detail]').forEach(b=>{
+  b.onclick=e=>{const t=e.target.closest('a,button,[data-copy]');if(t&&t!==b)return;showDetail(b.dataset.detail)};
+  if(b.tagName==='TR')b.onkeydown=e=>{if(e.key==='Enter'&&e.target===b)showDetail(b.dataset.detail)}})}
 async function showDetail(id){
   try{const d=await api('/api/payments/'+encodeURIComponent(id));const [ol,oc]=OUTCOME[d.outcome]||[d.outcome,'muted'];
-  drawer(id,`<div class="row">${st(d.status)}<span class="pill ${oc}">规则判断：${ol}</span></div>
+  drawer('付款详情',`<div class="row">${st(d.status)}<span class="pill ${oc}">规则判断：${ol}</span></div>
+    <div class="lg-dhead"><span class="money"><span class="num">${fmtNum(d.amount)}</span><span class="unit">${esc(d.token)}</span></span><span class="id mono" title="${esc(d.request_id)}">${esc(d.request_id)}${icopy(d.request_id,'编号')}</span></div>
     <dl class="kv">
       <dt>收款方</dt><dd>${d.payee_name?esc(d.payee_name)+'<br>':''}${addr(d.payee,d.payee_url)}</dd>
-      <dt>金额</dt><dd>${fmtAmt(d.amount,d.token)}</dd>
       <dt>用途</dt><dd>${esc(d.memo||'—')}</dd><dt>类别</dt><dd>${esc(d.category||'—')}</dd>
       <dt>谁发的</dt><dd>${esc(d.requester)}</dd>
       <dt>收到时间</dt><dd class="mono">${fmtTime(d.created_at)}</dd><dt>最后更新</dt><dd class="mono">${fmtTime(d.updated_at)}</dd>
-      ${d.tx_hash?`<dt>交易</dt><dd>${d.tx_url?`<a href="${esc(d.tx_url)}" target="_blank" rel="noreferrer" class="mono">${esc(short(d.tx_hash))}</a> `:`<span class="mono">${esc(d.tx_hash)}</span>`} <button class="copy" data-copy="${esc(d.tx_hash)}">复制</button></dd>`:''}
+      ${d.tx_hash?`<dt>交易</dt><dd>${!realTx(d.tx_hash)?`<span class="muted">测试模式，未上链</span>`:`<span class="id mono">${d.tx_url?`<a href="${esc(d.tx_url)}" target="_blank" rel="noreferrer" title="${esc(d.tx_hash)}">${esc(short(d.tx_hash))} ↗</a>`:`<span title="${esc(d.tx_hash)}">${esc(short(d.tx_hash))}</span>`}${icopy(d.tx_hash,'交易哈希')}</span>`}</dd>`:''}
       ${d.safe_tx_hash?`<dt>Safe 交易哈希</dt><dd>${addr(d.safe_tx_hash)}</dd>`:''}
       ${d.decided_by?`<dt>处理人</dt><dd>${esc(d.decided_by)}</dd>`:''}
       ${d.error?`<dt>错误</dt><dd class="block">${esc(d.error)}</dd>`:''}
@@ -917,37 +985,66 @@ async function showDetail(id){
     </ol></div>
     ${d.status==='pending_approval'?`<div class="row"><button class="btn ok" data-ap2>已签字</button><button class="btn danger" data-rj2>驳回</button></div>`:''}`);
   const ap=$('#overlay [data-ap2]'),rj=$('#overlay [data-rj2]');
-  if(ap)ap.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/approve`))};
-  if(rj)rj.onclick=async()=>{$('#overlay').innerHTML='';await act(()=>post(`/api/payments/${encodeURIComponent(id)}/reject`))};
+  if(ap)ap.onclick=async()=>{if(await confirmBox('确认已签字？',`确认你已经在 Safe 里签字并执行了 <b class="mono">${esc(id)}</b>。控制台只记账，不会再付一次。`,'已签字'))await act(()=>post(`/api/payments/${encodeURIComponent(id)}/approve`))};
+  if(rj)rj.onclick=async()=>{if(await confirmBox('驳回这笔付款？',`<b class="mono">${esc(id)}</b> 会标记为已驳回，不会付款。之后可以让团队重新发请求。`,'驳回',true))await act(()=>post(`/api/payments/${encodeURIComponent(id)}/reject`))};
   }catch(e){toast(e.message,true)}}
 
 // ---------- 03 ledger ----------
+const ICON_COPY='<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>';
+const icopy=(v,what)=>`<button class="icopy" data-copy="${esc(v)}" title="复制${what}" aria-label="复制${what}">${ICON_COPY}</button>`;
+const shortId=id=>id&&id.length>16?id.slice(0,8)+'…'+id.slice(-6):(id||'');
+// a "dry-run:" hash comes from test mode: nothing went on chain, so it never gets an explorer link
+const realTx=h=>!!h&&!/^dry-run:/.test(h);
 function ledgerQuery(extra){const f=S.ledger.f,q=new URLSearchParams();for(const k of ['status','token','payee','q','start','end'])if(f[k])q.set(k,f[k]);if(extra)for(const[k,v]of Object.entries(extra))q.set(k,v);return q.toString()}
+function ledgerWhy(r){
+  if(r.error)return `<span class="trunc why block" title="${esc(r.error)}">${esc(r.error)}</span>`;
+  if(r.messages.length){const all=r.messages.join('；');return `<span class="trunc why" title="${esc(all)}">${esc(r.messages[0])}${r.messages.length>1?` <span class="muted">+${r.messages.length-1}</span>`:''}</span>`}
+  if(r.tx_hash)return realTx(r.tx_hash)?`<span class="id">${esc(short(r.tx_hash))}${icopy(r.tx_hash,'交易哈希')}</span>`:'<span class="why muted">测试模式 · 未上链</span>';
+  return '<span class="muted">—</span>'}
 VIEWS.ledger=async()=>{
   const f=S.ledger.f,tokens=[...new Set([...Object.keys(S.rules.single_limit||{}),...Object.keys(S.rules.daily_limit||{})])];
   const rows=await api('/api/payments?'+ledgerQuery({limit:S.ledger.limit}));
-  const sum={};rows.forEach(r=>{if(r.status==='paid'||r.status==='approved')sum[r.token]=(sum[r.token]||0)+Number(r.amount)});
+  const sum={};let waiting=0,stopped=0;
+  rows.forEach(r=>{if(r.status==='paid'||r.status==='approved')sum[r.token]=(sum[r.token]||0)+Number(r.amount);
+    if(r.status==='pending_approval')waiting++;if(r.status==='blocked'||r.status==='failed')stopped++});
+  const full=rows.length>=S.ledger.limit,filtered=['status','token','payee','q','start','end'].some(k=>f[k]);
+  const sums=Object.entries(sum),scope=full?`最近 ${rows.length} 笔`:`共 ${rows.length} 笔`;
   return `
-  <section class="card"><div class="bd"><div class="grid g4" style="gap:10px">
-    <label class="f"><span>状态</span><select id="fStatus"><option value="">全部</option>${Object.entries(STATUS).map(([k,[l]])=>`<option value="${k}" ${f.status===k?'selected':''}>${l}</option>`).join('')}<option value="paid,approved" ${f.status==='paid,approved'?'selected':''}>已付出（自动 + 签字）</option></select></label>
-    <label class="f"><span>币种</span><select id="fToken"><option value="">全部</option>${tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
-    <label class="f"><span>从</span><input type="date" id="fStart" value="${esc((f.start||'').slice(0,10))}"></label>
-    <label class="f"><span>到（含）</span><input type="date" id="fEnd" value="${esc(f.endDay||'')}"></label>
+  <div class="lg-sum" aria-label="当前列表汇总">
+    <div><span class="k">记录${filtered?'（已筛选）':''}</span><span class="v">${fmtNum(rows.length)}${full?'<span class="unit">笔以上</span>':'<span class="unit">笔</span>'}</span><span class="s">${full?'只加载了最近 '+S.ledger.limit+' 笔':'当前条件下全部'}</span></div>
+    <div><span class="k">已付出</span>${sums.length?sums.map(([t,v])=>`<span class="v${sums.length>1?' sm':''}">${fmtNum(v)}<span class="unit">${esc(t)}</span></span>`).join(''):'<span class="v">0</span>'}<span class="s">自动付 + 老板已签，${scope}</span></div>
+    <div><span class="k">待签字</span><span class="v ${waiting?'review':''}">${waiting}</span><span class="s">${scope}</span></div>
+    <div><span class="k">拦截 / 失败</span><span class="v ${stopped?'block':''}">${stopped}</span><span class="s">${scope}</span></div>
   </div>
-  <div class="row" style="margin-top:10px"><input id="fQ" class="grow" style="width:auto" placeholder="搜索编号、用途、类别、发起人、地址" value="${esc(f.q||'')}">
-    ${f.payee?`<span class="chip">收款方 ${esc(short(f.payee))}<button data-clearpayee aria-label="清除">×</button></span>`:''}
-    <button class="btn" id="fApply">筛选</button><button class="btn ghost" id="fReset">清空</button><button class="btn" id="csv">导出 CSV</button></div></div></section>
-  <section class="card"><div class="hd"><h2>${rows.length} 笔${rows.length>=S.ledger.limit?'（只显示最近 '+S.ledger.limit+' 笔）':''}</h2><span class="muted" style="font-size:12px">已付出：${Object.entries(sum).map(([t,v])=>fmtNum(v)+' '+esc(t)).join('、')||'0'}</span></div>
-  <div class="bd flush scroll">${rows.length?`<table><thead><tr><th>时间</th><th>编号</th><th>收款方</th><th class="r">金额</th><th class="hide-sm">用途</th><th>状态</th><th class="hide-sm">原因 / 交易</th></tr></thead><tbody>${rows.map(r=>`<tr class="click" data-detail="${esc(r.request_id)}"><td class="mono" style="white-space:nowrap">${fmtTime(r.created_at)}</td><td class="mono">${esc(r.request_id)}</td><td>${r.payee_name?esc(r.payee_name):`<span class="mono">${esc(short(r.payee))}</span>`}</td><td class="r" style="white-space:nowrap">${fmtAmt(r.amount,r.token)}</td><td class="hide-sm">${esc(r.memo||'—')}</td><td>${st(r.status)}</td><td class="hide-sm muted" style="font-size:12px">${r.messages.length?esc(r.messages.join('；')):(r.tx_hash?`<span class="mono">${esc(short(r.tx_hash))}</span>`:'')}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">没有符合条件的记录</div>'}</div>
-  ${rows.length>=S.ledger.limit?`<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="more">再加载 ${S.ledger.limit} 笔</button></div>`:''}</section>`};
+  <div class="lg-bar" role="search">
+    <label class="lg-search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="fQ" type="search" placeholder="搜索编号、用途、类别、发起人、地址" aria-label="搜索账本" value="${esc(f.q||'')}"></label>
+    <select id="fStatus" aria-label="状态"><option value="">全部状态</option>${Object.entries(STATUS).map(([k,[l]])=>`<option value="${k}" ${f.status===k?'selected':''}>${l}</option>`).join('')}<option value="paid,approved" ${f.status==='paid,approved'?'selected':''}>已付出（自动 + 签字）</option></select>
+    <select id="fToken" aria-label="币种"><option value="">全部币种</option>${tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
+    <span class="lg-range"><input type="date" id="fStart" aria-label="开始日期" value="${esc((f.start||'').slice(0,10))}"><span aria-hidden="true">–</span><input type="date" id="fEnd" aria-label="结束日期（含）" value="${esc(f.endDay||'')}"></span>
+    ${f.payee?`<span class="chip">收款方 <span class="mono">${esc(short(f.payee))}</span><button data-clearpayee aria-label="清除收款方筛选">×</button></span>`:''}
+    <span class="end">${filtered?'<button class="btn ghost" id="fReset">清空筛选</button>':''}<button class="btn" id="csv">导出 CSV</button></span>
+  </div>
+  <section class="card">
+    ${rows.length?`<div class="lg-scroll"><table class="lg"><thead><tr><th>时间</th><th class="hide-sm">编号</th><th>收款方</th><th class="r">金额</th><th class="hide-sm">用途</th><th>状态</th><th class="hide-sm hide-md">原因 / 交易</th></tr></thead><tbody>${rows.map(r=>`<tr class="click" tabindex="0" data-detail="${esc(r.request_id)}" aria-label="付款 ${esc(r.request_id)}，查看详情">
+      <td class="t">${fmtTime(r.created_at)}</td>
+      <td class="hide-sm"><span class="id" title="${esc(r.request_id)}">${esc(shortId(r.request_id))}${icopy(r.request_id,'编号')}</span></td>
+      <td><span class="who">${r.payee_name?`<b>${esc(r.payee_name)}</b><span>${esc(short(r.payee))}</span>`:`<b class="mono">${esc(short(r.payee))}</b><span>白名单外</span>`}</span></td>
+      <td class="r amt"><span class="money"><span class="num">${fmtNum(r.amount)}</span><span class="unit">${esc(r.token)}</span></span></td>
+      <td class="hide-sm"><span class="trunc memo" title="${esc(r.memo||'')}">${esc(r.memo||'—')}</span></td>
+      <td>${st(r.status)}</td>
+      <td class="hide-sm hide-md">${ledgerWhy(r)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="lg-ft"><span>显示 ${rows.length} 笔，点任意一行看详情</span>${full?`<button class="btn sm" id="more">加载更多</button>`:''}</div>`
+    :`<div class="lg-empty">${filtered?'<span>没有符合条件的记录</span><button class="btn sm" id="fReset2">清空筛选</button>':'<span>还没有付款记录。团队在群里发付款请求后会出现在这里。</span>'}</div>`}
+  </section>`};
 BIND.ledger=()=>{
   const apply=()=>{const end=$('#fEnd').value;S.ledger.f={...S.ledger.f,status:$('#fStatus').value,token:$('#fToken').value,q:$('#fQ').value.trim(),start:$('#fStart').value,endDay:end,end:end?new Date(new Date(end+'T00:00:00Z').getTime()+864e5).toISOString().slice(0,10):''};S.ledger.limit=100;render()};
-  $('#fApply').onclick=apply;$('#fQ').onkeydown=e=>{if(e.key==='Enter')apply()};
+  $('#fQ').onkeydown=e=>{if(e.key==='Enter')apply()};
+  $('#fQ').onchange=()=>{if($('#fQ').value.trim()!==(S.ledger.f.q||''))apply()};
   ['#fStatus','#fToken','#fStart','#fEnd'].forEach(s=>$(s).onchange=apply);
-  $('#fReset').onclick=()=>{S.ledger.f={};render()};
+  document.querySelectorAll('#fReset,#fReset2').forEach(b=>b.onclick=()=>{S.ledger.f={};S.ledger.limit=100;render()});
   const cp=document.querySelector('[data-clearpayee]');if(cp)cp.onclick=()=>{delete S.ledger.f.payee;render()};
   const more=$('#more');if(more)more.onclick=()=>{S.ledger.limit+=100;render()};
-  $('#csv').onclick=async()=>{if(window.CONSOLE_DEMO)return toast('演示版不能下载文件。正式版点这里会下载当前筛选结果的 CSV。');try{const t=await api('/api/payments.csv?'+ledgerQuery());const url=URL.createObjectURL(new Blob([t],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='ledger-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出')}catch(e){toast(e.message,true)}};
+  $('#csv').onclick=async()=>{if(window.CONSOLE_DEMO)return toast('演示版不能下载文件。正式版点这里会下载当前筛选结果的 CSV。');const b=$('#csv');b.setAttribute('aria-busy','true');try{const t=await api('/api/payments.csv?'+ledgerQuery());const url=URL.createObjectURL(new Blob([t],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='ledger-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已导出')}catch(e){toast(e.message,true)}finally{b.removeAttribute('aria-busy')}};
   bindDetail()};
 
 // ---------- 04 payees ----------
