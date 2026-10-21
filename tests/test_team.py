@@ -104,7 +104,7 @@ def test_roles_catalog_is_consistent():
     ids = [r.id for r in ROLES]
     assert len(ids) == len(set(ids)) == 10
     assert [r.id for r in ROLES if r.touches_money] == ["finance_ops", "campaign_payouts"]
-    assert sum(r.status == "live" for r in ROLES) == 4
+    assert sum(r.status == "live" for r in ROLES) == 6
 
 
 def test_events_employee_column_and_migration(tmp_path):
@@ -684,7 +684,7 @@ def c(desk):
 def test_api_team(c, desk):
     t = c.get("/api/team", headers=H).json()
     assert [m["role"] for m in t["members"]] == ["finance_ops", "community_support", "chain_monitor", "announcement_translator"]
-    assert len(t["roles"]) == 10 and all(r["hired"] for r in t["roles"] if r["status"] == "live")
+    assert len(t["roles"]) == 10 and [r["id"] for r in t["roles"] if r["status"] == "live" and not r["hired"]] == ["campaign_payouts", "airdrop_sybil"]
     by = {m["role"]: m for m in t["members"]}
     assert "还没设要盯的地址" in by["chain_monitor"]["setup"] and by["announcement_translator"]["setup"] == []
     assert by["community_support"]["setup"] == [] and by["finance_ops"]["setup"] == []

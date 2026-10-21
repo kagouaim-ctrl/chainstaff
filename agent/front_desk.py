@@ -13,6 +13,8 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from agent.skills.airdrop_sybil.sybil import SybilChecker
+from agent.skills.campaign_payouts.payouts import CampaignPayouts
 from agent.skills.chain_monitor.monitor import ChainMonitor
 from agent.skills.community_support.support import CommunitySupport
 from agent.skills.finance_ops.employee import FinanceOpsEmployee
@@ -23,12 +25,14 @@ from agent.team import ROLE_BY_ID, Team
 PAYMENT_PREFIX = re.compile(r"^\s*(付|给|转|pay\b|send\b|transfer\b)", re.I)
 
 FINANCE, SUPPORT, MONITOR, TRANSLATOR = "finance_ops", "community_support", "chain_monitor", "announcement_translator"
+PAYOUTS, SYBIL = "campaign_payouts", "airdrop_sybil"
 COMMAND_ROLES = {
     "rules": FINANCE, "today": FINANCE, "pending": FINANCE, "report": FINANCE,
     "approve": FINANCE, "reject": FINANCE, "pause": FINANCE, "resume": FINANCE,
     "faq": SUPPORT, "tx": SUPPORT, "human": SUPPORT, "tickets": SUPPORT,
     "watch": MONITOR, "alerts": MONITOR, "brief": MONITOR,
     "translate": TRANSLATOR, "post": TRANSLATOR, "discard": TRANSLATOR,
+    "payouts": PAYOUTS, "sybil": SYBIL,
 }
 # Commands that change something; the console's chat simulator shows them but never runs them.
 MUTATING = {"approve", "reject", "pause", "resume", "human", "translate", "post", "discard"}
@@ -66,6 +70,8 @@ class FrontDesk:
         monitor: ChainMonitor | None = None,
         translator: Translator | None = None,
         team: Team | None = None,
+        payouts: CampaignPayouts | None = None,
+        sybil: SybilChecker | None = None,
     ) -> None:
         self.finance = finance
         self.store = finance.store
@@ -73,6 +79,8 @@ class FrontDesk:
         self.support = support or CommunitySupport(self.store)
         self.monitor = monitor or ChainMonitor(self.store)
         self.translator = translator or Translator(self.store)
+        self.payouts = payouts or CampaignPayouts(self.store, lambda: finance.policy)
+        self.sybil = sybil or SybilChecker(self.store, risk=lambda: finance.policy.risk_addresses)
 
     def on(self, role: str) -> bool:
         return self.team.is_on(role)
@@ -145,6 +153,8 @@ class FrontDesk:
             "translate": lambda: self._translate(args, owner, username),
             "post": lambda: self._post(args, owner, username, chat),
             "discard": lambda: self._discard(args, owner, username),
+            "payouts": lambda: self.payouts.payouts_text() if owner else "只有老板可以看结算批次。",
+            "sybil": lambda: self.sybil.sybil_text() if owner else "只有老板可以看反女巫检查。",
         }
         return Outgoing(handlers[cmd](), role, cmd)
 

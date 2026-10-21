@@ -87,10 +87,12 @@ def build_employee(env: dict[str, str] | None = None, wallet_factory=None, rpc_f
 def build_front_desk(env: dict[str, str] | None = None, wallet_factory=None, rpc_factory=None, anthropic_factory=None):
     """The whole AI team on one ledger: finance ops plus support, chain monitor and translator.
 
-    ETHERSCAN_API_KEY   lets the chain monitor read transfers and approvals (optional)
+    ETHERSCAN_API_KEY   lets the chain monitor and the sybil checker read the chain (optional)
     ANTHROPIC_API_KEY   lets the announcement translator draft translations (optional)
     """
     from agent.front_desk import FrontDesk
+    from agent.skills.airdrop_sybil.sybil import EtherscanProfileSource, SybilChecker
+    from agent.skills.campaign_payouts.payouts import CampaignPayouts
     from agent.skills.chain_monitor.monitor import ChainMonitor
     from agent.skills.community_support.support import CommunitySupport
     from agent.skills.finance_ops.alerts import EtherscanV2Source
@@ -99,7 +101,7 @@ def build_front_desk(env: dict[str, str] | None = None, wallet_factory=None, rpc
     env = dict(os.environ if env is None else env)
     employee, chain = build_employee(env, wallet_factory, rpc_factory)
     store = employee.store
-    tx_lookup = source = balances = None
+    tx_lookup = source = balances = profiles = None
     if chain:
         rpc = (rpc_factory or RpcClient)(chain.rpc_url)
         tx_lookup = rpc.tx_status
@@ -107,6 +109,7 @@ def build_front_desk(env: dict[str, str] | None = None, wallet_factory=None, rpc
             balances = lambda a: {t.symbol: rpc.balance(t, a) for t in chain.tokens.values()}  # noqa: E731
         if chain.explorer_api_url and env.get("ETHERSCAN_API_KEY"):
             source = EtherscanV2Source(chain.explorer_api_url, env["ETHERSCAN_API_KEY"], {s: t.address for s, t in chain.tokens.items()})
+            profiles = EtherscanProfileSource(chain.explorer_api_url, env["ETHERSCAN_API_KEY"])
     client_factory = None
     if env.get("ANTHROPIC_API_KEY"):
         client_factory = anthropic_factory or _anthropic_client  # pragma: no branch
@@ -122,7 +125,16 @@ def build_front_desk(env: dict[str, str] | None = None, wallet_factory=None, rpc
         explorer_tx_url=chain.explorer_tx_url if chain else None,
         timezone_name=employee.policy.timezone,
     )
-    desk = FrontDesk(employee, support, monitor, Translator(store, client_factory))
+    payouts = CampaignPayouts(
+        store,
+        lambda: employee.policy,
+        tokens=dict(chain.tokens) if chain else None,
+        chain_id=chain.chain_id if chain else None,
+        safe_address=chain.safe_address if chain else None,
+        explorer_tx_url=chain.explorer_tx_url if chain else None,
+    )
+    sybil = SybilChecker(store, profiles, risk=lambda: employee.policy.risk_addresses)
+    desk = FrontDesk(employee, support, monitor, Translator(store, client_factory), payouts=payouts, sybil=sybil)
     return desk, chain
 
 

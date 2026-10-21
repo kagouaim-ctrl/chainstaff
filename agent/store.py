@@ -88,6 +88,42 @@ CREATE TABLE IF NOT EXISTS translations (
     decided_by  TEXT,
     decided_at  TEXT
 );
+-- Batch payouts (campaign rewards, KOL fees): computed by agent/rules/batch.py, signed in the Safe.
+CREATE TABLE IF NOT EXISTS payout_batches (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    campaign    TEXT NOT NULL,
+    token       TEXT NOT NULL,
+    rules       TEXT NOT NULL,                 -- JSON
+    items       TEXT NOT NULL,                 -- JSON list
+    summary     TEXT NOT NULL,                 -- JSON
+    source      TEXT NOT NULL DEFAULT '',      -- the list as pasted
+    status      TEXT NOT NULL DEFAULT 'draft', -- draft | proposed | executed | cancelled
+    created_by  TEXT NOT NULL DEFAULT '',
+    decided_by  TEXT,
+    decided_at  TEXT,
+    tx_hash     TEXT,
+    note        TEXT
+);
+-- Airdrop sybil checks and the on-chain profiles they read (cached).
+CREATE TABLE IF NOT EXISTS sybil_checks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    settings    TEXT NOT NULL,                 -- JSON
+    addresses   TEXT NOT NULL,                 -- JSON list
+    status      TEXT NOT NULL DEFAULT 'running', -- running | done | failed
+    progress    INTEGER NOT NULL DEFAULT 0,
+    result      TEXT,                          -- JSON
+    error       TEXT,
+    created_by  TEXT NOT NULL DEFAULT '',
+    finished_at TEXT
+);
+CREATE TABLE IF NOT EXISTS address_profiles (
+    address     TEXT PRIMARY KEY,
+    data        TEXT NOT NULL,                 -- JSON
+    fetched_at  TEXT NOT NULL
+);
 -- Messages the console asks the bot to send; the bot drains it.
 CREATE TABLE IF NOT EXISTS outbox (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -363,6 +399,97 @@ class Store:
         d["outputs"] = json.loads(d["outputs"])
         d["warnings"] = json.loads(d["warnings"])
         return d
+
+    # ---- payout batches ----
+
+    def add_batch(self, campaign: str, token: str, rules: dict, items: list[dict], summary: dict, source: str, created_by: str) -> int:
+        with self._lock:
+            cur = self._db.execute(
+                "INSERT INTO payout_batches (at, campaign, token, rules, items, summary, source, created_by) VALUES (?,?,?,?,?,?,?,?)",
+                (_now(), campaign[:80], token, json.dumps(rules), json.dumps(items, ensure_ascii=False),
+                 json.dumps(summary, ensure_ascii=False), source[:200_000], created_by),
+            )
+        return int(cur.lastrowid)
+
+    def batch(self, bid: int) -> dict | None:
+        row = self._db.execute("SELECT * FROM payout_batches WHERE id = ?", (bid,)).fetchone()
+        return self._batch(row) if row else None
+
+    def batches(self, limit: int = 50, campaign: str | None = None) -> list[dict]:
+        if campaign is None:
+            rows = self._db.execute("SELECT * FROM payout_batches ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        else:
+            rows = self._db.execute("SELECT * FROM payout_batches WHERE campaign = ? ORDER BY id DESC LIMIT ?", (campaign, limit)).fetchall()
+        return [self._batch(r) for r in rows]
+
+    def set_batch_status(self, bid: int, allowed_from: tuple[str, ...], status: str, by: str,
+                         tx_hash: str | None = None, note: str | None = None) -> bool:
+        marks = ",".join("?" for _ in allowed_from)
+        with self._lock:
+            cur = self._db.execute(
+                f"UPDATE payout_batches SET status = ?, decided_by = ?, decided_at = ?, tx_hash = COALESCE(?, tx_hash),"
+                f" note = COALESCE(?, note) WHERE id = ? AND status IN ({marks})",
+                (status, by, _now(), tx_hash, note, bid, *allowed_from),
+            )
+        return cur.rowcount == 1
+
+    @staticmethod
+    def _batch(r: sqlite3.Row) -> dict:
+        d = dict(r)
+        for k in ("rules", "items", "summary"):
+            d[k] = json.loads(d[k])
+        return d
+
+    # ---- sybil checks ----
+
+    def add_sybil_check(self, name: str, settings: dict, addresses: list[str], created_by: str) -> int:
+        with self._lock:
+            cur = self._db.execute(
+                "INSERT INTO sybil_checks (at, name, settings, addresses, created_by) VALUES (?,?,?,?,?)",
+                (_now(), name[:80], json.dumps(settings, ensure_ascii=False), json.dumps(addresses), created_by),
+            )
+        return int(cur.lastrowid)
+
+    def sybil_progress(self, cid: int, progress: int) -> None:
+        self._db.execute("UPDATE sybil_checks SET progress = ? WHERE id = ?", (progress, cid))
+
+    def finish_sybil_check(self, cid: int, result: dict | None, error: str | None = None) -> None:
+        self._db.execute(
+            "UPDATE sybil_checks SET status = ?, result = ?, error = ?, finished_at = ? WHERE id = ?",
+            ("failed" if error else "done", json.dumps(result, ensure_ascii=False) if result is not None else None, error, _now(), cid),
+        )
+
+    def sybil_check(self, cid: int) -> dict | None:
+        row = self._db.execute("SELECT * FROM sybil_checks WHERE id = ?", (cid,)).fetchone()
+        return self._sybil(row) if row else None
+
+    def sybil_checks(self, limit: int = 30) -> list[dict]:
+        return [self._sybil(r) for r in self._db.execute("SELECT * FROM sybil_checks ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
+
+    @staticmethod
+    def _sybil(r: sqlite3.Row) -> dict:
+        d = dict(r)
+        d["settings"] = json.loads(d["settings"])
+        d["addresses"] = json.loads(d["addresses"])
+        d["result"] = json.loads(d["result"]) if d["result"] else None
+        return d
+
+    def profile(self, address: str, max_age_s: float | None = None) -> dict | None:
+        row = self._db.execute("SELECT data, fetched_at FROM address_profiles WHERE address = ?", (normalize_address(address),)).fetchone()
+        if not row:
+            return None
+        if max_age_s is not None:
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(row["fetched_at"])).total_seconds()
+            if age > max_age_s:
+                return None
+        return json.loads(row["data"])
+
+    def save_profile(self, address: str, data: dict) -> None:
+        self._db.execute(
+            "INSERT INTO address_profiles (address, data, fetched_at) VALUES (?, ?, ?)"
+            " ON CONFLICT(address) DO UPDATE SET data = excluded.data, fetched_at = excluded.fetched_at",
+            (normalize_address(address), json.dumps(data), _now()),
+        )
 
     def enqueue(self, chat: str, text: str) -> int:
         with self._lock:

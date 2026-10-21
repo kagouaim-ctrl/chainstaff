@@ -26,6 +26,8 @@ from fastapi.responses import FileResponse, Response
 
 from agent.config import ChainConfig
 from agent.front_desk import FrontDesk
+from agent.skills.airdrop_sybil.sybil import RULE_NAMES, VERDICT_NAMES
+from agent.skills.campaign_payouts.payouts import STATUS_NAMES, PayoutError
 from agent.skills.chain_monitor.monitor import KIND_NAMES, MonitorSettings
 from agent.skills.community_support.support import SupportSettings
 from agent.skills.translator.translator import LANGS, TONES, TranslationError, TranslatorSettings
@@ -51,7 +53,7 @@ def _when(v: str | None) -> datetime | None:
 
 
 def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | None = None, env: dict | None = None,
-               desk: FrontDesk | None = None) -> FastAPI:
+               desk: FrontDesk | None = None, sybil_background: bool = True) -> FastAPI:
     if not token or len(token) < 16:
         raise RuntimeError("CHAINSTAFF_CONSOLE_TOKEN must be set (at least 16 characters)")
     env = dict(os.environ if env is None else env)
@@ -358,6 +360,17 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
             day = desk.monitor.stats(days=1)
             view["todo"] = {"label": "24 小时高危预警", "value": day["high"], "href": "#monitor"}
             view["setup"] = [x for x, ok in (("还没设要盯的地址", desk.monitor.watch()), ("没有 Etherscan API key，读不到链上转账", desk.monitor.source)) if not ok]
+        elif m.role == "campaign_payouts":
+            ov = desk.payouts.overview()
+            view["headline"] = {"label": "已提案金额", "value": " / ".join(f"{v} {k}" for k, v in ov["paid_totals"].items()) or "0"}
+            view["todo"] = {"label": "待确认批次", "value": ov["pending"], "href": "#payouts"}
+            view["setup"] = [x for x, ok in (("没有配置 Safe 多签地址", desk.payouts.safe_address), ("没有配置代币合约地址，只能导出名单", ov["exportable"])) if not ok]
+        elif m.role == "airdrop_sybil":
+            checks = store.sybil_checks(200)
+            removed = sum(((c["result"] or {}).get("counts") or {}).get("excluded", 0) for c in checks)
+            view["headline"] = {"label": "检查过 / 剔除", "value": f"{sum(len(c['addresses']) for c in checks)} / {removed}"}
+            view["todo"] = {"label": "进行中的检查", "value": sum(c["status"] == "running" for c in checks), "href": "#sybil"}
+            view["setup"] = [] if desk.sybil.ready else ["没有 Etherscan API key，只能用导入的链上资料"]
         else:
             drafts = [d for d in store.translations(200) if d["status"] == "draft"]
             posted = sum(d["status"] == "posted" for d in store.translations(200))
@@ -554,6 +567,111 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     def discard_draft(tid: int) -> dict:
         _translator_call(desk.translator.discard, tid, OWNER_ID)
         return {"ok": True}
+
+    # ---- campaign payouts ----
+
+    def _payouts(fn, *args):
+        if not team.is_on("campaign_payouts"):
+            raise HTTPException(400, "营销结算员没上岗")
+        try:
+            return fn(*args)
+        except PayoutError as e:
+            raise HTTPException(400, str(e)) from e
+
+    @app.get("/api/payouts", dependencies=[Depends(auth)])
+    def payouts() -> dict:
+        return {**desk.payouts.overview(), "enabled": team.is_on("campaign_payouts"),
+                "hired": team.get("campaign_payouts") is not None, "status_names": STATUS_NAMES,
+                "sybil_checks": [{"id": c["id"], "name": c["name"], "excluded": c["result"]["counts"]["excluded"]}
+                                 for c in store.sybil_checks(30) if c["status"] == "done"]}
+
+    def _batch_args(body: dict) -> tuple:
+        sc = body.get("sybil_check")
+        return str(body.get("text", ""))[:400_000], body.get("rules") or {}, str(body.get("campaign", ""))[:80], int(sc) if sc else None
+
+    @app.post("/api/payouts/preview", dependencies=[Depends(auth)])
+    def payouts_preview(body: dict = Body(...)) -> dict:
+        text, rules, campaign, sc = _batch_args(body)
+        return _payouts(desk.payouts.preview, text, rules, campaign, sc)
+
+    @app.post("/api/payouts/batches", dependencies=[Depends(auth)])
+    def payouts_create(body: dict = Body(...)) -> dict:
+        text, rules, campaign, sc = _batch_args(body)
+        return _payouts(desk.payouts.create, campaign, text, rules, OWNER_ID, sc)
+
+    @app.get("/api/payouts/batches/{bid}", dependencies=[Depends(auth)])
+    def payouts_batch(bid: int) -> dict:
+        b = _payouts(desk.payouts.get, bid)
+        b["tx_url"] = explorer("tx", b["tx_hash"]) if b["tx_hash"] else None
+        return b
+
+    @app.post("/api/payouts/batches/{bid}/{action}", dependencies=[Depends(auth)])
+    def payouts_action(bid: int, action: str, body: dict = Body(default={})) -> dict:
+        if action == "propose":
+            return _payouts(desk.payouts.propose, bid, OWNER_ID)
+        if action == "executed":
+            return _payouts(desk.payouts.mark_executed, bid, str(body.get("tx_hash", "")), OWNER_ID)
+        if action == "cancel":
+            return _payouts(desk.payouts.cancel, bid, OWNER_ID, str(body.get("note", "")))
+        raise HTTPException(404, "没有这个操作")
+
+    @app.get("/api/payouts/batches/{bid}/export/{fmt}", dependencies=[Depends(auth)])
+    def payouts_export(bid: int, fmt: str) -> Response:
+        name, media, content = _payouts(desk.payouts.export, bid, fmt)
+        store.log_event("audit", f"导出结算批次 #{bid}（{name}）", OWNER_ID, {"batch": bid}, employee="campaign_payouts")
+        return Response(content, media_type=media, headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    # ---- airdrop sybil ----
+
+    def _sybil(fn, *args):
+        if not team.is_on("airdrop_sybil"):
+            raise HTTPException(400, "空投反女巫没上岗")
+        try:
+            return fn(*args)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+
+    @app.get("/api/sybil", dependencies=[Depends(auth)])
+    def sybil() -> dict:
+        return {**desk.sybil.overview(), "enabled": team.is_on("airdrop_sybil"), "hired": team.get("airdrop_sybil") is not None,
+                "rule_names": RULE_NAMES, "verdict_names": VERDICT_NAMES}
+
+    @app.put("/api/sybil/settings", dependencies=[Depends(auth)])
+    def sybil_settings(body: dict = Body(...)) -> dict:
+        try:
+            s = desk.sybil.save_settings(body, OWNER_ID)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        return {"ok": True, "settings": s.to_dict()}
+
+    @app.post("/api/sybil/checks", dependencies=[Depends(auth)])
+    def sybil_start(body: dict = Body(...)) -> dict:
+        cid = _sybil(desk.sybil.start, str(body.get("name", ""))[:80], str(body.get("text", ""))[:400_000], OWNER_ID, sybil_background)
+        return {"ok": True, "id": cid}
+
+    @app.post("/api/sybil/profiles", dependencies=[Depends(auth)])
+    def sybil_profiles(body: dict = Body(...)) -> dict:
+        n = _sybil(desk.sybil.import_profiles, str(body.get("text", ""))[:2_000_000], OWNER_ID)
+        return {"ok": True, "imported": n}
+
+    @app.get("/api/sybil/checks/{cid}", dependencies=[Depends(auth)])
+    def sybil_check(cid: int) -> dict:
+        try:
+            c = desk.sybil.check(cid)
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from e
+        c["total"] = len(c.pop("addresses"))
+        return c
+
+    @app.get("/api/sybil/checks/{cid}/export/{which}", dependencies=[Depends(auth)])
+    def sybil_export(cid: int, which: str) -> Response:
+        if which not in ("clean", "excluded", "review", "all"):
+            raise HTTPException(404, "没有这个导出")
+        try:
+            name, content = desk.sybil.export(cid, which)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        return Response(content, media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
     return app
 

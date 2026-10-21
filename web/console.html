@@ -173,7 +173,7 @@ pre.report{white-space:pre-wrap;margin:0;font:13px/1.7 var(--sans);background:va
 .emp .bd{display:grid;gap:12px}
 .emp .grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .mini{display:grid;gap:2px;padding:8px 10px;border:1px solid var(--line);background:var(--bg);min-width:0}
-.mini .num{font-size:18px}
+.mini .num{font-size:18px;word-break:break-all}
 .mini a{text-decoration:none}
 .duties{margin:0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:2px}
 .stack > [data-addrow]{justify-self:start}
@@ -318,7 +318,10 @@ const PAGES=[
   ['support','社区客服','社区客服','community_support'],
   ['monitor','链上监控','链上监控员','chain_monitor'],
   ['translator','公告翻译','公告翻译员','announcement_translator'],
+  ['payouts','营销结算','营销结算员','campaign_payouts'],
+  ['sybil','空投反女巫','空投反女巫','airdrop_sybil'],
   ['telegram','Telegram','通用',''],['audit','审计日志','通用',''],['settings','设置','通用','']];
+const EMP_PAGES=['support','monitor','translator','payouts','sybil'];
 const S={status:null,route:'team',team:null,ledger:{limit:100,f:{}},audit:{kind:'',items:[]},tgChat:[],dirtyRules:false};
 function route(){const r=(location.hash||'#team').slice(1).split('?')[0];return PAGES.some(p=>p[0]===r)?r:'team'}
 const member=role=>(S.team?.members||[]).find(m=>m.role===role);
@@ -328,12 +331,12 @@ function renderNav(){const pend=S.status?.pending||0;let g='',out='';
   for(const [k,l,grp,role] of PAGES){
     if(grp!==g){g=grp;const m=role&&member(role);
       out+=`<div class="ng">${esc(role&&m?m.name:grp)}${role?(m?(m.enabled?'':'<em class="off">停用</em>'):'<em>未雇佣</em>'):''}</div>`}
-    const badge=k==='approvals'?pend:(['support','monitor','translator'].includes(k)&&member(role)?todo[role]:0);
+    const badge=k==='approvals'?pend:(EMP_PAGES.includes(k)&&member(role)?todo[role]:0);
     out+=`<a href="#${k}" ${S.route===k?'aria-current="page"':''}>${l}${badge?`<span class="badge">${badge}</span>`:''}</a>`}
   $('#nav').innerHTML=out}
 function renderTop(){const s=S.status||{};
   const pg=PAGES.find(p=>p[0]===S.route);
-  $('#title').textContent=['support','monitor','translator'].includes(pg[0])&&member(pg[3])?member(pg[3]).name:pg[1];
+  $('#title').textContent=EMP_PAGES.includes(pg[0])&&member(pg[3])?member(pg[3]).name:pg[1];
   const pills=[s.live?'<span class="pill block"><span class="dot"></span>实盘</span>':'<span class="pill muted"><span class="dot"></span>测试模式</span>'];
   if(s.read_only)pills.push('<span class="pill review">试用只读</span>');
   if(s.paused)pills.push('<span class="pill block">已暂停</span>');
@@ -709,7 +712,7 @@ function promptBox(title,body,label,value,okText='确定'){return new Promise(re
   $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(null));
   const ok=()=>close($('#pv').value.trim());$('#overlay').querySelector('[data-ok]').onclick=ok;
   $('#pv').onkeydown=e=>{if(e.key==='Enter')ok()};$('#pv').focus();$('#pv').select()})}
-const ROLE_PAGE={finance_ops:'overview',community_support:'support',chain_monitor:'monitor',announcement_translator:'translator'};
+const ROLE_PAGE={finance_ops:'overview',community_support:'support',chain_monitor:'monitor',announcement_translator:'translator',campaign_payouts:'payouts',airdrop_sybil:'sybil'};
 async function hireFlow(id){const r=(S.team?.roles||[]).find(x=>x.id===id);if(!r)return;
   const body=`${esc(r.summary)}<ul class="duties" style="margin-top:8px">${r.duties.map(d=>`<li>${esc(d)}</li>`).join('')}</ul>${r.needs.length?`<p style="margin:8px 0 0">上岗前需要：${r.needs.map(esc).join('、')}</p>`:''}<p style="margin:8px 0 0">${r.touches_money?'这个岗位会动钱，所有付款都受规则引擎和限额约束。':'这个岗位只读、回答和起草，不碰钱。'}</p>`;
   const name=await promptBox('雇佣'+r.name,body,'在群里的称呼',r.name,'雇佣');if(name===null)return;
@@ -922,6 +925,144 @@ BIND.translator=()=>{if(!$('#trSave'))return;
   document.querySelectorAll('[data-trdrop]').forEach(b=>b.onclick=async()=>{if(await confirmBox(`作废草稿 #${b.dataset.trdrop}？`,'作废后不能再发出，需要的话重新生成。','作废',true))act(()=>post(`/api/translator/drafts/${b.dataset.trdrop}/discard`),'已作废')});
   $('#trSave').onclick=()=>act(()=>put('/api/translator/settings',{languages:langs(),tone:$('#trTone').value,project_name:$('#trName').value,notes:$('#trNotes').value,
     glossary:collect('trGloss').filter(x=>x.term),chats:Object.fromEntries([...document.querySelectorAll('[data-trc]')].map(i=>[i.dataset.trc,i.value.trim()]))}),'翻译设置已保存')};
+
+// ---------- shared: downloads ----------
+async function download(path,demoMsg){if(window.CONSOLE_DEMO)return toast(demoMsg||'演示版不能下载文件。正式版点这里会下载文件。');
+  try{const r=await fetch(path,{headers:{'Authorization':'Bearer '+token}});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.detail||('下载失败 '+r.status))}
+    const name=(r.headers.get('content-disposition')||'').match(/filename="([^"]+)"/)?.[1]||'export';
+    const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('已下载 '+name)}
+  catch(e){toast(e.message,true)}}
+
+// ---------- campaign payouts ----------
+const BSTATUS={draft:['待确认','review'],proposed:['等 Safe 签字','review'],executed:['已执行','ok'],cancelled:['已作废','muted']};
+const bst=s=>{const [l,c]=BSTATUS[s]||[s,'muted'];return `<span class="pill ${c}"><span class="dot"></span>${l}</span>`};
+const MODE_HELP={fixed:'名单每行：地址,金额[,备注]。例如 0xabc…,300,KOL 小王',pool:'名单每行：地址,积分[,备注]。奖池按积分比例分，向下取整到 6 位小数'};
+function payItems(items,limit=300){return items.length?`<div class="scroll"><table><thead><tr><th>行</th><th>地址</th><th style="text-align:right">数量</th><th>结果</th></tr></thead><tbody>${items.slice(0,limit).map(i=>`<tr><td class="mono muted">${i.line}</td><td class="mono" style="white-space:nowrap">${esc(short(i.address)||i.address)}${i.note?`<div class="muted" style="font-size:11px">${esc(i.note)}</div>`:''}</td><td class="num" style="text-align:right">${i.status==='ok'?fmtNum(i.amount):'—'}</td><td>${i.status==='ok'?(i.adjusted.length?`<span class="pill review">已调整</span><div class="muted" style="font-size:11px">${i.adjusted.map(esc).join('；')}</div>`:'<span class="pill ok">发放</span>'):`<span class="pill block">剔除</span><div class="muted" style="font-size:11px">${i.reasons.map(esc).join('；')}</div>`}</td></tr>`).join('')}</tbody></table></div>${items.length>limit?`<p class="muted" style="font-size:12px;margin:8px 16px">只显示前 ${limit} 行，共 ${items.length} 行。</p>`:''}`:'<div class="empty">没有行</div>'}
+function paySummary(s,token){return `<div class="grid g4" style="gap:8px"><div class="mini"><span class="label">可发放</span><span class="num">${s.payable}</span></div><div class="mini"><span class="label">合计</span><span class="num">${fmtNum(s.total)} ${esc(token)}</span></div><div class="mini"><span class="label">剔除</span><span class="num ${s.excluded?'block':''}">${s.excluded}</span></div><div class="mini"><span class="label">调整</span><span class="num ${s.adjusted?'review':''}">${s.adjusted}</span></div></div>
+  ${Object.keys(s.excluded_reasons||{}).length?`<p class="muted" style="margin:0;font-size:12px">剔除原因：${Object.entries(s.excluded_reasons).map(([k,n])=>`${esc(k)} ${n}`).join('，')}</p>`:''}
+  ${(s.errors||[]).length||(s.parse_problems||[]).length?`<div class="note block">${[...(s.errors||[]),...(s.parse_problems||[])].map(x=>`<div>${esc(x)}</div>`).join('')}</div>`:''}`}
+VIEWS.payouts=async()=>{if(!member('campaign_payouts'))return notHired('campaign_payouts');
+  const d=await api('/api/payouts');S.pay=d;const f=S.payForm||(S.payForm={campaign:'',token:d.tokens[0]||'USDT',mode:'fixed',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:'',text:''});
+  const pv=S.payPreview;
+  return `${offNote('campaign_payouts')}
+  ${!d.safe?'<div class="note block"><b>还没配置 Safe 多签地址。</b>批次照样能核对和导出名单，但要导出 Safe 批量交易文件，需要在链配置里填 <code>safe_address</code> 和代币合约地址。</div>':''}
+  <div class="grid g4">
+    ${kpi('待确认批次',d.pending,d.pending?'核对后确认才会生成提案':'没有待确认的',d.pending?'review':'')}
+    ${kpi('等 Safe 签字',d.awaiting_signature,'导出文件后在 Safe 里签')}
+    ${kpi('已提案金额',Object.entries(d.paid_totals).map(([k,v])=>`${fmtNum(v)} <span class="muted" style="font-size:13px">${esc(k)}</span>`).join('<br>')||'0','含已执行')}
+    ${kpi('Safe 多签',d.safe?`<span style="font-size:15px" class="mono">${esc(short(d.safe))}</span>`:'未配置','员工不签名，只出提案',d.safe?'':'review')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${card('新建结算批次',`<div class="stack">
+    <div class="grid g2" style="gap:8px"><label class="f"><span>活动名称</span><input id="pyCamp" value="${esc(f.campaign)}" placeholder="例如 10 月 KOL 结算" maxlength="80"></label>
+    <label class="f"><span>币种</span><select id="pyTok">${d.tokens.map(t=>`<option ${f.token===t?'selected':''}>${esc(t)}</option>`).join('')}</select></label></div>
+    <div class="grid g2" style="gap:8px"><label class="f"><span>结算方式</span><select id="pyMode"><option value="fixed" ${f.mode==='fixed'?'selected':''}>按名单金额</option><option value="pool" ${f.mode==='pool'?'selected':''}>按积分分奖池</option></select></label>
+    ${f.mode==='pool'?`<label class="f"><span>奖池总额</span><input id="pyPool" class="mono" value="${esc(f.pool)}" placeholder="例如 10000"></label>`:`<label class="f"><span>预算上限（可空）</span><input id="pyBudget" class="mono" value="${esc(f.budget)}" placeholder="超过就不能生成"></label>`}</div>
+    <div class="grid g2" style="gap:8px"><label class="f"><span>单人上限（可空）</span><input id="pyCap" class="mono" value="${esc(f.per_person_cap)}" placeholder="${f.mode==='pool'?'超过按上限发':'超过就剔除'}"></label>
+    <label class="f"><span>最低发放额（可空）</span><input id="pyMin" class="mono" value="${esc(f.min_amount)}" placeholder="低于就不发，省 gas"></label></div>
+    <label class="f"><span>剔除反女巫结果（可选）</span><select id="pySyb"><option value="">不使用</option>${d.sybil_checks.map(c=>`<option value="${c.id}" ${String(f.sybil_check)===String(c.id)?'selected':''}>#${c.id} ${esc(c.name)} · 剔除 ${c.excluded}</option>`).join('')}</select></label>
+    <label class="f"><span>名单</span><textarea id="pyText" class="mono" style="min-height:180px" placeholder="${esc(MODE_HELP[f.mode])}">${esc(f.text)}</textarea></label>
+    <p class="muted" style="margin:0;font-size:12px">${esc(MODE_HELP[f.mode])}。可以直接从表格复制粘贴，第一行是表头也没关系。同一活动里已经发过的地址会自动剔除。</p>
+    <div class="row"><button class="btn" id="pyPrev">核对预览</button><button class="btn signal" id="pyMake" ${pv&&pv.ok?'':'disabled'}>生成批次</button><span class="muted" style="font-size:12px">${pv?(pv.ok?'预览通过，可以生成':'预览有问题，改好再生成'):'先预览，看清楚再生成'}</span></div>
+    ${pv?`<div class="stack" id="pyPv">${paySummary(pv.summary,pv.summary.token)}</div>`:''}</div>`,{id:'pyNew'})}
+  ${pv?card('预览明细',payItems(pv.items),{flush:true}):''}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('结算批次',d.batches.length?`<div class="scroll"><table><thead><tr><th>#</th><th>活动</th><th style="text-align:right">合计</th><th>状态</th></tr></thead><tbody>${d.batches.map(b=>`<tr class="click" data-batch="${b.id}"><td class="mono">${b.id}</td><td>${esc(b.campaign)}<div class="muted" style="font-size:11px">${fmtTime(b.at)} · ${b.summary.payable} 个地址${b.summary.excluded?` · 剔除 ${b.summary.excluded}`:''}</div></td><td class="num" style="text-align:right;white-space:nowrap">${fmtNum(b.summary.total)} <span class="muted">${esc(b.token)}</span></td><td>${bst(b.status)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">还没有结算批次</div>',{flush:true})}
+  ${card('怎么发出去',`<ol class="steps"><li>粘贴名单，结算员核对地址、去重、对风险名单和反女巫结果，按规则算出每人多少。</li><li>老板看过明细，点「确认并生成提案」。</li><li>下载 Safe 批量交易文件，在 Safe{Wallet} 的 Transaction Builder 里导入（或用 CSV Airdrop 应用导入 CSV），多签人一次签完。</li><li>执行后把交易哈希填回来，结算员记账；同一活动下这些地址不会再被重复发放。</li></ol><p class="muted" style="margin:8px 0 0;font-size:12px">结算员不持有私钥、不签名、不发交易。所有批量付款都要经过 Safe 多签。</p>`)}
+  </div></div>`};
+BIND.payouts=()=>{if(!$('#pyPrev'))return;
+  const form=()=>{const f=S.payForm;f.campaign=$('#pyCamp').value;f.token=$('#pyTok').value;f.mode=$('#pyMode').value;if($('#pyPool'))f.pool=$('#pyPool').value;if($('#pyBudget'))f.budget=$('#pyBudget').value;
+    f.per_person_cap=$('#pyCap').value;f.min_amount=$('#pyMin').value;f.sybil_check=$('#pySyb').value;f.text=$('#pyText').value;return f};
+  const body=f=>({campaign:f.campaign,text:f.text,sybil_check:f.sybil_check?+f.sybil_check:null,rules:{token:f.token,mode:f.mode,pool:f.mode==='pool'?f.pool:null,budget:f.mode==='fixed'?f.budget:null,per_person_cap:f.per_person_cap,min_amount:f.min_amount}});
+  document.querySelectorAll('#pyNew input,#pyNew textarea,#pyNew select').forEach(el=>el.addEventListener('input',()=>{form();if(S.payPreview){S.payPreview=null;$('#pyMake').disabled=true}}));
+  $('#pyMode').onchange=()=>{form();S.payPreview=null;render()};
+  $('#pyPrev').onclick=async()=>{const f=form();try{S.payPreview=await post('/api/payouts/preview',body(f));render()}catch(e){toast(e.message,true)}};
+  $('#pyMake').onclick=async()=>{const f=form(),s=S.payPreview?.summary;if(!s)return;
+    if(!await confirmBox('生成结算批次？',`「${esc(f.campaign||'（未填活动名）')}」：${s.payable} 个地址，合计 ${esc(fmtNum(s.total))} ${esc(s.token)}，剔除 ${s.excluded} 个。<br>生成后还要老板再确认一次，才会出 Safe 提案文件。`,'生成'))return;
+    try{const b=await post('/api/payouts/batches',body(f));S.payPreview=null;S.payForm=null;toast(`批次 #${b.id} 已生成，等老板确认`);await refresh();openBatch(b.id)}catch(e){toast(e.message,true)}};
+  document.querySelectorAll('[data-batch]').forEach(tr=>tr.onclick=()=>openBatch(+tr.dataset.batch))};
+async function openBatch(id){let b;try{b=await api('/api/payouts/batches/'+id)}catch(e){return toast(e.message,true)}
+  const ok=b.items.filter(i=>i.status==='ok'),r=b.rules;
+  drawer(`结算批次 #${b.id}`,`<div class="stack">
+    <div class="row">${bst(b.status)}<span class="grow"></span><span class="muted" style="font-size:12px">${fmtTime(b.at)} · ${esc(b.created_by)}${b.decided_by?` · ${esc(b.decided_by)} ${fmtTime(b.decided_at)}`:''}</span></div>
+    <h3 style="margin:0">${esc(b.campaign)}</h3>
+    ${paySummary(b.summary,b.token)}
+    <p class="muted" style="margin:0;font-size:12px">规则：${r.mode==='pool'?`按积分分奖池 ${esc(r.pool)} ${esc(r.token)}`:`按名单金额${r.budget?`，预算 ${esc(r.budget)}`:''}`}${r.per_person_cap?`，单人上限 ${esc(r.per_person_cap)}`:''}${Number(r.min_amount)?`，最低 ${esc(r.min_amount)}`:''}${r.sybil_check?`，剔除反女巫检查 #${r.sybil_check}`:''}</p>
+    ${b.tx_hash?`<p style="margin:0">交易：${b.tx_url?`<a href="${esc(b.tx_url)}" target="_blank" rel="noreferrer" class="mono">${esc(short(b.tx_hash))}</a>`:`<span class="mono">${esc(b.tx_hash)}</span>`}</p>`:''}
+    ${b.note?`<p class="muted" style="margin:0">备注：${esc(b.note)}</p>`:''}
+    <div class="row" style="flex-wrap:wrap">
+    ${b.status==='draft'?`<button class="btn signal" data-bact="propose">确认并生成提案</button>`:''}
+    ${['proposed','executed'].includes(b.status)?`<button class="btn primary" data-bexp="safe_json">下载 Safe 批量交易</button><button class="btn" data-bexp="csv_airdrop">下载 CSV Airdrop</button><button class="btn" data-bexp="list">下载名单</button>`:''}
+    ${b.status==='proposed'?`<button class="btn ok" data-bact="executed">标记已执行</button>`:''}
+    ${['draft','proposed'].includes(b.status)?`<button class="btn ghost block" data-bact="cancel">作废</button>`:''}</div>
+    <h3 style="margin:8px 0 0">明细（发放 ${ok.length} / 共 ${b.items.length} 行）</h3>
+    <div style="margin:0 -16px">${payItems(b.items,500)}</div></div>`);
+  document.querySelectorAll('[data-bexp]').forEach(x=>x.onclick=()=>download(`/api/payouts/batches/${id}/export/${x.dataset.bexp}`,'演示版不能下载文件。正式版会下载 Safe{Wallet} 可以直接导入的批量交易文件。'));
+  document.querySelectorAll('[data-bact]').forEach(x=>x.onclick=async()=>{const a=x.dataset.bact;let extra={};
+    if(a==='propose'&&!await confirmBox(`确认批次 #${id}？`,`${ok.length} 笔，合计 ${esc(fmtNum(b.summary.total))} ${esc(b.token)}。确认后可以下载 Safe 批量交易文件，钱要等多签人在 Safe 里签完才会动。`,'确认'))return;
+    if(a==='executed'){const h=await promptBox(`批次 #${id} 已在 Safe 执行`,'把 Safe 执行后的交易哈希填进来，方便以后核对（可空）。','交易哈希','','标记已执行');if(h===null)return;extra={tx_hash:h}}
+    if(a==='cancel'){const n=await promptBox(`作废批次 #${id}？`,'作废后不能再导出。如果已经在 Safe 里提交了，记得在 Safe 里也拒绝掉。','原因（可空）','','作废');if(n===null)return;extra={note:n}}
+    try{await post(`/api/payouts/batches/${id}/${a}`,extra);toast({propose:'已确认，可以下载 Safe 文件',executed:'已标记执行',cancel:'已作废'}[a]);await refresh();openBatch(id)}catch(e){toast(e.message,true)}})}
+
+// ---------- airdrop sybil ----------
+const VERD={clean:['干净','ok'],review:['待复核','review'],excluded:['剔除','block']};
+VIEWS.sybil=async()=>{if(!member('airdrop_sybil'))return notHired('airdrop_sybil');
+  const d=await api('/api/sybil');S.syb=d;const s=d.settings,R=d.rule_names;
+  const cur=S.sybSel||d.checks.find(c=>c.status!=='failed')?.id;const c=cur?await api('/api/sybil/checks/'+cur).catch(()=>null):null;
+  clearTimeout(S.sybTimer);if(d.checks.some(x=>x.status==='running'))S.sybTimer=setTimeout(()=>{if(S.route==='sybil'&&!$('#overlay').innerHTML)render()},2500);
+  const res=c?.result,vf=S.sybF??(res=>res&&res.counts.excluded?'excluded':'')(c?.result);
+  const rows=res?res.addresses.filter(a=>!vf||(vf.startsWith('c:')?String(a.cluster)===vf.slice(2):a.verdict===vf)):[];
+  return `${offNote('airdrop_sybil')}
+  ${!d.ready?'<div class="note block"><b>没有接上链上数据。</b>部署时设置 <code>ETHERSCAN_API_KEY</code>，反女巫员会逐个地址查资金来源和交易记录。在这之前只能做格式、重复和风险名单检查，或者在下面导入你已有的链上资料。</div>':''}
+  <div class="grid g4">
+    ${kpi('检查过的名单',d.checks.length,d.checks.length?`最近：${esc(d.checks[0].name)}`:'还没有')}
+    ${kpi('当前结果',res?`${res.counts.clean} / ${res.counts.review} / ${res.counts.excluded}`:'—','干净 / 待复核 / 剔除',res?.counts.excluded?'block':'')}
+    ${kpi('女巫团伙',res?res.clusters.length:'—',res?.clusters.length?`最大 ${res.clusters[0].size} 个地址`:'没有发现团伙')}
+    ${kpi('数据来源',d.ready?'Etherscan':'导入资料',d.ready?'免费档每秒 5 次，1000 个地址约 4 分钟':'设置 API key 后自动查')}
+  </div>
+  <div class="grid g2" style="align-items:start">
+  <div class="stack" style="gap:16px">
+  ${c?card(`检查 #${c.id} · ${esc(c.name)}`,c.status==='running'?`<div class="stack"><div class="row"><span class="spin"></span><span>正在查链上数据：${c.progress} / ${c.total}</span></div><div class="bar"><i style="width:${c.total?Math.round(c.progress/c.total*100):0}%"></i></div><p class="muted" style="margin:0;font-size:12px">可以离开这一页，查完会记在审计日志里。</p></div>`
+    :c.status==='failed'?`<div class="note block">检查失败：${esc(c.error)}</div>`
+    :`<div class="stack">
+      <div class="grid g4" style="gap:8px">${['clean','review','excluded'].map(v=>`<div class="mini"><span class="label">${VERD[v][0]}</span><span class="num ${v==='excluded'&&res.counts[v]?'block':v==='review'&&res.counts[v]?'review':''}">${res.counts[v]}</span></div>`).join('')}<div class="mini"><span class="label">干净名单</span><span class="num">${res.clean.length}</span></div></div>
+      <p class="muted" style="margin:0;font-size:12px">共 ${res.total} 个地址${res.duplicates?`，名单里重复 ${res.duplicates} 次`:''}${res.invalid.length?`，${res.invalid.length} 行不是有效地址`:''}；查到链上数据 ${res.with_data} 个${res.lookup_errors?`，${res.lookup_errors} 个查询失败`:''}。干净名单${s.review_as==='exclude'?'不含':'包含'}待复核地址。</p>
+      ${Object.keys(res.by_rule).length?`<p style="margin:0;font-size:13px">${Object.entries(res.by_rule).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span class="pill muted" style="margin:0 4px 4px 0">${esc(R[k]||k)} ${n}</span>`).join('')}</p>`:''}
+      <div class="row" style="flex-wrap:wrap"><button class="btn signal" id="sybPay">干净名单交给营销结算员</button><button class="btn" data-sybexp="clean">下载干净名单</button><button class="btn" data-sybexp="excluded">下载剔除名单和理由</button><button class="btn ghost" data-sybexp="all">下载全部</button></div></div>`)
+    :card('检查结果','<div class="empty">还没有检查。在右边粘贴空投名单开始。</div>')}
+  ${res?card('团伙',res.clusters.length?`<div class="scroll"><table><thead><tr><th>#</th><th>地址数</th><th>特征</th><th>资金来源</th></tr></thead><tbody>${res.clusters.slice(0,50).map(k=>`<tr class="click" data-sybf="c:${k.id}"><td class="mono">${k.id}</td><td class="num">${k.size}</td><td>${k.kinds.map(x=>esc(R[x]||x)).join('、')}</td><td class="mono">${k.funder?esc(short(k.funder)):'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">没有发现团伙</div>',{flush:true}):''}
+  ${res?card('地址明细',`<div class="tabs" role="tablist" style="margin:-14px -16px 0">${[['','全部'],['excluded','剔除'],['review','待复核'],['clean','干净'],...(vf.startsWith('c:')?[[vf,'团伙 #'+vf.slice(2)]]:[])].map(([v,l])=>`<button role="tab" aria-selected="${vf===v}" data-sybf="${v}">${esc(l)}</button>`).join('')}</div>
+    ${rows.length?`<div class="scroll" style="margin:0 -16px -14px"><table><thead><tr><th>地址</th><th>结果</th><th>理由</th></tr></thead><tbody>${rows.slice(0,300).map(a=>`<tr><td class="mono" style="white-space:nowrap">${esc(short(a.address))}${a.cluster?`<div class="muted" style="font-size:11px">团伙 #${a.cluster}</div>`:''}</td><td><span class="pill ${VERD[a.verdict][1]}">${VERD[a.verdict][0]}</span></td><td style="font-size:12px">${a.reasons.length?a.reasons.map(r=>`<div>${r.severity==='high'?'🔴':r.severity==='medium'?'🟡':'⚪'} ${esc(r.text)}</div>`).join(''):'<span class="muted">没有发现问题</span>'}</td></tr>`).join('')}</tbody></table>${rows.length>300?`<p class="muted" style="font-size:12px;margin:8px 16px">只显示前 300 个，下载可以看全部。</p>`:''}</div>`:'<div class="empty">没有</div>'}`):''}
+  </div>
+  <div class="stack" style="gap:16px">
+  ${card('新的检查',`<div class="stack"><label class="f"><span>名单名称</span><input id="sybName" placeholder="例如 第一期空投" maxlength="80"></label>
+    <label class="f"><span>地址名单</span><textarea id="sybText" class="mono" style="min-height:160px" placeholder="每行一个地址，或者直接粘贴表格（取第一列）"></textarea></label>
+    <div class="row"><button class="btn signal" id="sybGo">开始检查</button><span class="muted" style="font-size:12px">一次最多 3000 个地址</span></div></div>`)}
+  ${d.checks.length?card('历史检查',`<div class="scroll"><table><tbody>${d.checks.map(x=>`<tr class="click" data-sybsel="${x.id}" ${x.id===cur?'aria-current="true"':''}><td class="mono">#${x.id}</td><td>${esc(x.name)}<div class="muted" style="font-size:11px">${fmtTime(x.at)} · ${x.total} 个地址</div></td><td>${x.status==='running'?`<span class="pill review">进行中 ${x.progress}/${x.total}</span>`:x.status==='failed'?'<span class="pill block">失败</span>':`<span class="muted" style="font-size:12px;white-space:nowrap">剔除 ${x.counts.excluded} · 团伙 ${x.clusters}</span>`}</td></tr>`).join('')}</tbody></table></div>`,{flush:true}):''}
+  ${card('判定规则',`<div class="stack">
+    <div class="grid g2" style="gap:8px"><label class="f"><span>几个地址算一个团伙</span><input id="sbMin" class="mono" value="${s.cluster_min}"></label><label class="f"><span>批量创建时间窗口（分钟）</span><input id="sbWin" class="mono" value="${s.window_minutes}"></label></div>
+    <div class="grid g2" style="gap:8px"><label class="f"><span>少于几笔交易算没活动</span><input id="sbTx" class="mono" value="${s.min_tx}"></label><label class="f"><span>这天之后新建的算新钱包</span><input id="sbAfter" class="mono" value="${esc(s.created_after)}" placeholder="2026-09-01（可空）"></label></div>
+    <label class="f"><span>忽略的资金来源（交易所热钱包、水龙头、跨链桥，一行一个）</span><textarea id="sbIgn" class="mono" placeholder="0x…">${esc(s.ignore_funders.join('\n'))}</textarea></label>
+    <label class="f"><span>待复核的地址</span><select id="sbRev"><option value="keep" ${s.review_as==='keep'?'selected':''}>留在干净名单里（只剔除高危）</option><option value="exclude" ${s.review_as==='exclude'?'selected':''}>也一起剔除（更严格）</option></select></label>
+    <div class="row"><button class="btn primary" id="sbSave">保存规则</button></div>
+    <p class="muted" style="margin:0;font-size:12px">🔴 高危直接剔除：同一资金来源、名单内互相打钱（3 个以上）、批量创建、操作完全相同、风险名单。🟡 待复核：几乎没活动、快照前新建、两个地址互相打钱。每条都写清楚理由，方便人工复核和对外解释。</p></div>`)}
+  ${card('导入链上资料（可选）',`<div class="stack"><p class="muted" style="margin:0;font-size:12px">已经有数据的话可以直接导入，不用再查。每行：地址,第一笔资金来源,首次交易时间,交易数[,首笔金额]</p>
+    <textarea id="sbProf" class="mono" placeholder="0xabc…,0xfunder…,2026-09-03T10:00:00,4,0.01"></textarea><div class="row"><button class="btn" id="sbImp">导入</button></div></div>`)}
+  </div></div>`};
+BIND.sybil=()=>{if(!$('#sybGo'))return;
+  $('#sybGo').onclick=async()=>{const text=$('#sybText').value.trim();if(!text)return toast('先粘贴地址名单',true);
+    try{const r=await post('/api/sybil/checks',{name:$('#sybName').value,text});S.sybSel=r.id;S.sybF=undefined;toast(`检查 #${r.id} 已开始`);render()}catch(e){toast(e.message,true)}};
+  document.querySelectorAll('[data-sybsel]').forEach(tr=>tr.onclick=()=>{S.sybSel=+tr.dataset.sybsel;S.sybF=undefined;render()});
+  document.querySelectorAll('[data-sybf]').forEach(b=>b.onclick=()=>{S.sybF=b.dataset.sybf;render()});
+  document.querySelectorAll('[data-sybexp]').forEach(b=>b.onclick=()=>{const id=S.sybSel||S.syb.checks.find(c=>c.status!=='failed')?.id;download(`/api/sybil/checks/${id}/export/${b.dataset.sybexp}`)});
+  $('#sybPay')&&($('#sybPay').onclick=async()=>{const id=S.sybSel||S.syb.checks.find(c=>c.status!=='failed')?.id;let c;try{c=await api('/api/sybil/checks/'+id)}catch(e){return toast(e.message,true)}
+    if(!member('campaign_payouts')){toast('先在团队里雇佣营销结算员');location.hash='#team';return}
+    S.payForm={campaign:c.name,token:(S.pay?.tokens||['USDT'])[0],mode:'pool',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:String(c.id),text:c.result.clean.map(a=>a+',1').join('\n')};S.payPreview=null;
+    toast(`已把 ${c.result.clean.length} 个干净地址交给营销结算员：每人积分 1（平分奖池），填上奖池总额就能核对`);location.hash='#payouts'});
+  $('#sbSave').onclick=()=>act(()=>put('/api/sybil/settings',{cluster_min:+$('#sbMin').value,window_minutes:+$('#sbWin').value,min_tx:+$('#sbTx').value,created_after:$('#sbAfter').value.trim(),ignore_funders:splitList($('#sbIgn').value),review_as:$('#sbRev').value}),'规则已保存，下次检查生效');
+  $('#sbImp').onclick=async()=>{const text=$('#sbProf').value.trim();if(!text)return toast('先粘贴资料',true);try{const r=await post('/api/sybil/profiles',{text});toast(`导入了 ${r.imported} 个地址的资料`);render()}catch(e){toast(e.message,true)}}};
 
 // ---------- boot ----------
 function applyTheme(){const t=store.get('cs-theme','dark'),r=document.documentElement;r.removeAttribute('data-auto');
