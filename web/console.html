@@ -706,8 +706,8 @@ BIND.settings=()=>{$('#theme').onchange=e=>{store.set('cs-theme',e.target.value)
   $('#logout').onclick=()=>logout('已退出');$('#kill2').onclick=()=>$('#kill').click()};
 
 // ---------- shared: hire flow, row editors ----------
-function promptBox(title,body,label,value,okText='确定'){return new Promise(res=>{
-  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="bd"><h2 id="mt">${esc(title)}</h2>${body?`<div class="muted">${body}</div>`:''}<label class="f"><span>${esc(label)}</span><input id="pv" value="${esc(value||'')}" maxlength="30"></label></div><div class="ft"><button class="btn" data-x>取消</button><button class="btn primary" data-ok>${esc(okText)}</button></div></div>`;
+function promptBox(title,body,label,value,okText='确定',maxlen=30){return new Promise(res=>{
+  $('#overlay').innerHTML=`<div class="scrim" data-x></div><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="bd"><h2 id="mt">${esc(title)}</h2>${body?`<div class="muted">${body}</div>`:''}<label class="f"><span>${esc(label)}</span><input id="pv" value="${esc(value||'')}" maxlength="${maxlen}"></label></div><div class="ft"><button class="btn" data-x>取消</button><button class="btn primary" data-ok>${esc(okText)}</button></div></div>`;
   const close=v=>{$('#overlay').innerHTML='';res(v)};
   $('#overlay').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>close(null));
   const ok=()=>close($('#pv').value.trim());$('#overlay').querySelector('[data-ok]').onclick=ok;
@@ -828,7 +828,7 @@ BIND.support=()=>{if(!$('#spSave'))return;
     try{S.spOut=spResult(await post('/api/support/simulate',{text:S.spText,username:S.spUser,display_name:S.spDisp,mentioned:$('#spAt').checked}));$('#spOut').innerHTML=S.spOut}catch(e){toast(e.message,true)}};
   $('#spTry').onclick=run;
   document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{$('#spText').value=b.dataset.sp;$('#spUser').value=b.dataset.spu||'member';$('#spDisp').value=b.dataset.spu?'KAGOU Lina':'';run()});
-  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{const note=await promptBox(`关闭工单 #${b.dataset.close}`,'处理完了就关掉。可以留一句备注，方便以后查。','备注（可空）','','关闭');
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{const note=await promptBox(`关闭工单 #${b.dataset.close}`,'处理完了就关掉。可以留一句备注，方便以后查。','备注（可空）','','关闭',300);
     if(note!==null)act(()=>post(`/api/support/tickets/${b.dataset.close}/close`,{note}),'工单已关闭')})};
 
 // ---------- chain monitor ----------
@@ -942,7 +942,7 @@ function paySummary(s,token){return `<div class="grid g4" style="gap:8px"><div c
   ${Object.keys(s.excluded_reasons||{}).length?`<p class="muted" style="margin:0;font-size:12px">剔除原因：${Object.entries(s.excluded_reasons).map(([k,n])=>`${esc(k)} ${n}`).join('，')}</p>`:''}
   ${(s.errors||[]).length||(s.parse_problems||[]).length?`<div class="note block">${[...(s.errors||[]),...(s.parse_problems||[])].map(x=>`<div>${esc(x)}</div>`).join('')}</div>`:''}`}
 VIEWS.payouts=async()=>{if(!member('campaign_payouts'))return notHired('campaign_payouts');
-  const d=await api('/api/payouts');S.pay=d;const f=S.payForm||(S.payForm={campaign:'',token:d.tokens[0]||'USDT',mode:'fixed',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:'',text:''});
+  const d=await api('/api/payouts');S.pay=d;const f=S.payForm||(S.payForm={campaign:'',token:d.tokens.includes('USDT')?'USDT':d.tokens[0]||'USDT',mode:'fixed',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:'',text:''});
   const pv=S.payPreview;
   return `${offNote('campaign_payouts')}
   ${!d.safe?'<div class="note block"><b>还没配置 Safe 多签地址。</b>批次照样能核对和导出名单，但要导出 Safe 批量交易文件，需要在链配置里填 <code>safe_address</code> 和代币合约地址。</div>':''}
@@ -1002,8 +1002,8 @@ async function openBatch(id){let b;try{b=await api('/api/payouts/batches/'+id)}c
   document.querySelectorAll('[data-bexp]').forEach(x=>x.onclick=()=>download(`/api/payouts/batches/${id}/export/${x.dataset.bexp}`,'演示版不能下载文件。正式版会下载 Safe{Wallet} 可以直接导入的批量交易文件。'));
   document.querySelectorAll('[data-bact]').forEach(x=>x.onclick=async()=>{const a=x.dataset.bact;let extra={};
     if(a==='propose'&&!await confirmBox(`确认批次 #${id}？`,`${ok.length} 笔，合计 ${esc(fmtNum(b.summary.total))} ${esc(b.token)}。确认后可以下载 Safe 批量交易文件，钱要等多签人在 Safe 里签完才会动。`,'确认'))return;
-    if(a==='executed'){const h=await promptBox(`批次 #${id} 已在 Safe 执行`,'把 Safe 执行后的交易哈希填进来，方便以后核对（可空）。','交易哈希','','标记已执行');if(h===null)return;extra={tx_hash:h}}
-    if(a==='cancel'){const n=await promptBox(`作废批次 #${id}？`,'作废后不能再导出。如果已经在 Safe 里提交了，记得在 Safe 里也拒绝掉。','原因（可空）','','作废');if(n===null)return;extra={note:n}}
+    if(a==='executed'){const h=await promptBox(`批次 #${id} 已在 Safe 执行`,'把 Safe 执行后的交易哈希填进来，方便以后核对（可空）。','交易哈希','','标记已执行',80);if(h===null)return;extra={tx_hash:h}}
+    if(a==='cancel'){const n=await promptBox(`作废批次 #${id}？`,'作废后不能再导出。如果已经在 Safe 里提交了，记得在 Safe 里也拒绝掉。','原因（可空）','','作废',200);if(n===null)return;extra={note:n}}
     try{await post(`/api/payouts/batches/${id}/${a}`,extra);toast({propose:'已确认，可以下载 Safe 文件',executed:'已标记执行',cancel:'已作废'}[a]);await refresh();openBatch(id)}catch(e){toast(e.message,true)}})}
 
 // ---------- airdrop sybil ----------
@@ -1059,7 +1059,7 @@ BIND.sybil=()=>{if(!$('#sybGo'))return;
   document.querySelectorAll('[data-sybexp]').forEach(b=>b.onclick=()=>{const id=S.sybSel||S.syb.checks.find(c=>c.status!=='failed')?.id;download(`/api/sybil/checks/${id}/export/${b.dataset.sybexp}`)});
   $('#sybPay')&&($('#sybPay').onclick=async()=>{const id=S.sybSel||S.syb.checks.find(c=>c.status!=='failed')?.id;let c;try{c=await api('/api/sybil/checks/'+id)}catch(e){return toast(e.message,true)}
     if(!member('campaign_payouts')){toast('先在团队里雇佣营销结算员');location.hash='#team';return}
-    S.payForm={campaign:c.name,token:(S.pay?.tokens||['USDT'])[0],mode:'pool',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:String(c.id),text:c.result.clean.map(a=>a+',1').join('\n')};S.payPreview=null;
+    S.payForm={campaign:c.name,token:(S.pay?.tokens||['USDT']).includes('USDT')?'USDT':S.pay.tokens[0],mode:'pool',pool:'',budget:'',per_person_cap:'',min_amount:'',sybil_check:String(c.id),text:c.result.clean.map(a=>a+',1').join('\n')};S.payPreview=null;
     toast(`已把 ${c.result.clean.length} 个干净地址交给营销结算员：每人积分 1（平分奖池），填上奖池总额就能核对`);location.hash='#payouts'});
   $('#sbSave').onclick=()=>act(()=>put('/api/sybil/settings',{cluster_min:+$('#sbMin').value,window_minutes:+$('#sbWin').value,min_tx:+$('#sbTx').value,created_after:$('#sbAfter').value.trim(),ignore_funders:splitList($('#sbIgn').value),review_as:$('#sbRev').value}),'规则已保存，下次检查生效');
   $('#sbImp').onclick=async()=>{const text=$('#sbProf').value.trim();if(!text)return toast('先粘贴资料',true);try{const r=await post('/api/sybil/profiles',{text});toast(`导入了 ${r.imported} 个地址的资料`);render()}catch(e){toast(e.message,true)}}};
