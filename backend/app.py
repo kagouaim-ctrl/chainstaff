@@ -93,6 +93,12 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     def index() -> FileResponse:
         return FileResponse(WEB)
 
+    @app.get("/vendor/gramjs.min.js")
+    def gramjs() -> FileResponse:
+        # Telegram client library (GramJS, MIT) for signing in to the owner's own account in the browser.
+        return FileResponse(WEB.parent / "vendor" / "gramjs.min.js", media_type="text/javascript",
+                            headers={"Cache-Control": "public, max-age=86400"})
+
     # ---- status and overview ----
 
     @app.get("/api/status", dependencies=[Depends(auth)])

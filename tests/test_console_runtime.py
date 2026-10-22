@@ -39,6 +39,13 @@ def test_requires_token(client):
     assert c.get("/").status_code == 200  # page itself is public; data isn't
 
 
+def test_serves_the_browser_telegram_client(client):
+    c, _ = client
+    r = c.get("/vendor/gramjs.min.js")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/javascript")
+    assert b"window.GramJS" in r.content or b"GramJS" in r.content
+
+
 def test_short_token_refused(env):
     emp, _ = build_employee(env)
     with pytest.raises(RuntimeError):

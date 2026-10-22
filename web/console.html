@@ -540,6 +540,23 @@ body.tgmode .page{padding:0}
 .tg-intro{align-self:center;margin:auto 0;max-width:380px;background:var(--tg-in);border-radius:12px;padding:14px 16px;white-space:pre-wrap;color:var(--text-2);font-size:14px}
 .tg-intro b{display:block;margin-bottom:6px;color:var(--tg-text);font-weight:500}
 .tg-empty{margin:auto;text-align:center;color:var(--tg-sub);font-size:14px;padding:24px}
+.tgu{align-self:center;margin:auto 0;width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;font-size:14px;color:var(--text)}
+.tgu h3{margin:0;font-size:17px;font-weight:600}
+.tgu p,.tgu ol{margin:0;color:var(--text-2);line-height:1.55}.tgu ol{padding-left:20px}
+.tgu a{color:var(--info)}
+.tgu label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2)}
+.tgu input,.tgu textarea{font:inherit;font-size:15px;color:var(--text);background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;resize:vertical}
+.tgu input:focus,.tgu textarea:focus{outline:2px solid var(--info);outline-offset:-1px;border-color:transparent}
+.tg .tgu .btn{padding:6px 16px;min-height:36px;border:1px solid var(--line2);background:var(--raise)}
+.tg .tgu .btn.signal{background:var(--signal);border-color:var(--signal);color:var(--signal-fg)}.tg .tgu .btn:disabled{opacity:.6;cursor:default}
+.tgu-act{display:flex;gap:8px;flex-wrap:wrap}
+.tgu-qr{align-self:center;width:220px;height:220px;background:#fff;border-radius:10px;padding:8px;display:grid;place-items:center;color:#69707B;font-size:13px}
+.tgu-qr svg{width:100%;height:100%;display:block}
+.tgu-note{font-size:12.5px!important;color:var(--muted)!important}
+.tgu-err{color:var(--block)!important;font-size:13px}
+.tgu-alt{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tg .tgu .link{color:var(--info);font-size:13px;padding:2px 0;background:none;border:0;cursor:pointer}
+@media (max-width:720px){.tgu{border:0;background:none;padding:16px 4px;margin:0 0 auto}.tgu input,.tgu textarea{font-size:16px}}
 /* jump to the newest message when reading history */
 .tg .tg-new{position:absolute;right:20px;bottom:calc(var(--tg-bh,72px) + 12px);z-index:4;height:36px;min-width:36px;padding:0 12px;border-radius:18px;background:var(--elev);border:1px solid var(--line2);
   color:var(--tg-text);display:flex;align-items:center;gap:6px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.25);transition:opacity .15s,transform .15s}
@@ -1268,20 +1285,27 @@ function tgText(t){ // escape, then make URLs, /commands and @names look and act
 function tgBot(){const b=S.tg?.bot;return {name:b?.name||'KAGOU 团队',user:b?.username||''}}
 function tgMe(){return S.tgc.asOwner&&S.tg?.owners?.length?S.tg.owners[0]:'member'}
 function tgChats(){const b=tgBot(),on=(S.team?.members||[]).filter(m=>m.enabled).length;
-  const real=(S.tg?.messages||[]).slice().reverse();
-  return [
+  const real=(S.tg?.messages||[]).slice().reverse(),u=S.tgu;
+  const own=u.st==='ready'?u.dialogs.map(d=>({id:d.id,title:d.title,av:d.title,g:tguHue(d.id),real:true,dm:d.kind==='user'||d.kind==='bot',ro:d.ro,kind:d.kind,unread:d.unread,
+      sub:{user:'Telegram 联系人',bot:'机器人',channel:'频道',group:'群组'}[d.kind],msgs:u.msgs[d.id]||(d.last?[d.last]:[]),loading:!u.msgs[d.id]}))
+    :[{id:'tglogin',title:u.st==='resume'?(u.err?'没连上 Telegram':'正在连接 Telegram…'):'连接我的 Telegram',av:'',g:'tgc4',icon:'user',pane:true,sub:'登录后在这里用真实的群和联系人',
+      prev:u.st==='resume'?(u.err?'点开重试':'稍等'):'登录后，真实的群聊和私聊都在这里',msgs:[]}];
+  return [...own,{id:'tgform',title:S.tgu.form&&S.tgu.form.kind==='add'?'拉人进群':'新建群',av:'',g:'tgc4',icon:'group',pane:true,hide:true,sub:'Telegram',msgs:[]},
     {id:'group',title:'KAGOU 项目群',av:'K',g:'tgc2',icon:'group',sub:`${on} 位 AI 员工 · 模拟群聊`,msgs:S.tgc.log.group},
-    {id:'dm',title:b.name,av:'',g:'tgc5',icon:'bot',sub:'机器人',msgs:S.tgc.log.dm},
+    {id:'dm',dm:true,title:b.name,av:'',g:'tgc5',icon:'bot',sub:'机器人',msgs:S.tgc.log.dm},
     {id:'real',title:'群里的真实消息',av:'',g:'tgc3',icon:'eye',sub:S.tg?.online?'机器人在线 · 只读':'只读：机器人在群里处理过的消息',
       msgs:real.map(m=>({out:false,who:m.kind==='telegram_in'?m.actor:(m.employee?roleName(m.employee):b.name),role:m.kind==='telegram_in'?'':m.employee||'',
         tag:m.kind==='telegram_in'?'':(m.employee?'AI 员工':'机器人'),text:m.text,at:m.at,user:m.kind==='telegram_in'}))}]}
 const tgCur=()=>{const cs=tgChats();return cs.find(x=>x.id===S.tgc.chat)||cs[0]};
-function tgPreview(c){const m=c.msgs[c.msgs.length-1];if(!m)return c.id==='dm'?'发 /start 开始':c.id==='real'?'还没有消息':'点开就能跟 AI 员工说话';
+function tgPreview(c){if(c.prev)return esc(c.prev);const m=c.msgs[c.msgs.length-1];if(!m)return c.id==='dm'?'发 /start 开始':c.id==='real'?'还没有消息':'点开就能跟 AI 员工说话';
   if(m.svc)return esc(m.text);if(m.typing)return '正在输入…';
-  return (m.out?'<b>你：</b>':m.who&&c.id!=='dm'?`<b>${esc(m.who)}：</b>`:'')+esc(String(m.text).split('\n')[0])}
+  return (m.out?'<b>你：</b>':m.who&&!c.dm?`<b>${esc(m.who)}：</b>`:'')+esc(String(m.text).split('\n')[0])}
 function tgAv(name,g,icon,cls=''){return `<div class="tg-av ${cls} ${g}" aria-hidden="true">${icon?TG_ICON[icon]:esc(Array.from(String(name||'?').replace(/^@/,''))[0]||'?')}</div>`}
 function tgMsgs(c){
+  if(c.pane)return tguPaneHtml(c);
+  if(c.real&&c.loading)return '<div class="tg-empty">正在读取消息…</div>';
   if(!c.msgs.length){
+    if(c.real)return '<div class="tg-empty">还没有消息，打个招呼吧</div>';
     if(c.id==='dm')return `<div class="tg-intro"><b>这个机器人能做什么？</b>${esc('我是 '+tgBot().name+'。项目群里的 AI 员工都通过我工作：付款、客服、链上监控、公告翻译、营销结算和空投反女巫。\n\n点下面的「开始」看看都有谁在岗。')}</div>`;
     if(c.id==='real')return `<div class="tg-empty">机器人在群里处理过的消息会出现在这里。<br>先在「Telegram」页面把机器人接进群。</div>`;
     return `<div class="tg-svc">你加入了群聊 · 这里是模拟，不记账、不发到真实群</div>`}
@@ -1292,8 +1316,8 @@ function tgMsgs(c){
     const p=c.msgs[i-1],n=c.msgs[i+1];
     const same=(a,b)=>a&&b&&!a.svc&&!b.svc&&a.out===b.out&&a.who===b.who&&(b.at||'').slice(0,10)===(a.at||'').slice(0,10);
     const last=!same(m,n),first=!same(p,m);
-    const showName=!m.out&&c.id!=='dm'&&first;
-    const col='tgc'+(m.user?6:tgColor(m.role));
+    const showName=!m.out&&!c.dm&&first;
+    const col=m.g||'tgc'+(m.user?6:tgColor(m.role));
     const tick=m.out?(m.failed?'':m.pending?TG_ICON.check:TG_ICON.checks):'';
     const meta=m.failed?`<span class="tg-meta fail">未发送 <button class="retry" data-retry="${i}">重试</button></span>`:`<span class="tg-meta">${tgHM(m.at)}${tick}</span>`;
     const body=m.deleted?`<span class="tg-del">${esc(m.text)}</span>`:m.typing?'<span class="tg-dots" aria-label="正在输入"><i></i><i></i><i></i></span>':tgText(m.text);
@@ -1303,32 +1327,37 @@ function tgMsgs(c){
 function tgCmds(){return (S.tg?.commands||[]).filter(c=>c.cmd.startsWith('/'))}
 // pieces of the screen, each repainted on its own so the composer (and the phone keyboard) never gets rebuilt
 function tgListHtml(){const cs=tgChats(),q=S.tgc.q.trim().toLowerCase(),cur=S.tgc.chat;
-  const rows=cs.filter(x=>!q||x.title.toLowerCase().includes(q)).map(x=>{const unread=x.msgs.length-(S.tgc.seen[x.id]||0);
+  const rows=cs.filter(x=>!x.hide&&(!q||x.title.toLowerCase().includes(q))).map(x=>{const unread=x.unread!=null?x.unread:x.msgs.length-(S.tgc.seen[x.id]||0);
     const lm=x.msgs[x.msgs.length-1];
     return `<button class="tg-item" data-chat="${x.id}" aria-current="${x.id===cur}">${tgAv(x.av,x.g,x.av?'':x.icon)}
     <span class="tx"><span class="tg-row"><span class="tg-name">${esc(x.title)}</span><span class="tg-time">${lm?tgHM(lm.at):''}</span></span>
     <span class="tg-row"><span class="tg-prev">${tgPreview(x)}</span>${unread>0&&!(x.id===cur&&(S.tgc.open||!tgNarrow()))?`<span class="tg-badge" aria-label="${unread} 条未读">${unread}</span>`:''}</span></span></button>`}).join('');
   return rows||'<div class="tg-empty">没有匹配的会话</div>'}
-function tgHeadHtml(c){const ro=c.id==='real';
+function tgHeadHtml(c){const ro=c.id==='real'||c.pane;
   const sub=S.tgc.typing&&S.tgc.typing.chat===c.id?`<span class="tg-sub typing">${esc(S.tgc.typing.who)} 正在输入…</span>`:`<span class="tg-sub">${esc(c.sub)}</span>`;
   return `<button class="ic back" id="tgBack" aria-label="返回会话列表">${TG_ICON.back}</button>
     ${tgAv(c.av,c.g,c.av?'':c.icon,'sm')}<div class="tx"><span class="tg-name">${esc(c.title)}</span>${sub}</div>
     ${ro?'':`<button class="ic" id="tgMore" aria-label="更多" aria-haspopup="menu" aria-expanded="${S.tgc.dd}">${TG_ICON.more}</button>`}
-    ${S.tgc.dd?`<div class="tg-dd" role="menu">
+    ${S.tgc.dd&&c.real?`<div class="tg-dd" role="menu">
+      ${c.kind==='group'?`<button data-dd="add" role="menuitem">${TG_ICON.user}拉人进群</button>`:''}
+      ${c.kind==='group'||c.kind==='channel'?`<button data-dd="invite" role="menuitem">${TG_ICON.group}复制邀请链接</button>`:''}
+      <button data-dd="newgroup" role="menuitem">${TG_ICON.group}新建群</button>
+      <button data-dd="logout" role="menuitem">${TG_ICON.exit}退出 Telegram 登录</button></div>`:S.tgc.dd?`<div class="tg-dd" role="menu">
       <button data-dd="member" role="menuitemradio" aria-checked="${!S.tgc.asOwner}">${TG_ICON.user}以群成员 @member 发言${S.tgc.asOwner?'':'<span class="chk">✓</span>'}</button>
       ${S.tg?.owners?.length?`<button data-dd="owner" role="menuitemradio" aria-checked="${S.tgc.asOwner}">${TG_ICON.user}以老板 @${esc(S.tg.owners[0])} 发言${S.tgc.asOwner?'<span class="chk">✓</span>':''}</button>`:''}
       <button data-dd="clear" role="menuitem">${TG_ICON.trash}清空聊天记录</button>
       <button data-dd="home" role="menuitem">${TG_ICON.exit}返回控制台</button></div>`:''}`}
-function tgBottomKind(c){return c.id==='real'?'ro':c.id==='dm'&&!c.msgs.length?'start':'comp'}
+function tgBottomKind(c){return c.pane?'none':c.id==='real'||c.ro?'ro':c.id==='dm'&&!c.msgs.length?'start':'comp'}
 function tgBottomHtml(c){const k=tgBottomKind(c),draft=S.tgc.draft[c.id]||'';
-  if(k==='ro')return `<div class="tg-ro">只读：这里是机器人在真实群里收发的消息</div>`;
+  if(k==='none')return '';
+  if(k==='ro')return `<div class="tg-ro">${c.ro?'这是频道，只有管理员能发消息':'只读：这里是机器人在真实群里收发的消息'}</div>`;
   if(k==='start')return `<div class="tg-comp"><button class="tg-start" data-say="/start">开始</button></div>`;
   return `<div class="tg-pop" id="tgPop" role="listbox" hidden></div>
     <div class="tg-comp"><div class="tg-pill">
-      <button class="ic" id="tgMenu" aria-label="命令和示例消息" aria-haspopup="listbox" aria-expanded="false">${TG_ICON.slash}</button>
+      ${c.real?'':`<button class="ic" id="tgMenu" aria-label="命令和示例消息" aria-haspopup="listbox" aria-expanded="false">${TG_ICON.slash}</button>`}
       <textarea class="tg-in" id="tgIn" rows="1" placeholder="${c.id==='group'?`以 @${esc(tgMe())} 发消息`:'消息'}" aria-label="消息" enterkeyhint="${tgTouch()?'enter':'send'}">${esc(draft)}</textarea></div>
       <button class="tg-send ${draft.trim()?'go':''}" id="tgSend" aria-label="发送" ${draft.trim()?'':'disabled'}>${TG_ICON.send}</button></div>`}
-function tgPopHtml(){const draft=S.tgc.draft[S.tgc.chat]||'',fq=draft.startsWith('/')&&!/\s/.test(draft)?draft.slice(1).toLowerCase():null;
+function tgPopHtml(){if(S.tgu.byId[S.tgc.chat])return '';const draft=S.tgc.draft[S.tgc.chat]||'',fq=draft.startsWith('/')&&!/\s/.test(draft)?draft.slice(1).toLowerCase():null;
   if(!S.tgc.menu&&fq===null)return '';
   const cmds=tgCmds().filter(x=>fq===null||x.cmd.slice(1).toLowerCase().startsWith(fq));
   let h=cmds.length?`<div class="gh">命令</div>${cmds.map(x=>`<button data-pick="${esc(x.cmd)}" role="option"><span class="c">${esc(x.cmd)}</span><span class="d">${esc(x.desc)}${x.owner_only?' · 老板':''}</span></button>`).join('')}`:'';
@@ -1373,6 +1402,7 @@ function tgOpen(id,{push=true}={}){const tg=$('#tg');if(!tg)return;
   tgPaint({head:true,msgs:'enter',bottom:changed||bt.dataset.kind!==tgBottomKind(c)||bt.dataset.for!==c.id});
   if(tgNarrow()){if(!S.tgc.open){S.tgc.open=true;tg.classList.add('open');if(push)history.pushState({tgChat:id},'',location.hash)}}
   else{const i=$('#tgIn');if(i)i.focus()}
+  if(S.tgu.byId[id]&&(S.tgc.open||!tgNarrow())){tguRead(id);tguHistory(id)}
   tgSeen();tgPaint({list:true})}
 function tgClose({fromHistory=false}={}){const tg=$('#tg');if(!tg||!S.tgc.open)return;
   tgSaveScroll();const a=document.activeElement;if(a&&a.blur&&tg.contains(a))a.blur();
@@ -1398,7 +1428,9 @@ function tgSwipe(tg){const conv=tg.querySelector('.tg-conv'),side=tg.querySelect
   conv.addEventListener('touchend',end);conv.addEventListener('touchcancel',()=>{if(s)reset()})}
 function tgSeen(){const c=tgCur();if(c&&(S.tgc.open||!tgNarrow()))S.tgc.seen[c.id]=c.msgs.length}
 async function tgSay(text){
-  const chat=S.tgc.chat;text=String(text||'').trim();if(!text||chat==='real'||S.tgc.typing)return;
+  const chat=S.tgc.chat;text=String(text||'').trim();if(!text)return;
+  if(S.tgu.byId[chat]){S.tgc.menu=false;tgPop();return tguSend(chat,text)}
+  if(chat==='real'||!S.tgc.log[chat]||S.tgc.typing)return;
   const b=tgBot(),log=S.tgc.log[chat],me=tgMe();
   // In the group the bot only hears commands and messages that @ it (or anything, for support's scans).
   const mentioned=chat==='dm'||(!!b.user&&text.toLowerCase().includes('@'+b.user.toLowerCase()));
@@ -1423,15 +1455,185 @@ async function tgSay(text){
 async function tgRefresh(){ // called by the console's auto refresh: repaint in place, never rebuild the screen
   if(!S.tg||Date.now()-(S.tgAt||0)>15000){S.tg=await api('/api/telegram');S.tgAt=Date.now()}
   if(!$('#tg'))return;tgPaint({list:true,head:true,msgs:S.tgc.chat==='real'?'keep':false})}
+// ---- the owner's own Telegram account, signed in right here (MTProto in the browser through GramJS).
+// The login session is kept only in this browser's storage; it never goes to the KAGOU server.
+const TGU_APP={id:0,hash:''}; // the app registered at my.telegram.org; until it is filled in, the login screen asks for it
+const tguGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const tguSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+const tguApp=()=>({id:TGU_APP.id||+(tguGet('kagou.tgapp.id')||0),hash:TGU_APP.hash||tguGet('kagou.tgapp.hash')||''});
+S.tgu={st:tguGet('kagou.tg.session')?'resume':'off',step:null,err:'',busy:false,dialogs:[],byId:{},msgs:{},form:null,qr:'',qrRun:0};
+const TGU_ERR={PHONE_NUMBER_INVALID:'手机号格式不对，记得带国家区号，比如 +86 138…',PHONE_CODE_INVALID:'验证码不对',PHONE_CODE_EXPIRED:'验证码过期了，重新获取一次',
+  PHONE_CODE_EMPTY:'先填验证码',PASSWORD_HASH_INVALID:'两步验证密码不对',API_ID_INVALID:'api_id 或 api_hash 不对，去 my.telegram.org 核对',API_ID_PUBLISHED_FLOOD:'这个 api_id 被 Telegram 限制了，换一个',
+  PHONE_NUMBER_BANNED:'这个号被 Telegram 封禁了',PHONE_NUMBER_UNOCCUPIED:'这个手机号还没注册 Telegram，先在手机上注册',SESSION_REVOKED:'登录已在别的设备上被注销',AUTH_KEY_UNREGISTERED:'登录已失效，重新登录',
+  USER_PRIVACY_RESTRICTED:'对方的隐私设置不允许被拉进群，发邀请链接给 TA',USER_NOT_MUTUAL_CONTACT:'对方不是你的双向联系人，发邀请链接给 TA',USERS_TOO_FEW:'至少要拉一个人才能建群',
+  USERNAME_NOT_OCCUPIED:'没有这个用户名',USERNAME_INVALID:'用户名格式不对',CHAT_ADMIN_REQUIRED:'需要群管理员权限',USER_ALREADY_PARTICIPANT:'TA 已经在群里了',
+  USER_BOT:'这个机器人不能被拉进群',BOT_GROUPS_BLOCKED:'这个机器人不允许被拉进群',PEER_FLOOD:'操作太频繁，Telegram 暂时限制了，过一阵再试',CHAT_WRITE_FORBIDDEN:'你在这里没有发言权限',
+  'Could not find the input entity':'找不到这个用户，检查用户名'};
+function tguErr(e){const m=String(e&&(e.errorMessage||e.message)||e),w=m.match(/FLOOD_WAIT_?(\d+)|wait of (\d+) seconds/i);
+  if(w)return `操作太频繁，${w[1]||w[2]} 秒后再试`;for(const k in TGU_ERR)if(m.includes(k))return TGU_ERR[k];return '出错了：'+m}
+let tguLib=null;
+function tguLoad(){return tguLib||(tguLib=new Promise((ok,no)=>{if(window.GramJS)return ok(window.GramJS);
+  const s=document.createElement('script');s.src='vendor/gramjs.min.js';s.async=true;
+  s.onload=()=>window.GramJS?ok(window.GramJS):no(new Error('Telegram 组件加载失败'));s.onerror=()=>{tguLib=null;no(new Error('Telegram 组件加载失败，检查网络后重试'))};document.head.appendChild(s)}))}
+async function tguClient(){if(S.tgu.client)return S.tgu.client;const G=await tguLoad(),a=tguApp();
+  const c=new G.TelegramClient(new G.StringSession(tguGet('kagou.tg.session')||''),a.id,a.hash,{connectionRetries:3,useWSS:true,deviceModel:'KAGOU 控制台',appVersion:'1.0',systemVersion:'Web'});
+  c.setLogLevel('none');
+  // GramJS keeps retrying forever when Telegram is unreachable (blocked networks need a proxy or VPN), so give up after a while
+  let timer;const late=new Promise((_,no)=>{timer=setTimeout(()=>no(new Error('连不上 Telegram 服务器。检查网络；在中国大陆需要先打开代理或 VPN')),20000)});
+  try{await Promise.race([(async()=>{await c.connect();await c.invoke(new G.Api.help.GetNearestDc())})(),late])}catch(e){c.disconnect().catch(()=>{});throw e}finally{clearTimeout(timer)}
+  S.tgu.client=c;return c}
+const tguHue=s=>{let h=0;for(const ch of String(s))h=(h*31+ch.charCodeAt(0))>>>0;return 'tgc'+(h%7)};
+function tguName(e){if(!e)return '';return e.title||[e.firstName,e.lastName].filter(Boolean).join(' ')||(e.username?'@'+e.username:'已删除的账号')}
+const TGU_ACT={MessageActionChatCreate:'群已创建',MessageActionChatAddUser:'有新成员加入',MessageActionChatDeleteUser:'有成员离开了群',MessageActionChatJoinedByLink:'有人通过邀请链接加入',
+  MessageActionChatJoinedByRequest:'有人申请后加入',MessageActionChatEditTitle:'群名已修改',MessageActionChatEditPhoto:'群头像已修改',MessageActionPinMessage:'置顶了一条消息',
+  MessageActionChannelCreate:'频道已创建',MessageActionChatMigrateTo:'已升级为超级群',MessageActionChannelMigrateFrom:'已升级为超级群'};
+function tguMsg(m){if(!m)return null;const at=new Date(m.date*1000).toISOString();
+  if(m.className==='MessageService')return {id:m.id,svc:true,text:TGU_ACT[m.action&&m.action.className]||'群通知',at};
+  const s=m.sender,media=m.media?(m.photo?'[图片]':m.sticker?'[贴纸]':m.voice?'[语音]':m.video?'[视频]':m.document?'[文件]':'[消息]'):'';
+  return {id:m.id,out:!!m.out,who:m.out?'':tguName(s),g:tguHue(m.senderId),user:true,text:[media,m.message].filter(Boolean).join(' ')||'[消息]',at}}
+async function tguDialogs(){const ds=await S.tgu.client.getDialogs({limit:80});
+  S.tgu.dialogs=ds.filter(d=>d.entity).map(d=>{const e=d.entity,ch=e.className==='Channel';
+    return {id:'tg'+d.id.toString(),peer:e,title:tguName(e)||'未命名',kind:e.className==='User'?(e.bot?'bot':'user'):ch&&e.broadcast?'channel':'group',
+      ro:ch&&e.broadcast&&!e.creator&&!e.adminRights,unread:d.unreadCount||0,last:tguMsg(d.message),date:d.date||0}});
+  S.tgu.byId=Object.fromEntries(S.tgu.dialogs.map(d=>[d.id,d]))}
+function tguRepaint(msgs){if(S.route!=='chat'||!$('#tg'))return;const c=tgCur(),bt=$('#tgBottom'),ng=$('#tgNewGroup');if(ng)ng.hidden=S.tgu.st!=='ready';
+  tgPaint({list:true,head:true,msgs:msgs||false,bottom:!!bt&&(bt.dataset.for!==c.id||bt.dataset.kind!==tgBottomKind(c))})}
+const tguPane=()=>{if(S.tgc.chat==='tglogin'||S.tgc.chat==='tgform')tguRepaint('enter')};
+async function tguReady(){const c=S.tgu.client;tguSet('kagou.tg.session',c.session.save());S.tgu.me=await c.getMe();
+  if(!S.tgu.handler){S.tgu.handler=e=>tguIncoming(e.message);c.addEventHandler(S.tgu.handler,new window.GramJS.NewMessage({}))}
+  await tguDialogs();Object.assign(S.tgu,{st:'ready',step:null,err:'',busy:false,qr:''});S.tgu.qrRun++;
+  if(S.tgc.chat==='tglogin'){const f=S.tgu.dialogs[0];S.tgc.chat=f?f.id:'group';if(f&&(S.tgc.open||!tgNarrow())){tguRead(f.id);tguHistory(f.id)}}
+  tguRepaint('enter')}
+async function tguResume(){if(S.tgu.st!=='resume'||S.tgu.resuming)return;S.tgu.resuming=true;
+  try{const c=await tguClient();if(await c.checkAuthorization())await tguReady();else{tguSet('kagou.tg.session',null);S.tgu.st='off';tguRepaint()}}
+  catch(e){S.tgu.err=tguErr(e);S.tgu.client=null;tguRepaint('enter')}finally{S.tgu.resuming=false}}
+async function tguQr(){S.tgu.step='qr';S.tgu.qr='';S.tgu.err='';const run=++S.tgu.qrRun;tguPane();
+  try{const c=await tguClient(),a=tguApp(),G=window.GramJS;
+    await c.signInUserWithQrCode({apiId:a.id,apiHash:a.hash},{
+      qrCode:async({token})=>{if(run!==S.tgu.qrRun)return;
+        const url='tg://login?token='+btoa(String.fromCharCode(...token)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+        const q=G.qrcode(0,'M');q.addData(url);q.make();S.tgu.qr=q.createSvgTag({cellSize:4,margin:2,scalable:true});tguPane()},
+      password:async()=>{S.tgu.step='password';S.tgu.busy=false;tguPane();return new Promise(r=>{S.tgu.pwWait=r})},
+      onError:async e=>{if(run!==S.tgu.qrRun)return true;S.tgu.err=tguErr(e);S.tgu.busy=false;tguPane();return String(e.errorMessage||e.message).includes('PASSWORD_HASH_INVALID')?false:true}});
+    if(run===S.tgu.qrRun)await tguReady()}
+  catch(e){if(run===S.tgu.qrRun){S.tgu.err=S.tgu.err||tguErr(e);S.tgu.busy=false;tguPane()}}}
+async function tguLogin(kind,v){const a=tguApp();S.tgu.err='';S.tgu.busy=true;tguPane();
+  try{const c=await tguClient(),G=window.GramJS;
+    if(kind==='phone'){S.tgu.qrRun++;const r=await c.sendCode({apiId:a.id,apiHash:a.hash},v);S.tgu.phone=v;S.tgu.hash=r.phoneCodeHash;S.tgu.step='code'}
+    else if(kind==='code'){try{await c.invoke(new G.Api.auth.SignIn({phoneNumber:S.tgu.phone,phoneCodeHash:S.tgu.hash,phoneCode:v}))}
+      catch(e){if(String(e.errorMessage||e.message).includes('SESSION_PASSWORD_NEEDED')){S.tgu.step='password';S.tgu.busy=false;tguPane();return}throw e}
+      return await tguReady()}
+    else if(kind==='password'){if(S.tgu.pwWait){const w=S.tgu.pwWait;S.tgu.pwWait=null;w(v);return}
+      await c.signInWithPassword({apiId:a.id,apiHash:a.hash},{password:async()=>v,onError:async e=>{throw e}});return await tguReady()}}
+  catch(e){S.tgu.err=tguErr(e)}
+  S.tgu.busy=false;tguPane()}
+async function tguLogout(){const c=S.tgu.client;S.tgu.qrRun++;
+  try{if(c){await c.invoke(new window.GramJS.Api.auth.LogOut());await c.disconnect()}}catch(e){}
+  tguSet('kagou.tg.session',null);Object.assign(S.tgu,{st:'off',step:null,err:'',busy:false,client:null,handler:null,me:null,dialogs:[],byId:{},msgs:{},form:null,qr:''});
+  if(/^tg/.test(S.tgc.chat))S.tgc.chat='group';toast('已退出 Telegram 登录');tguRepaint('enter')}
+async function tguHistory(id){const d=S.tgu.byId[id];if(!d||S.tgu.msgs[id])return;
+  try{const ms=await S.tgu.client.getMessages(d.peer,{limit:50});S.tgu.msgs[id]=ms.reverse().map(tguMsg).filter(Boolean)}
+  catch(e){S.tgu.msgs[id]=[];toast('读取消息失败：'+tguErr(e),true)}
+  if(S.tgc.chat===id)tguRepaint('enter')}
+function tguRead(id){const d=S.tgu.byId[id];if(!d||!d.unread)return;d.unread=0;S.tgu.client.markAsRead(d.peer).catch(()=>{})}
+function tguIncoming(m){const id='tg'+(m.chatId?m.chatId.toString():''),d=S.tgu.byId[id],mm=tguMsg(m);if(!mm)return;
+  if(!d){tguDialogs().then(()=>tguRepaint()).catch(()=>{});return}
+  const log=S.tgu.msgs[id];
+  if(log){if(log.some(x=>x.id===mm.id))return;
+    const mine=mm.out&&log.find(x=>x.pending&&!x.id&&x.text===mm.text); // our own send, echoed back before sendMessage returned
+    if(mine){mine.id=mm.id}else log.push(mm)}
+  d.last=mm;d.date=m.date;const here=S.route==='chat'&&S.tgc.chat===id&&(S.tgc.open||!tgNarrow());
+  if(!mm.out){if(here)S.tgu.client.markAsRead(d.peer).catch(()=>{});else d.unread++}
+  S.tgu.dialogs.sort((a,b)=>b.date-a.date);tguRepaint(here?'keep':false)}
+async function tguSend(id,text){const d=S.tgu.byId[id],log=S.tgu.msgs[id]||(S.tgu.msgs[id]=[]);
+  const mine={out:true,text,at:tgNow(),pending:true,user:true};log.push(mine);d.last=mine;
+  S.tgc.draft[id]='';const i=$('#tgIn');if(i&&S.tgc.chat===id){i.value='';tgFitInput();const sd=$('#tgSend');sd.disabled=true;sd.classList.remove('go')}
+  tguRepaint(S.tgc.chat===id?'bottom':false);
+  try{const m=await S.tgu.client.sendMessage(d.peer,{message:text});mine.id=m.id;d.date=m.date;S.tgu.dialogs.sort((a,b)=>b.date-a.date)}
+  catch(e){mine.failed=true;toast('没发出去：'+tguErr(e),true)}
+  mine.pending=false;tguRepaint(S.tgc.chat===id?'keep':false)}
+const tguUsers=v=>String(v||'').split(/[\s,，、]+/).map(x=>x.trim()).filter(Boolean).map(x=>x.replace(/^https?:\/\/t\.me\//,'').replace(/^@?/,'@'));
+async function tguResolve(names){const c=S.tgu.client,out=[],bad=[];
+  for(const n of names){try{out.push(await c.getInputEntity(n))}catch(e){bad.push(n)}}
+  if(bad.length)throw new Error('找不到 '+bad.join('、')+'，检查用户名');return out}
+const tguMissing=r=>{const n=(r&&r.missingInvitees||[]).length;return n?`，有 ${n} 人因为隐私设置没拉进来，发邀请链接给他们`:''};
+async function tguCreateGroup(title,members){const c=S.tgu.client,G=window.GramJS;S.tgu.busy=true;S.tgu.err='';tguPane();
+  try{if(!title.trim())throw new Error('先起个群名');const users=await tguResolve(tguUsers(members));if(!users.length)throw new Error(TGU_ERR.USERS_TOO_FEW);
+    const r=await c.invoke(new G.Api.messages.CreateChat({title:title.trim(),users}));await tguDialogs();
+    const d=S.tgu.dialogs.find(x=>x.kind==='group'&&x.title===title.trim());S.tgu.form=null;S.tgu.busy=false;
+    toast('群建好了'+tguMissing(r));if(d){S.tgc.chat=d.id;await tguHistory(d.id)}tguRepaint('enter')}
+  catch(e){S.tgu.err=tguErr(e);S.tgu.busy=false;tguPane()}}
+async function tguAddMembers(id,members){const c=S.tgu.client,G=window.GramJS,d=S.tgu.byId[id];S.tgu.busy=true;S.tgu.err='';tguPane();
+  try{const users=await tguResolve(tguUsers(members));if(!users.length)throw new Error('填要拉进群的用户名');let r,miss='';
+    if(d.peer.className==='Channel')r=await c.invoke(new G.Api.channels.InviteToChannel({channel:d.peer,users}));
+    else for(const u of users){r=await c.invoke(new G.Api.messages.AddChatUser({chatId:d.peer.id,userId:u,fwdLimit:50}));miss=miss||tguMissing(r)}
+    S.tgu.form=null;S.tgu.busy=false;S.tgc.chat=id;toast('已拉进群'+(miss||tguMissing(r)));tguRepaint('enter')}
+  catch(e){S.tgu.err=tguErr(e);S.tgu.busy=false;tguPane()}}
+async function tguInvite(id){const d=S.tgu.byId[id];
+  try{const r=await S.tgu.client.invoke(new window.GramJS.Api.messages.ExportChatInvite({peer:d.peer}));
+    try{await navigator.clipboard.writeText(r.link);toast('邀请链接已复制：'+r.link)}catch(e){toast('邀请链接：'+r.link)}}
+  catch(e){toast('拿不到邀请链接：'+tguErr(e),true)}}
+function tguForm(kind,chat){S.tgu.form={kind,chat};S.tgu.err='';S.tgu.busy=false;tgOpen('tgform')}
+// the login and form screens use the message area of the conversation pane
+function tguPaneHtml(c){const u=S.tgu,a=tguApp(),dis=u.busy?'disabled':'',err=u.err?`<p class="tgu-err" role="alert">${esc(u.err)}</p>`:'';
+  const safe=`<p class="tgu-note">登录信息只保存在这个浏览器里，不会发到 KAGOU 的服务器。验证码只在这里输入，不要告诉任何人。</p>`;
+  if(c.id==='tgform'){const f=u.form||{};const d=S.tgu.byId[f.chat];
+    if(f.kind==='add'&&d)return `<form class="tgu" data-tguform="add"><h3>拉人进「${esc(d.title)}」</h3>
+      <label>Telegram 用户名<textarea name="users" rows="3" placeholder="@alice @bob" required></textarea></label>
+      <p class="tgu-note">多个用空格或逗号隔开。对方隐私设置不允许被拉进群时，用「复制邀请链接」发给 TA。</p>${err}
+      <div class="tgu-act"><button class="btn signal" ${dis}>${u.busy?'正在拉人…':'拉进群'}</button><button type="button" class="btn" data-tgu="cancel">取消</button></div></form>`;
+    return `<form class="tgu" data-tguform="group"><h3>新建群</h3>
+      <label>群名<input name="title" maxlength="128" required placeholder="比如：KAGOU 项目群"></label>
+      <label>拉谁进群<textarea name="users" rows="3" placeholder="@alice @kagouai_bot" required></textarea></label>
+      <p class="tgu-note">填 Telegram 用户名，多个用空格或逗号隔开。把 AI 员工的机器人也填上，它就会在群里干活。</p>${err}
+      <div class="tgu-act"><button class="btn signal" ${dis}>${u.busy?'正在建群…':'建群'}</button><button type="button" class="btn" data-tgu="cancel">取消</button></div></form>`}
+  if(u.st==='resume')return `<div class="tgu"><h3>${u.err?'没连上 Telegram':'正在连接 Telegram…'}</h3>${err}${u.err?`<div class="tgu-act"><button type="button" class="btn signal" data-tgu="resume">重试</button><button type="button" class="btn" data-tgu="logout">退出登录</button></div>`:''}</div>`;
+  if(!a.id||!a.hash||u.step==='app')return `<form class="tgu" data-tguform="app"><h3>先填 Telegram 应用编号</h3>
+    <p>打开 <a href="https://my.telegram.org/apps" target="_blank" rel="noreferrer">my.telegram.org</a>，用你的手机号登录，在 API development tools 里建一个应用，把 api_id 和 api_hash 填在这里。只需要填一次。</p>
+    <label>api_id<input name="id" inputmode="numeric" pattern="[0-9]+" required value="${a.id||''}" autocomplete="off"></label>
+    <label>api_hash<input name="hash" required pattern="[0-9a-fA-F]{32}" value="${esc(a.hash)}" autocomplete="off" spellcheck="false"></label>${err}
+    <div class="tgu-act"><button class="btn signal">保存</button></div></form>`;
+  const step=u.step||(tgTouch()?'phone':'qr');
+  const alt=`<div class="tgu-alt">${step==='qr'?'<button type="button" class="link" data-tgu="phone">改用手机号登录</button>':'<button type="button" class="link" data-tgu="qr">改用扫码登录</button>'}
+    <button type="button" class="link" data-tgu="app">更换应用编号</button></div>`;
+  if(step==='qr')return `<div class="tgu"><h3>用手机 Telegram 扫码登录</h3>
+    <div class="tgu-qr">${u.qr||`<span>${u.err?'没拿到二维码':'正在生成二维码…'}</span>`}</div>
+    <ol><li>打开手机上的 Telegram</li><li>设置 → 设备 → 连接桌面设备</li><li>扫上面的二维码</li></ol>${err}${u.err&&!u.qr?'<div class="tgu-act"><button type="button" class="btn" data-tgu="qr">重试</button></div>':''}${safe}${alt}</div>`;
+  if(step==='code')return `<form class="tgu" data-tguform="code"><h3>输入验证码</h3><p>验证码发到了你的 Telegram App 里（${esc(u.phone||'')}）。</p>
+    <label>验证码<input name="v" inputmode="numeric" autocomplete="one-time-code" required maxlength="8"></label>${err}
+    <div class="tgu-act"><button class="btn signal" ${dis}>${u.busy?'正在登录…':'登录'}</button><button type="button" class="btn" data-tgu="phone">重新获取</button></div>${safe}</form>`;
+  if(step==='password')return `<form class="tgu" data-tguform="password"><h3>两步验证密码</h3><p>这个号开了两步验证，输入你设置的密码。</p>
+    <label>密码<input name="v" type="password" autocomplete="current-password" required></label>${err}
+    <div class="tgu-act"><button class="btn signal" ${dis}>${u.busy?'正在验证…':'确定'}</button></div>${safe}</form>`;
+  return `<form class="tgu" data-tguform="phone"><h3>用手机号登录 Telegram</h3>
+    <label>手机号<input name="v" type="tel" inputmode="tel" autocomplete="tel" placeholder="+86 138 0000 0000" required value="${esc(u.phone||'')}"></label>${err}
+    <div class="tgu-act"><button class="btn signal" ${dis}>${u.busy?'正在发送…':'获取验证码'}</button></div>${safe}${alt}</form>`}
+function tguBind(tg){
+  tg.addEventListener('submit',e=>{const f=e.target.closest('[data-tguform]');if(!f)return;e.preventDefault();if(S.tgu.busy)return;
+    const k=f.dataset.tguform,v=n=>(f.elements[n]&&f.elements[n].value||'').trim();
+    if(k==='app'){tguSet('kagou.tgapp.id',v('id'));tguSet('kagou.tgapp.hash',v('hash'));S.tgu.step=null;S.tgu.client=null;S.tgu.err='';tguPane();if(!tgTouch())tguQr();return}
+    if(k==='group')return tguCreateGroup(v('title'),v('users'));
+    if(k==='add')return tguAddMembers(S.tgu.form.chat,v('users'));
+    tguLogin(k,k==='phone'?v('v').replace(/[\s-]/g,''):v('v'))});
+  tg.addEventListener('click',e=>{const b=e.target.closest('[data-tgu]');if(!b)return;const k=b.dataset.tgu;
+    if(k==='qr')return tguQr();
+    if(k==='resume'){S.tgu.err='';tguPane();return tguResume()}
+    if(k==='phone'){S.tgu.qrRun++;S.tgu.step='phone';S.tgu.err='';return tguPane()}
+    if(k==='app'){S.tgu.qrRun++;S.tgu.step='app';S.tgu.err='';return tguPane()}
+    if(k==='newgroup')return tguForm('group');
+    if(k==='cancel'){const back=S.tgu.form&&S.tgu.form.chat;S.tgu.form=null;
+      if(back||!tgNarrow())tgOpen(back||(S.tgu.dialogs[0]||{}).id||'group',{push:false});else tgClose();return}
+    if(k==='logout')return tguLogout()})}
 VIEWS.chat=async()=>{
   if(!S.tg||Date.now()-(S.tgAt||0)>15000){S.tg=await api('/api/telegram');S.tgAt=Date.now()}
-  if(S.tgc.seen.real===undefined)S.tgc.seen.real=tgChats()[2].msgs.length; // only messages that arrive while the console is open count as unread
+  if(S.tgc.seen.real===undefined)S.tgc.seen.real=tgChats().find(x=>x.id==='real').msgs.length; // only messages that arrive while the console is open count as unread
   if(history.state&&history.state.tgChat)history.replaceState(null,'',location.hash); // a reload starts on the list
   S.tgc.open=false;S.tgc.dd=false;S.tgc.menu=false;
   return `<div class="tg" id="tg">
   <aside class="tg-side" aria-label="会话">
     <div class="tg-sh"><button class="ic" id="tgHome" title="返回控制台" aria-label="返回控制台">${TG_ICON.home}</button>
-      <label class="tg-search">${TG_ICON.search}<input id="tgQ" type="search" placeholder="搜索会话" value="${esc(S.tgc.q)}" aria-label="搜索会话" autocomplete="off"></label></div>
+      <label class="tg-search">${TG_ICON.search}<input id="tgQ" type="search" placeholder="搜索会话" value="${esc(S.tgc.q)}" aria-label="搜索会话" autocomplete="off"></label>
+      <button class="ic" data-tgu="newgroup" id="tgNewGroup" title="新建 Telegram 群" aria-label="新建 Telegram 群" ${S.tgu.st==='ready'?'':'hidden'}>${TG_ICON.group}</button></div>
     <div class="tg-list" id="tgList">${tgListHtml()}</div>
     <div class="tg-foot"><span style="flex:1">AI 员工在这里回复，跟真实群里一样。</span><a href="#team">返回控制台</a></div>
     <div class="tg-dim"></div>
@@ -1455,6 +1657,9 @@ BIND.chat=()=>{
     if(t.closest('#tgMore')){e.stopPropagation();S.tgc.dd=!S.tgc.dd;tgPaint({head:true});return}
     const dd=t.closest('[data-dd]');if(dd){const k=dd.dataset.dd;S.tgc.dd=false;
       if(k==='home'){location.hash='#team';return}
+      if(k==='add'||k==='newgroup'){tguForm(k==='add'?'add':'group',S.tgc.chat);return}
+      if(k==='invite'){tguInvite(S.tgc.chat);tgPaint({head:true});return}
+      if(k==='logout'){tguLogout();return}
       if(k==='member'||k==='owner'){S.tgc.asOwner=k==='owner';const i=$('#tgIn');if(i&&S.tgc.chat==='group')i.placeholder=`以 @${tgMe()} 发消息`}
       if(k==='clear'){S.tgc.log[S.tgc.chat]=[];S.tgc.seen[S.tgc.chat]=0;S.tgc.scroll[S.tgc.chat]=null;tgPaint({msgs:'bottom',list:true,bottom:S.tgc.chat==='dm'})}
       tgPaint({head:true});return}
@@ -1467,7 +1672,7 @@ BIND.chat=()=>{
       tgSay(v);return}
     const say=t.closest('[data-say]');if(say){tgSay(say.dataset.say);return}
     const cmd=t.closest('.tg-b [data-cmd]');if(cmd){tgSay(cmd.dataset.cmd);return}
-    const rt=t.closest('[data-retry]');if(rt){const log=S.tgc.log[S.tgc.chat],m=log[+rt.dataset.retry];if(m&&m.failed){log.splice(+rt.dataset.retry,1);tgSay(m.text)}return}
+    const rt=t.closest('[data-retry]');if(rt){const log=S.tgu.msgs[S.tgc.chat]||S.tgc.log[S.tgc.chat],m=log[+rt.dataset.retry];if(m&&m.failed){log.splice(+rt.dataset.retry,1);tgSay(m.text)}return}
     if(t.closest('#tgSend')){const i=$('#tgIn');if(i)tgSay(i.value)}});
   tg.addEventListener('input',e=>{const t=e.target;
     if(t.id==='tgQ'){S.tgc.q=t.value;tgPaint({list:true});return}
@@ -1482,7 +1687,7 @@ BIND.chat=()=>{
       if(e.key==='Escape'&&S.tgc.menu){S.tgc.menu=false;tgPop()}}
     if(e.key==='Escape'&&S.tgc.open&&!t.closest('.tg-pill')&&!S.tgc.dd)tgClose()});
   tgBox().addEventListener('scroll',()=>{tgNewBtn()},{passive:true});
-  tgSwipe(tg);tgSeen();
+  tgSwipe(tg);tguBind(tg);tgSeen();tguResume();
   if(!tgNarrow()&&!tgTouch())setTimeout(()=>{const i=$('#tgIn');if(i&&document.activeElement!==$('#tgQ'))i.focus()},0)};
 
 // ---------- 09 reports ----------
