@@ -22,7 +22,7 @@
 | `agent/execution/` | ERC-20 / BNB 转账、发送前模拟、Safe 提案和 EIP-712 哈希、只读 RPC |
 | `agent/store.py` | SQLite 账本：先记账后付款，重启不丢，同一请求不会付两次 |
 | `bot/` | Telegram 机器人：付款请求和财务命令，`/faq` `/tx` `/human` `/tickets`，`/watch` `/alerts` `/brief`，`/translate` `/post` `/discard`，`/team` `/help`；定时周报、简报和预警 |
-| `backend/` + `web/` | 老板控制台：团队总览（雇佣、停用、改称呼、岗位库）、社区客服（设置、FAQ、骗局试算、工单）、链上监控（盯盘地址、预警线、预警、简报）、公告翻译（写公告、草稿核对、术语表、分语言发群）、营销结算（名单核对预览、批次、导出 Safe 文件、标记执行）、空投反女巫（检查进度、团伙、逐个地址理由、导出、判定规则、导入链上资料）；财务的总览、审批、账本筛选和 CSV、收款人、规则和试算、国库预警、员工档案、Telegram 管理（通知群、自动通知、发消息、群聊模拟器、消息记录）、报告、审计日志、一键暂停 |
+| `backend/` + `web/` | 老板控制台：团队总览（雇佣、停用、改称呼、岗位库）、社区客服（设置、FAQ、骗局试算、工单）、链上监控（盯盘地址、预警线、预警、简报）、公告翻译（写公告、草稿核对、术语表、分语言发群）、营销结算（名单核对预览、批次、导出 Safe 文件、标记执行）、空投反女巫（检查进度、团伙、逐个地址理由、导出、判定规则、导入链上资料）；财务的总览、审批、账本筛选和 CSV、收款人、规则和试算、国库预警、员工档案、Telegram 管理（通知群、自动通知、发消息、群聊模拟器、消息记录）、聊天页登录老板自己的 Telegram 号（真实群聊私聊收发、建群拉人、邀请链接，登录只存在浏览器里）、报告、审计日志、一键暂停 |
 | `scripts/register_agent.py` | 用 bnbagent SDK 注册 ERC-8004 链上工号（测试网免 gas） |
 | `scripts/stage0_gate.py` | 读阶段 0 访谈记录表，算漏斗、中位数和关卡 A 是否通过 |
 | `tests/` | 310 个用例，覆盖率 99.9%；CI 跑测试、pip-audit、Semgrep |
@@ -54,6 +54,10 @@ uvicorn backend.app:app --port 8000      # 打开 http://localhost:8000，粘贴
 其他员工需要的环境变量（都是可选的，没设置时控制台会提示）：链上监控员读转账和授权、空投反女巫查地址资料要 `ETHERSCAN_API_KEY`；营销结算员导出 Safe 文件要在链配置里填 `safe_address` 和代币合约地址；公告翻译员要 `ANTHROPIC_API_KEY`。社区客服要删骗子消息时，把机器人设为群管理员并给「删除消息」权限。
 
 上测试网和主网：见 [docs/deploy-bnb.md](docs/deploy-bnb.md)。上线前对照 [安全清单](docs/security-checklist.md)。
+
+公开 Telegram 体验群（任何人可进群试用，只跑测试模式）：见 [docs/telegram-demo.md](docs/telegram-demo.md)。
+
+在控制台里用自己的 Telegram 号：打开聊天页，点「连接我的 Telegram」。第一次要填 [my.telegram.org](https://my.telegram.org/apps) 申请的 api_id 和 api_hash（只存在这个浏览器里），然后扫码或用手机号登录。浏览器直接连 Telegram 服务器，登录信息不经过 KAGOU 后端；在中国大陆要先开代理。客户端库在 `web/vendor/gramjs.min.js`，重新打包用 `scripts/build_gramjs.sh`。
 
 ## 目录
 

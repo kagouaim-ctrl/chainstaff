@@ -1,0 +1,10 @@
+.git
+.venv
+data
+tests
+docs
+**/__pycache__
+*.png
+.env
+config/policy.json
+config/chain.json
