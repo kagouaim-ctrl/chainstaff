@@ -55,6 +55,8 @@ uvicorn backend.app:app --port 8000      # 打开 http://localhost:8000，粘贴
 
 上测试网和主网：见 [docs/deploy-bnb.md](docs/deploy-bnb.md)。上线前对照 [安全清单](docs/security-checklist.md)。
 
+公开 Telegram 体验群（任何人可进群试用，只跑测试模式）：见 [docs/telegram-demo.md](docs/telegram-demo.md)。
+
 ## 目录
 
 ```
