@@ -62,14 +62,39 @@
 
 员工的实时状态（`live`）：`busy`（有分派中或运行中的子任务，或在管的 Mission 在执行）、`review`（手上的 Mission 在等人审批）、`idle`、`error`（24 小时内有失败），以及 `paused`、`archived`。
 
+## Squad
+
+Squad 是一个固定的执行团队：一个主管（manager）加若干成员，属于某个工作区。一个员工可以同时在多个 Squad 里。Mission 发给 Squad，主管只会把任务分给这个 Squad 里在岗、有对应技能和权限的员工。工作区的 `members` 现在由它所有 Squad 的成员合并而来，旧数据在启动时自动迁移成一个「Core squad」。
+
+「工作区里没有在岗的员工」的原因：以前规划只看工作区的成员列表，新建的员工不会自动进去，主管本人也从不算执行者，而且下达 Mission 时不做检查，到规划阶段才失败。现在：
+
+- 下达前预检（`POST /api/wf/missions/preflight`），返回每一项检查和对应的修复动作（`create_squad`、`add_agent`、`create_agent`、`assign_manager`、`resume_squad`、`configure_squad`、`configure_manager`）。有错误时 Mission 不会被创建，接口返回 400 和原因。
+- 没有模型时，规则规划只能处理带 0x 地址的链上分析目标，预检会直接说明。
+- Squad 权限：`manager_executes`（主管有技能时自己也执行）、`peer_messages`（成员之间直接发消息）、`anchor_results`（允许把结果上链）。
+- 并发：每个员工有 `max_concurrency`（默认 2），Squad 有 `max_parallel`（0 为不限）。超出的任务排队（`task.queued`），有空位时重新派发。
+- 暂停的 Squad 不派新任务（`squad.holding`），恢复后继续。
+- 员工失败、暂停或没有权限时，任务改派给同一 Squad 里能做的其他员工（`task.reassigned`），交接消息一起转过去；没人能接就失败并写明原因。
+- 有进行中 Mission 的 Squad 不能删除；有历史的 Squad 软删除。
+
+| 接口 | 作用 |
+|---|---|
+| `GET/POST /api/wf/squads` | 列表（参数 `workspace`）和新建 |
+| `GET/PUT/DELETE /api/wf/squads/{id}` | 详情、修改（名称、描述、主管、成员、权限、`max_parallel`）、删除 |
+| `POST /api/wf/squads/{id}/members`、`DELETE …/members/{agent}` | 加入、移出成员 |
+| `POST /api/wf/squads/{id}/manager` | 换主管，原主管变成成员 |
+| `POST /api/wf/squads/{id}/status` | `active` 或 `paused` |
+| `POST /api/wf/squads/{id}/missions` | 给 Squad 下 Mission，可带 `manager_id`、`priority`、`budget_usd`、`timeout_s`、`attachments`（最多 5 个文本文件，共 12000 字） |
+| `POST /api/wf/missions/preflight` | 预检 |
+
 ## 终端
 
-`/terminal/` 是一个面向执行的工作台，不是聊天界面。顶栏：Terminal、Agents、Workspace、Tasks、On-Chain、Skills，右侧是全局搜索（`/` 或 ⌘K，可搜员工、Mission、任务号、交易哈希、地址）、网络和实时连接状态、运行中数量、通知（待审批和最近事件）、钱包。Activity 和 Settings 在 More 菜单里。默认首页是 Terminal。
+`/terminal/` 是一个面向执行的工作台，不是聊天界面。顶栏：Terminal、Agents、Squads、Workspace、Tasks、On-Chain、Skills，右侧是全局搜索（`/` 或 ⌘K，可搜员工、Mission、任务号、交易哈希、地址）、网络和实时连接状态、运行中数量、通知（待审批和最近事件）、钱包。Activity 和 Settings 在 More 菜单里。默认首页是 Terminal。
 
-- Terminal：左边按状态和职能分类，中间是员工表（排序、筛选、搜索、自定义列、紧凑模式、收藏、实时刷新），右边是员工 Inspector（概览、当前执行、技能、最近任务、记忆、权限、动态）。在 Inspector 里可以直接派活（Run task）或交给工作区一个 Mission（Assign mission）、暂停、配置。
-- Workspace：左边 Agent Squad（每个员工的状态、当前任务、进度、最近活动）和 Mission 列表；中间是 Mission 工作区（Mission 头部、待审批、简报、任务分配、员工进度与协作时间线、结果），底部是下达 Mission 的输入框；右边是 Execution Inspector（Overview、Steps、Logs、Results、On-Chain），完整日志只在 Logs 里。
-- Tasks：全宽任务表（All、Running、Pending、Review、Completed、Failed，可切换看子任务或 Mission），点一行在右边打开 Inspector（Overview、Execution、Graph、Messages、Logs、Result、On-Chain），任务图只在 Graph 标签里画。
-- On-Chain：顶部是网络、RPC 健康、最新区块、Gas、锚定钱包；主区是执行账本（谁跑了什么、产出的哈希、有没有上链、在哪笔交易），以及交易、员工登记、合约事件、钱包查询。
+- Terminal：顶部四个指标（Active agents、Running missions、Pending approvals、Execution cost，可展开更多），左边按状态、职能和 Squad 分类，中间是员工表（Agent、Role、Status、Current mission、Tasks、Success、Avg duration、Cost、Skills，排序、筛选、搜索、自定义列、紧凑模式、收藏、实时刷新），右边是 Live operations（需要处理、运行中的 Mission、最近动态）；选中员工后是员工 Inspector（概览、当前执行、技能、最近任务、记忆、权限、动态）。在 Inspector 里可以直接派活（Run task）或交给工作区一个 Mission（Assign mission）、暂停、配置。
+- Squads：Squad 列表、成员表（可拖入员工、设主管、移出）、Inspector（暂停/恢复、编辑、删除、权限、能力、Mission）。
+- Workspace：左边是工作区和 Squad 切换、成员（Idle、Running、Waiting、Paused、Failed 和当前任务）和 Mission 列表；中间是 Mission 头部、Execution Feed（计划、分派、交接、工具、审批、上链各有自己的样式）、交付物，底部是下达 Mission 的输入框（Squad、主管、优先级、预算、截止时间、附件，下达前预检，不通过时给出修复按钮）；右边是 Execution Inspector（Overview、Steps、Logs、Results、On-Chain），完整日志只在 Logs 里。
+- Tasks：全宽任务表（All、Running、Waiting、Review、Completed、Failed，可切换看子任务或 Mission），点一行在右边打开 Inspector（Overview、Execution、Dependencies、Messages、Logs、Results、On-Chain），任务图只在 Dependencies 标签里画。
+- On-Chain：选中一行会显示 Agent → Task → Result → Verification → Transaction 的证明链，链下完成、交易待打包、已打包三种状态分开；顶部是网络、RPC 健康、最新区块、Gas、锚定钱包；主区是执行账本（谁跑了什么、产出的哈希、有没有上链、在哪笔交易），以及交易、员工登记、合约事件、钱包查询。
 - 手机：底部导航 Terminal、Agents、Workspace、Tasks、More。Workspace 上面是 Mission 头部，中间是时间线，下面是输入框；Squad 是左侧抽屉，Inspector 是底部弹层，日志默认折叠。
 
 登录用控制台的同一个令牌，令牌只存在当前标签页。列设置、收藏、紧凑模式这类偏好存在浏览器本地。所有数据来自后端，实时更新走 `/api/wf/stream` 的 SSE。

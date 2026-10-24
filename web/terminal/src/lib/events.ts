@@ -43,6 +43,15 @@ const MAP: Record<string, EventView> = {
   "message.expired": { verb: "Timed out", tone: "bad", major: true, showTarget: false },
   "engine.error": { verb: "Engine error", tone: "bad", major: true, showTarget: false },
   "agent.message": { verb: "Message", tone: "mute", major: true, showTarget: true },
+  "task.reassigned": { verb: "Reassigned", tone: "acc", major: true, showTarget: false },
+  "task.queued": { verb: "Queued", tone: "mute", major: true, showTarget: false },
+  "squad.holding": { verb: "Squad paused", tone: "acc", major: true, showTarget: false },
+  "squad.created": { verb: "Squad created", tone: "info", major: false, showTarget: false },
+  "squad.member_added": { verb: "Joined squad", tone: "info", major: false, showTarget: false },
+  "squad.member_removed": { verb: "Left squad", tone: "mute", major: false, showTarget: false },
+  "squad.manager": { verb: "Manager set", tone: "info", major: false, showTarget: false },
+  "squad.paused": { verb: "Squad paused", tone: "acc", major: false, showTarget: false },
+  "squad.active": { verb: "Squad resumed", tone: "ok", major: false, showTarget: false },
 };
 
 export function describe(m: Message): EventView {

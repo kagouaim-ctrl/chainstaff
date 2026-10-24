@@ -14,6 +14,7 @@ import "./styles.css";
 const PAGES = {
   terminal: lazy(() => import("./pages/Terminal")),
   agents: lazy(() => import("./pages/Agents")),
+  squads: lazy(() => import("./pages/Squads")),
   workspace: lazy(() => import("./pages/Workspace")),
   tasks: lazy(() => import("./pages/Tasks")),
   onchain: lazy(() => import("./pages/OnChain")),

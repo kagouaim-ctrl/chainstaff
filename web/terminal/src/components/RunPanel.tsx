@@ -1,7 +1,7 @@
 import { ArrowRight, Play, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { post } from "../lib/api";
-import { useAction, useAgentName, useSkills, useWorkspaces } from "../lib/queries";
+import { useAction, useAgentName, useSkills, useSquads } from "../lib/queries";
 import type { AgentDetail, Task } from "../lib/types";
 import { go } from "../lib/util";
 import { Seg } from "./ui";
@@ -22,8 +22,8 @@ export function RunPanel({ agent, mode, onMode, presetSkill, onDone }: {
 }) {
   const skills = useSkills();
   const name = useAgentName();
-  const ws = useWorkspaces();
-  const spaces = useMemo(() => (ws.data || []).filter((w) => !w.archived && (w.members.includes(agent.id) || w.manager_id === agent.id)), [ws.data, agent.id]);
+  const squads = useSquads();
+  const spaces = useMemo(() => (squads.data || []).filter((q) => q.status !== "deleted" && (q.members.includes(agent.id) || q.manager_id === agent.id)), [squads.data, agent.id]);
   const runnable = agent.skills.filter((s) => s !== "data_report");
   const [skill, setSkill] = useState(presetSkill && runnable.includes(presetSkill) ? presetSkill : runnable.find((s) => !agent.can_run[s]) || runnable[0] || "");
   useEffect(() => {
@@ -51,18 +51,18 @@ export function RunPanel({ agent, mode, onMode, presetSkill, onDone }: {
   };
   const keys = ["agents", "missions", "tasks", "workspaces", "task"];
   const run = useAction(
-    () => post<Task>(`/api/wf/agents/${agent.id}/run`, { skill, input: body(), title, workspace_id: space?.id, priority: Number(o.priority), budget_usd: o.budget_usd, timeout_s: Number(o.timeout_s) }),
+    () => post<Task>(`/api/wf/agents/${agent.id}/run`, { skill, input: body(), title, workspace_id: space?.workspace_id, priority: Number(o.priority), budget_usd: o.budget_usd, timeout_s: Number(o.timeout_s) }),
     keys,
     `已派给 ${agent.name}`,
   );
   const assign = useAction(
-    () => post<Task>(`/api/wf/workspaces/${space!.id}/goals`, { text: goal, priority: Number(o.priority), budget_usd: o.budget_usd, timeout_s: Number(o.timeout_s), max_steps: Number(o.max_steps) }),
+    () => post<Task>(`/api/wf/squads/${space!.id}/missions`, { text: goal, priority: Number(o.priority), budget_usd: o.budget_usd, timeout_s: Number(o.timeout_s), max_steps: Number(o.max_steps) }),
     keys,
     "Mission 已提交",
   );
   const manager = space?.manager_id;
   const canRun = !!skill && !blocked && required.every((k) => (input[k] || "").trim()) && agent.status === "active" && !!space;
-  const canAssign = !!goal.trim() && !!space && !!manager;
+  const canAssign = !!goal.trim() && !!space && !!manager && space.status === "active";
 
   if (done)
     return (
@@ -80,13 +80,13 @@ export function RunPanel({ agent, mode, onMode, presetSkill, onDone }: {
       <div className="row sp">
         <Seg<RunMode> value={mode} onChange={onMode} options={[["run", "Run task"], ["assign", "Assign mission"]]} />
         {spaces.length > 1 && (
-          <select className="input sm" value={space?.id} onChange={(e) => setWsId(e.target.value)} aria-label="工作区" style={{ maxWidth: 150 }}>
+          <select className="input sm" value={space?.id} onChange={(e) => setWsId(e.target.value)} aria-label="Squad" style={{ maxWidth: 150 }}>
             {spaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
         )}
       </div>
       {!spaces.length ? (
-        <div className="note">{agent.name} 还不在任何工作区里。到 Workspace 把它加进一个 Squad 后才能派活。</div>
+        <div className="note">{agent.name} 还不在任何 Squad 里。到 Squads 把它加进一个 Squad 后才能派活。</div>
       ) : mode === "run" ? (
         <>
           {runnable.length === 0 ? (
@@ -116,7 +116,7 @@ export function RunPanel({ agent, mode, onMode, presetSkill, onDone }: {
         <>
           <textarea className="input" rows={3} placeholder="例如：Analyze this BSC contract 0x…" value={goal} onChange={(e) => setGoal(e.target.value)} />
           <div className="muted xs">
-            {manager ? <>由 <b className="dim">{name(manager)}</b> 在 <b className="dim">{space?.name}</b> 里拆分并分派；{agent.is_manager ? "" : `${agent.name} 会在需要它的技能时被分到任务。`}</> : <span className="warn">{space?.name} 还没有 AI 主管，不能接 Mission。</span>}
+            {manager ? <>由 <b className="dim">{name(manager)}</b> 在 <b className="dim">{space?.name}</b> 里拆分并分派；{agent.is_manager ? "" : `${agent.name} 会在需要它的技能时被分到任务。`}</> : <span className="warn">{space?.status === "paused" ? `${space?.name} 已暂停。` : `${space?.name} 还没有 AI 主管，不能接 Mission。`}</span>}
           </div>
         </>
       )}

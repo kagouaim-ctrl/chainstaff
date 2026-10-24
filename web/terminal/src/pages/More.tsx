@@ -1,7 +1,8 @@
-import { Activity, Blocks, ChevronRight, LogOut, Puzzle, Settings, SquareArrowOutUpRight } from "lucide-react";
+import { Activity, Blocks, ChevronRight, LogOut, Puzzle, Settings, SquareArrowOutUpRight, Users } from "lucide-react";
 import { setToken } from "../lib/api";
 
 const ITEMS: [string, string, string, typeof Blocks][] = [
+  ["squads", "Squads", "Teams of agents, their manager and policy", Users],
   ["onchain", "On-Chain", "Execution ledger, transactions, agent registry", Blocks],
   ["skills", "Skills", "Web3 skills and who can run them", Puzzle],
   ["activity", "Activity", "Every event, live", Activity],

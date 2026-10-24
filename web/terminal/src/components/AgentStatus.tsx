@@ -3,9 +3,10 @@ import type { Agent } from "../lib/types";
 // The engine's live state for an agent, in the terminal's words.
 const LIVE: Record<string, [string, string, boolean?]> = {
   busy: ["Running", "acc", true],
+  waiting: ["Waiting", "info"],
   review: ["In review", "warn"],
   idle: ["Idle", "ok"],
-  error: ["Error", "bad"],
+  error: ["Failed", "bad"],
   paused: ["Paused", "mute"],
   archived: ["Archived", "mute"],
   active: ["Active", "ok"],

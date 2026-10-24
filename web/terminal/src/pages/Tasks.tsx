@@ -10,6 +10,7 @@ import type { Task, TaskStatus } from "../lib/types";
 import { errText, fmtTime, go, setParams, toast, useIsMobile, type Route } from "../lib/util";
 
 type F = "all" | "running" | "pending" | "review" | "completed" | "failed" | "approvals";
+// "pending" stays the URL key for older links; the tab reads Waiting: queued behind a dependency, a cap or a paused squad.
 const GROUPS: Record<Exclude<F, "approvals">, TaskStatus[]> = {
   all: [],
   running: ["assigned", "running", "waiting"],
@@ -51,7 +52,7 @@ function Header({ route, f, counts, kind }: { route: Route; f: F; counts?: Recor
         value={f}
         onChange={(v) => setParams(route, { f: v === "all" ? null : v }, undefined)}
         options={[
-          ["all", "All", n("all")], ["running", "Running", n("running")], ["pending", "Pending", n("pending")], ["review", "Review", n("review")],
+          ["all", "All", n("all")], ["running", "Running", n("running")], ["pending", "Waiting", n("pending")], ["review", "Review", n("review")],
           ["completed", "Completed", n("completed")], ["failed", "Failed", n("failed")], ["approvals", "Approval log", approvals.data?.length || undefined],
         ]}
       />

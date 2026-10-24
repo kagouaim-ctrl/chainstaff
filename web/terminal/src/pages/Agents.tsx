@@ -1,5 +1,5 @@
 import { Copy, Plus, Search, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AgentForm } from "../components/AgentForm";
 import { AgentInspector } from "../components/AgentInspector";
 import { AgentStatus, liveOf } from "../components/AgentStatus";
@@ -7,16 +7,15 @@ import { DataTable, type Column } from "../components/DataTable";
 import type { RunMode } from "../components/RunPanel";
 import { Avatar, EmptyState, ErrorState, Loading, Sheet, Tabs } from "../components/ui";
 import { del, post } from "../lib/api";
-import { useAction, useAgents, useSkills, useWorkspaces } from "../lib/queries";
+import { useAction, useAgents, useSkills } from "../lib/queries";
 import type { Agent } from "../lib/types";
-import { fmtTime, go, setParams, short, usd, useIsMobile, usePref, type Route } from "../lib/util";
+import { fmtTime, go, pct, setParams, short, usd, useIsMobile, usePref, type Route } from "../lib/util";
 
 type Filter = "roster" | "managers" | "paused" | "archived";
 
 /** Roster management: who exists, how each one is configured, and bulk changes. Operating them lives in Terminal. */
 export default function Agents({ route }: { route: Route }) {
   const agents = useAgents();
-  const ws = useWorkspaces();
   const skills = useSkills();
   const mobile = useIsMobile();
   const [favs, setFavs] = usePref<string[]>("favorites", []);
@@ -29,7 +28,6 @@ export default function Agents({ route }: { route: Route }) {
   const dup = useAction((id: string) => post<Agent>(`/api/wf/agents/${id}/duplicate`), ["agents"], "已复制");
   const remove = useAction((id: string) => del(`/api/wf/agents/${id}`), ["agents"], "已删除");
   const selected = route.id;
-  const squads = useCallback((id: string) => (ws.data || []).filter((w) => w.members.includes(id) || w.manager_id === id), [ws.data]);
   const all = agents.data || [];
   const match = (a: Agent, f: Filter) => (f === "roster" ? a.status !== "archived" : f === "managers" ? a.is_manager && a.status !== "archived" : a.status === (f === "paused" ? "paused" : "archived"));
   const rows = useMemo(() => {
@@ -53,7 +51,8 @@ export default function Agents({ route }: { route: Route }) {
     { id: "model", header: "Model", sort: (a) => a.model, cell: (a) => <span className="mono dim">{a.provider === "none" ? "skills only" : a.model}</span> },
     { id: "skills", header: "Skills", sort: (a) => a.skills.length, cell: (a) => <span className="row gap4">{a.skills.slice(0, 3).map((s) => <span key={s} className="tag">{skillName(s)}</span>)}{a.skills.length > 3 && <span className="muted xs">+{a.skills.length - 3}</span>}{!a.skills.length && <span className="muted">—</span>}</span> },
     { id: "perms", header: "Permissions", cell: (a) => <span className="mono muted xs">{a.permissions.join(" ") || "—"}</span> },
-    { id: "squads", header: "Squads", cell: (a) => <span className="dim">{squads(a.id).map((w) => w.name).join(", ") || <span className="muted">—</span>}</span> },
+    { id: "squads", header: "Squad", sort: (a) => a.squads?.length || 0, cell: (a) => <span className="row gap4">{a.squads?.length ? a.squads.map((q) => <a key={q.id} className="tag" href={`#/squads/${q.id}`} onClick={(e) => e.stopPropagation()}>{q.name}{q.role === "manager" ? " ★" : ""}</a>) : <span className="warn xs" title="不在任何 Squad，Mission 不会分到它">no squad</span>}</span> },
+    { id: "perf", header: "Tasks", align: "r", sort: (a) => a.tasks_completed || 0, cell: (a) => <span className="mono">{a.tasks_completed ?? 0}<span className="muted">/{a.tasks_failed ?? 0}</span> <span className="muted">{pct(a.success_rate, 0)}</span></span> },
     { id: "budget", header: "Budget cap", align: "r", sort: (a) => Number(a.budget_usd), cell: (a) => <span className="mono">{Number(a.budget_usd) ? usd(a.budget_usd) : "—"}</span> },
     { id: "cost", header: "Spent", align: "r", sort: (a) => Number(a.cost_usd), cell: (a) => <span className="mono">{usd(a.cost_usd)}</span> },
     { id: "erc", header: "ERC-8004", cell: (a) => <span className="mono dim">{a.onchain.agent_id ? `#${a.onchain.agent_id}` : "—"}{a.onchain.address ? ` · ${short(a.onchain.address, 4)}` : ""}</span> },

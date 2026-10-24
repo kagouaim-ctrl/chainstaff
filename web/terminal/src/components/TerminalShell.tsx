@@ -11,7 +11,7 @@ const MOBILE: [string, string, typeof Bot][] = [
   ["tasks", "Tasks", ListChecks],
   ["more", "More", MoreHorizontal],
 ];
-const UNDER_MORE = ["more", "onchain", "skills", "activity", "settings"];
+const UNDER_MORE = ["more", "squads", "onchain", "skills", "activity", "settings"];
 
 /** Compact top navigation on desktop, a five-item bottom bar on phones; pages fill the rest. */
 export function TerminalShell({ route, children }: { route: Route; children: ReactNode }) {

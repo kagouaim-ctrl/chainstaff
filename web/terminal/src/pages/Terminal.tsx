@@ -11,10 +11,10 @@ import { NewMissionDialog } from "../components/TaskComposer";
 import { EmptyState, ErrorState, Loading, Progress, Seg, Sheet } from "../components/ui";
 import { CATEGORIES, categoriesOf, inView, type Category, type View } from "../lib/agents";
 import { api } from "../lib/api";
-import { useAgentName, useAgents, useApprovals, useMissions, useSkills } from "../lib/queries";
+import { useAgentName, useAgents, useApprovals, useMissions, useOverview, useSkills, useSquads } from "../lib/queries";
 import { useLiveMessages, useStreamState } from "../lib/stream";
 import type { Agent, Message } from "../lib/types";
-import { ago, go, setParams, useIsMobile, usePref, type Route } from "../lib/util";
+import { ago, go, setParams, usd, useIsMobile, usePref, type Route } from "../lib/util";
 
 const VIEWS: [View, string, typeof Bot][] = [
   ["all", "All agents", Layers],
@@ -56,6 +56,9 @@ export default function Terminal({ route }: { route: Route }) {
   const catCount = (c: Category) => all.filter((a) => a.status !== "archived" && cats.get(a.id)?.has(c)).length;
   const setView = (v: string) => setParams(route, { view: v === "mine" ? null : v, cat: null }, selected);
   const setCat = (c: Category | null) => setParams(route, { cat: c }, selected);
+  const clearFilters = () => (setQ(""), setParams(route, { view: "all", cat: null }, selected));
+  const live = all.filter((a) => a.status === "active");
+  const allIdle = live.length > 0 && live.every((a) => a.live === "idle" || a.live === "error");
 
   if (agents.isLoading) return <div className="page"><Loading rows={10} /></div>;
   if (agents.error) return <div className="page"><ErrorState error={agents.error} retry={() => agents.refetch()} /></div>;
@@ -71,7 +74,7 @@ export default function Terminal({ route }: { route: Route }) {
     return (
       <MobileTerminal
         rows={rows} all={all} view={view} cat={cat} setView={setView} setCat={setCat} q={q} setQ={setQ} favs={favs} toggleFav={toggleFav}
-        selected={selected} action={action} setAction={setAction} onConfigure={configure} onNewMission={() => setNewMission(true)} route={route} dialogs={dialogs}
+        selected={selected} action={action} setAction={setAction} onConfigure={configure} onNewMission={() => setNewMission(true)} onNewAgent={() => setForm("new")} route={route} dialogs={dialogs}
       />
     );
 
@@ -119,12 +122,16 @@ export default function Terminal({ route }: { route: Route }) {
           <Seg value={detailed ? "detailed" : "compact"} onChange={(v) => setDetailed(v === "detailed")} options={[["compact", "Compact"], ["detailed", "Detailed"]]} />
         </div>
         {!all.length ? (
-          <EmptyState title="还没有 AI 员工">
-            <span>先建一个 AI Manager，再建几个带技能的员工（钱包分析、合约分析、数据报告）。</span>
-            <button className="btn primary" onClick={() => setForm("new")}>创建第一个员工</button>
+          <EmptyState title="Create your first agent">
+            <span>先建一个 AI Manager，再建几个带技能的员工（钱包分析、合约分析、数据报告），然后把它们组成一个 Squad。</span>
+            <button className="btn primary" onClick={() => setForm("new")}>Create agent</button>
           </EmptyState>
         ) : (
-          <AgentTable rows={rows} selected={selected} favorites={favs} onFavorite={toggleFav} onSelect={select} onAction={act} onConfigure={configure} detailed={detailed} />
+          <>
+            {allIdle && <div className="banner"><span className="ind ok" /> All agents idle · 没有执行中的任务<div className="grow" /><button className="btn sm primary" onClick={() => setNewMission(true)}>Create mission</button></div>}
+            <AgentTable rows={rows} selected={selected} favorites={favs} onFavorite={toggleFav} onSelect={select} onAction={act} onConfigure={configure} detailed={detailed}
+              empty={<EmptyState title="No matching agents"><span>当前筛选没有结果。</span><button className="btn" onClick={clearFilters}>Clear filters</button></EmptyState>} />
+          </>
         )}
       </section>
 
@@ -158,28 +165,30 @@ function LiveTag() {
 }
 
 function SquadLinks() {
-  const ws = useMissions({ status: "pending,running,waiting,review", limit: 200 });
-  const spaces = useQuery({ queryKey: ["workspaces"], queryFn: () => api<{ id: string; name: string; archived: boolean }[]>("/api/wf/workspaces") });
+  const squads = useSquads();
   return (
     <>
-      {(spaces.data || []).filter((w) => !w.archived).map((w) => {
-        const live = ws.data?.filter((m) => m.workspace_id === w.id).length || 0;
-        return (
-          <button key={w.id} className="rail-item" onClick={() => go("workspace", w.id)}>
-            <span className="ellipsis">{w.name}</span>
-            {live > 0 && <span className="n acc">{live} live</span>}
-          </button>
-        );
-      })}
-      {!spaces.data?.length && <span className="muted xs" style={{ padding: "0 14px" }}>还没有工作区</span>}
+      {(squads.data || []).map((q) => (
+        <button key={q.id} className="rail-item" onClick={() => go("workspace", q.workspace_id, { s: q.id })}>
+          <span className={`ind ${q.status === "paused" ? "" : q.ready ? "ok" : "bad"}`} />
+          <span className="ellipsis">{q.name}</span>
+          {q.missions.active > 0 ? <span className="n acc">{q.missions.active} live</span> : <span className="n">{q.members.length + (q.manager_id ? 1 : 0)}</span>}
+        </button>
+      ))}
+      {!squads.data?.length && <button className="rail-item" onClick={() => go("squads")}><span className="muted">+ Create squad</span></button>}
     </>
   );
 }
 
-/** With no agent selected, the right column shows what needs a human and what is moving. */
+/**
+ * Live Operations, with no agent selected: what needs a human first, then what is running, then
+ * plain activity. With nothing wrong it collapses to one line instead of empty boxes.
+ */
 function LivePanel() {
   const approvals = useApprovals("pending");
   const missions = useMissions({ status: "pending,running,waiting", limit: 20 });
+  const squads = useSquads();
+  const failed = useMissions({ status: "failed", limit: 5 });
   const name = useAgentName();
   const base = useQuery({ queryKey: ["activity", "terminal"], queryFn: () => api<Message[]>("/api/wf/activity?kinds=agent,task,chain,system,user&limit=40"), staleTime: Infinity });
   const [live, setLive] = useState<Message[]>([]);
@@ -188,23 +197,39 @@ function LivePanel() {
     const seen = new Set<number>();
     return [...live, ...(base.data || [])].filter((m) => !seen.has(m.id) && (seen.add(m.id), true)).slice(0, 60);
   }, [live, base.data]);
+  const dayAgo = Date.now() - 86_400_000;
+  const recentFails = (failed.data || []).filter((m) => +new Date(m.finished_at || m.updated_at) > dayAgo);
+  const broken = (squads.data || []).filter((q) => q.status === "active" && !q.ready);
+  const attention = (approvals.data?.length || 0) + recentFails.length + broken.length;
   return (
     <>
-      <div className="pane-h"><span className="label">Needs you</span><span className="mono acc xs">{approvals.data?.length || 0}</span></div>
-      <div style={{ flex: "none", maxHeight: "34%", overflow: "auto" }}>
+      <div className="pane-h"><span className="label">Live operations</span><div className="grow" /><LiveTag /></div>
+      <div className="pane-h sub-h"><span className="label">Needs attention</span><span className={`mono xs ${attention ? "acc" : "muted"}`}>{attention}</span></div>
+      <div style={{ flex: "none", maxHeight: "38%", overflow: "auto" }}>
         {(approvals.data || []).map((a) => (
           <button key={a.id} className="m-row" onClick={() => a.task_id && go("workspace", a.workspace_id, { m: a.task_id })}>
             <ShieldCheck size={14} className="acc" style={{ flex: "none" }} />
-            <span className="col gap2 grow">
-              <span className="ellipsis sm">{a.title}</span>
-              <span className="muted xs">{name(a.requested_by)} · {ago(a.at)}</span>
-            </span>
+            <span className="col gap2 grow"><span className="ellipsis sm">{a.title}</span><span className="muted xs">{a.kind === "over_budget" ? "预算用完" : "等你审批"} · {name(a.requested_by)} · {ago(a.at)}</span></span>
             <ChevronRight size={14} className="muted" />
           </button>
         ))}
-        {!approvals.data?.length && <div className="muted sm" style={{ padding: "10px 14px" }}>没有等你审批的结果。</div>}
+        {recentFails.map((m) => (
+          <button key={m.id} className="m-row" onClick={() => go("workspace", m.workspace_id, { m: m.id })}>
+            <Activity size={14} className="bad" style={{ flex: "none" }} />
+            <span className="col gap2 grow"><span className="ellipsis sm">{m.name}</span><span className="bad xs ellipsis">{m.error || "failed"}</span></span>
+            <ChevronRight size={14} className="muted" />
+          </button>
+        ))}
+        {broken.map((q) => (
+          <button key={q.id} className="m-row" onClick={() => go("squads", q.id)}>
+            <Activity size={14} className="warn" style={{ flex: "none" }} />
+            <span className="col gap2 grow"><span className="ellipsis sm">Squad {q.name} 不能接 Mission</span><span className="muted xs ellipsis">{q.issues[0]?.text}</span></span>
+            <ChevronRight size={14} className="muted" />
+          </button>
+        ))}
+        {!attention && <div className="all-clear"><span className="ind ok" /> 没有需要你处理的事项</div>}
       </div>
-      <div className="pane-h" style={{ borderTop: "1px solid var(--line)" }}><span className="label">Live missions</span><span className="mono muted xs">{missions.data?.length || 0}</span></div>
+      <div className="pane-h sub-h" style={{ borderTop: "1px solid var(--line)" }}><span className="label">Running missions</span><span className="mono muted xs">{missions.data?.length || 0}</span></div>
       <div style={{ flex: "none", maxHeight: "28%", overflow: "auto" }}>
         {(missions.data || []).map((m) => (
           <button key={m.id} className="m-row" onClick={() => go("workspace", m.workspace_id, { m: m.id })}>
@@ -215,9 +240,9 @@ function LivePanel() {
             <span style={{ width: 90 }}><Progress done={m.progress.completed} failed={m.progress.failed} total={m.progress.total} /></span>
           </button>
         ))}
-        {!missions.data?.length && <div className="muted sm" style={{ padding: "10px 14px" }}>现在没有执行中的 Mission。</div>}
+        {!missions.data?.length && <div className="all-clear muted">没有执行中的 Mission</div>}
       </div>
-      <div className="pane-h" style={{ borderTop: "1px solid var(--line)" }}><span className="label">Activity</span><div className="grow" /><a className="btn ghost xs" href="#/activity">All</a></div>
+      <div className="pane-h sub-h" style={{ borderTop: "1px solid var(--line)" }}><span className="label">Recent activity</span><div className="grow" /><a className="btn ghost xs" href="#/activity">All</a></div>
       <div className="scroll" style={{ padding: "0 14px" }}>
         <ActivityStream rows={rows} name={name} compact />
       </div>
@@ -228,21 +253,21 @@ function LivePanel() {
 function MobileTerminal(p: {
   rows: Agent[]; all: Agent[]; view: View; cat: Category | null; setView: (v: string) => void; setCat: (c: Category | null) => void; q: string; setQ: (s: string) => void;
   favs: string[]; toggleFav: (id: string) => void; selected?: string; action: RunMode | null; setAction: (m: RunMode | null) => void; onConfigure: (a: Agent) => void;
-  onNewMission: () => void; route: Route; dialogs: React.ReactNode;
+  onNewMission: () => void; onNewAgent: () => void; route: Route; dialogs: React.ReactNode;
 }) {
   const approvals = useApprovals("pending");
   const busy = p.all.filter((a) => a.live === "busy").length;
-  const idle = p.all.filter((a) => a.live === "idle").length;
-  const err = p.all.filter((a) => a.live === "error").length;
+  const running = useMissions({ status: "pending,running,waiting", limit: 200 });
+  const ov = useOverview("24h");
   const close = () => go("terminal", undefined, Object.fromEntries(p.route.params));
   const open = (a: Agent, m: RunMode | null = null) => (go("terminal", a.id, Object.fromEntries(p.route.params)), setTimeout(() => p.setAction(m), 0));
   return (
     <div className="page">
       <div className="strip">
-        <button className="cell" onClick={() => p.setView("running")}><span className="label">Running</span><span className={`v ${busy ? "acc" : ""}`}>{busy}</span></button>
-        <button className="cell" onClick={() => p.setView("idle")}><span className="label">Idle</span><span className="v">{idle}</span></button>
-        <button className="cell" onClick={() => p.setView("attention")}><span className="label">Error</span><span className={`v ${err ? "bad" : ""}`}>{err}</span></button>
-        <button className="cell" onClick={() => go("tasks", undefined, { f: "review", kind: "goal" })}><span className="label">Review</span><span className={`v ${approvals.data?.length ? "acc" : ""}`}>{approvals.data?.length || 0}</span></button>
+        <button className="cell" onClick={() => p.setView("running")}><span className="label">Active</span><span className={`v ${busy ? "acc" : ""}`}>{busy}<span className="muted">/{p.all.filter((a) => a.status === "active").length}</span></span></button>
+        <button className="cell" onClick={() => go("tasks", undefined, { f: "running", kind: "goal" })}><span className="label">Missions</span><span className="v">{running.data?.length ?? "—"}</span></button>
+        <button className="cell" onClick={() => go("tasks", undefined, { f: "review", kind: "goal" })}><span className="label">Approvals</span><span className={`v ${approvals.data?.length ? "acc" : ""}`}>{approvals.data?.length || 0}</span></button>
+        <button className="cell" onClick={() => go("tasks", undefined, { kind: "goal" })}><span className="label">Cost 24h</span><span className="v">{ov.data ? usd(ov.data.cost_usd) : "—"}</span></button>
       </div>
       <div className="row gap6" style={{ padding: "8px 12px", overflowX: "auto", flex: "none" }}>
         {VIEWS.filter(([v]) => v !== "all").map(([v, label]) => (
@@ -256,7 +281,8 @@ function MobileTerminal(p: {
       </div>
       <div className="m-list" style={{ borderTop: "1px solid var(--line)" }}>
         {p.rows.map((a) => <AgentRow key={a.id} agent={a} onOpen={open} />)}
-        {!p.rows.length && <EmptyState title="没有符合条件的员工" />}
+        {!p.all.length && <EmptyState title="Create your first agent"><button className="btn primary" onClick={p.onNewAgent}>Create agent</button></EmptyState>}
+        {!!p.all.length && !p.rows.length && <EmptyState title="No matching agents"><button className="btn" onClick={() => (p.setQ(""), p.setView("all"), p.setCat(null))}>Clear filters</button></EmptyState>}
       </div>
       {p.selected && (
         <Sheet onClose={close} tall>

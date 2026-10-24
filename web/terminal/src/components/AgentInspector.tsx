@@ -1,7 +1,7 @@
 import { ArrowRight, Pause, Play, Settings2, Star, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { post } from "../lib/api";
-import { useAction, useAgent, useAgentName, useMeta, useMissions, useSkills } from "../lib/queries";
+import { useAction, useAgent, useAgentName, useMeta, useMissions, useSkills, useSquads } from "../lib/queries";
 import type { Agent, AgentDetail } from "../lib/types";
 import { ago, duration, fmtTime, go, pct, secs, usd, useNow } from "../lib/util";
 import { ActivityStream } from "./ActivityStream";
@@ -81,7 +81,7 @@ export function AgentInspector({ id, onClose, onConfigure, fav, onFav, action, o
       <Tabs<Tab>
         value={tab}
         onChange={setTab}
-        options={[["overview", "Overview"], ["execution", "Execution"], ["skills", "Skills", a.skills.length], ["tasks", "Tasks", a.tasks.length], ["memory", "Memory", a.memory.length], ["permissions", "Permissions"], ["activity", "Activity"]]}
+        options={[["overview", "Overview"], ["execution", "Execution"], ["skills", "Skills", a.skills.length], ["tasks", "Tasks", a.tasks.length], ["memory", "Memory", a.memory.length], ["permissions", "Permissions"], ["activity", "Logs"]]}
       />
       <div className="insp-b">
         {tab === "overview" && <OverviewTab a={a} />}
@@ -173,7 +173,8 @@ function OverviewTab({ a }: { a: AgentDetail }) {
           <dd className="row wrap gap4">{a.skills.length ? a.skills.map((s) => <span key={s} className="tag">{skills.data?.find((x) => x.id === s)?.name || s}</span>) : <span className="muted">—</span>}</dd>
           <dt>Model</dt><dd className="mono">{a.provider === "none" ? "No model · skills only" : `${a.provider} · ${a.model}`}</dd>
           <dt>Budget cap</dt><dd className="mono">{Number(a.budget_usd) ? usd(a.budget_usd) : "none"} · {a.tokens_in + a.tokens_out} tok used</dd>
-          <dt>Squads</dt><dd>{a.workspaces.length ? a.workspaces.map((w) => <a key={w.id} className="link" href={`#/workspace/${w.id}`} style={{ marginRight: 8 }}>{w.name}</a>) : <span className="muted">不在任何工作区</span>}</dd>
+          <dt>Squads</dt><dd>{a.squads?.length ? a.squads.map((q) => <a key={q.id} className="link" href={`#/squads/${q.id}`} style={{ marginRight: 8 }}>{q.name}{q.role === "manager" ? " · MGR" : ""}</a>) : <span className="muted">不在任何 Squad</span>} <AddToSquad a={a} /></dd>
+          <dt>Concurrency</dt><dd className="mono">{a.running ?? 0} running / max {a.max_concurrency ?? 2}</dd>
           <dt>Completed</dt><dd className="mono">{a.tasks_completed} ok · {a.tasks_failed} failed</dd>
           <dt>ERC-8004</dt><dd className="mono">{a.onchain.agent_id || <span className="muted">未登记</span>}</dd>
           <dt>Created</dt><dd>{fmtTime(a.created_at)}</dd>
@@ -308,5 +309,19 @@ function ActivityTab({ a }: { a: AgentDetail }) {
     <div className="insp-sec" style={{ gap: 0 }}>
       <ActivityStream rows={a.logs} name={name} compact />
     </div>
+  );
+}
+
+/** Join one more squad without leaving the inspector. */
+function AddToSquad({ a }: { a: AgentDetail }) {
+  const squads = useSquads();
+  const add = useAction((sid: string) => post(`/api/wf/squads/${sid}/members`, { agent_id: a.id }), ["squads", "agents", "workspaces", "preflight"], "已加入 Squad");
+  const options = (squads.data || []).filter((q) => q.manager_id !== a.id && !q.members.includes(a.id));
+  if (!options.length || a.status === "archived") return null;
+  return (
+    <select className="input sm" style={{ width: 130, display: "inline-block" }} value="" onChange={(e) => e.target.value && add.mutate(e.target.value)} aria-label="Add to squad">
+      <option value="">+ Add to squad</option>
+      {options.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
+    </select>
   );
 }

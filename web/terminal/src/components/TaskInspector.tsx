@@ -53,7 +53,7 @@ export function TaskInspector({ id, onClose }: { id: string; onClose?: () => voi
       <Tabs<Tab>
         value={tab}
         onChange={setTab}
-        options={[["overview", "Overview"], ["execution", "Execution", d.subtasks.length], ["graph", "Graph"], ["messages", "Messages"], ["logs", "Logs", logs], ["result", "Result"], ["onchain", "On-Chain", d.chain.length || undefined]]}
+        options={[["overview", "Overview"], ["execution", "Execution", d.subtasks.length], ["graph", "Dependencies"], ["messages", "Messages"], ["logs", "Logs", logs], ["result", "Results"], ["onchain", "On-Chain", d.chain.length || undefined]]}
       />
       <div className="insp-b">
         {tab === "overview" && <Overview d={d} t={t} proof={mission.data?.proof} progress={mission.data?.progress} />}

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { api, post } from "./api";
 import type {
-  Agent, AgentDetail, Approval, ChainRecord, ChainStatus, LedgerRow, Memory, Meta, Mission, Overview, Schedule, Skill, TaskDetail, TaskPage, Workspace,
+  Agent, AgentDetail, Approval, ChainRecord, ChainStatus, LedgerRow, Memory, Meta, Mission, Overview, Preflight, Schedule, Skill, Squad, TaskDetail, TaskPage, Workspace,
 } from "./types";
 import { errText, toast } from "./util";
 
@@ -22,7 +22,20 @@ export const useTasks = (params: Record<string, string | number | undefined>) =>
 };
 export const useTask = (id?: string | null) =>
   useQuery({ queryKey: ["task", id], queryFn: () => api<TaskDetail>(`/api/wf/tasks/${id}`), enabled: !!id });
-export const useMissions = (params: { workspace?: string; status?: string; agent?: string; q?: string; limit?: number } = {}) => {
+export const useSquads = (workspace?: string) =>
+  useQuery({ queryKey: ["squads", workspace || ""], queryFn: () => api<Squad[]>(`/api/wf/squads${workspace ? `?workspace=${workspace}` : ""}`) });
+
+/** What would stop a mission, asked as the composer changes; nothing is created. */
+export const usePreflight = (body: { workspace_id?: string; squad_id?: string; manager_id?: string; text: string; budget_usd: string; attachments?: { name: string; text: string }[] }, enabled = true) =>
+  useQuery({
+    queryKey: ["preflight", body],
+    queryFn: () => post<Preflight>("/api/wf/missions/preflight", body),
+    enabled: enabled && !!body.workspace_id,
+    placeholderData: (p) => p,
+    staleTime: 2_000,
+  });
+
+export const useMissions = (params: { workspace?: string; squad?: string; status?: string; agent?: string; q?: string; limit?: number } = {}) => {
   const q = qs(params);
   return useQuery({ queryKey: ["missions", q], queryFn: () => api<Mission[]>(`/api/wf/missions?${q}`), placeholderData: (p) => p });
 };

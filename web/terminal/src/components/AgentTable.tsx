@@ -49,18 +49,18 @@ export function AgentTable({ rows, selected, favorites, onFavorite, onSelect, on
       ),
     },
     { id: "role", header: "Role", sort: (a) => a.role, cell: (a) => <span className="dim">{a.role || "—"}</span> },
-    { id: "status", header: "Status", sort: (a) => ({ busy: 0, review: 1, error: 2, idle: 3, paused: 4, archived: 5 } as Record<string, number>)[liveOf(a)] ?? 6, cell: (a) => <AgentStatus agent={a} /> },
+    { id: "status", header: "Status", sort: (a) => ({ busy: 0, waiting: 1, review: 2, error: 3, idle: 4, paused: 5, archived: 6 } as Record<string, number>)[liveOf(a)] ?? 7, cell: (a) => <AgentStatus agent={a} /> },
     {
-      id: "current", header: "Current task", sort: (a) => a.current_task?.title || "~",
+      id: "current", header: "Current mission", sort: (a) => a.current_task?.title || "~",
       cell: (a) => a.current_task ? (
         <a className="link ellipsis" style={{ display: "inline-block", maxWidth: 240, verticalAlign: "middle" }} href={`#/tasks/${a.current_task.id}`} onClick={(e) => e.stopPropagation()} title={a.current_task.title}>
           {a.current_task.title}
         </a>
       ) : <span className="muted">{a.last_activity_at ? `idle · ${ago(a.last_activity_at)}` : "—"}</span>,
     },
-    { id: "done", header: "Done", align: "r", sort: (a) => a.tasks_completed || 0, cell: (a) => <span className="mono">{a.tasks_completed ?? 0}</span> },
+    { id: "done", header: "Tasks", align: "r", title: "completed / failed · running", sort: (a) => a.tasks_completed || 0, cell: (a) => <span className="mono">{a.tasks_completed ?? 0}<span className="muted">/{a.tasks_failed ?? 0}</span>{a.running ? <span className="acc"> ·{a.running}</span> : null}</span> },
     { id: "rate", header: "Success", align: "r", sort: (a) => a.success_rate ?? -1, cell: (a) => <span className={`mono ${a.success_rate == null ? "muted" : a.success_rate >= 0.95 ? "ok" : a.success_rate < 0.8 ? "bad" : ""}`}>{pct(a.success_rate)}</span> },
-    { id: "avg", header: "Avg time", align: "r", sort: (a) => a.avg_secs ?? 1e9, cell: (a) => <span className="mono">{secs(a.avg_secs)}</span> },
+    { id: "avg", header: "Avg duration", align: "r", sort: (a) => a.avg_secs ?? 1e9, cell: (a) => <span className="mono">{secs(a.avg_secs)}</span> },
     { id: "cost", header: "Cost", align: "r", sort: (a) => Number(a.cost_usd), cell: (a) => <span className="mono">{usd(a.cost_usd)}</span> },
     {
       id: "skills", header: "Skills", sort: (a) => a.skills.length,
@@ -72,6 +72,7 @@ export function AgentTable({ rows, selected, favorites, onFavorite, onSelect, on
         </span>
       ),
     },
+    { id: "squad", header: "Squad", defaultHidden: true, cell: (a) => <span className="dim">{a.squads?.map((q) => q.name).join(", ") || <span className="warn xs">no squad</span>}</span> },
     { id: "model", header: "Model", defaultHidden: true, cell: (a) => <span className="mono dim">{a.provider === "none" ? "—" : a.model}</span> },
     { id: "actions", header: "", title: "Actions", hideable: false, align: "r", cell: (a) => <RowActions a={a} onAction={onAction} onConfigure={onConfigure} onView={onSelect} /> },
   ], [favorites, onFavorite, onAction, onConfigure, onSelect, detailed, skillName]);
@@ -113,7 +114,7 @@ const RowActions = memo(function RowActions({ a, onAction, onConfigure, onView }
         <button className="btn ghost xs icon" title="Resume" aria-label="恢复" onClick={() => status.mutate("active")}><Play size={11} /></button>
       ) : <span style={{ width: 20 }} />}
       <button className="btn ghost xs icon" title="Configure" aria-label="配置" onClick={() => onConfigure(a)}><Settings2 size={11} /></button>
-      <button className="btn ghost xs" title="View" onClick={() => onView(a)}>View</button>
+      <button className="btn ghost xs" title="Inspect" onClick={() => onView(a)}>Inspect</button>
     </span>
   );
 });
