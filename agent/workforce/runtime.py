@@ -335,7 +335,7 @@ class AgentRuntime:
             validate(skill.input_schema, use.input)
         except SkillError as e:
             return done(None, f"参数不对：{e}")
-        sub = SkillContext(None, None, ctx.tokens, ctx.upstream, cancelled=ctx.cancelled,
+        sub = SkillContext(None, None, ctx.tokens, ctx.upstream, cancelled=ctx.cancelled, events=ctx.events,
                            deadline=time.monotonic() + skill.timeout_s if ctx.deadline is None else min(ctx.deadline, time.monotonic() + skill.timeout_s))
         sub.reader = wf.reader.fork(sub.check) if wf.reader else None
         if ctx.etherscan:

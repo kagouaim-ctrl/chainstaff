@@ -33,6 +33,8 @@ from agent.skills.community_support.support import SupportSettings
 from agent.skills.translator.translator import LANGS, TONES, TranslationError, TranslatorSettings
 from agent.team import ROLE_BY_ID, ROLES, Team
 from agent.workforce import Workforce
+from agent.bsc.service import ChainService
+from backend.chain_api import mount_chain
 from backend.workforce_api import mount_workforce
 from agent.skills.finance_ops.employee import FinanceOpsEmployee
 from agent.skills.finance_ops.insights import TelegramSettings, overview, payee_stats, rules_diff
@@ -55,7 +57,8 @@ def _when(v: str | None) -> datetime | None:
 
 
 def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | None = None, env: dict | None = None,
-               desk: FrontDesk | None = None, sybil_background: bool = True, workforce: Workforce | None = None) -> FastAPI:
+               desk: FrontDesk | None = None, sybil_background: bool = True, workforce: Workforce | None = None,
+               chain_service: ChainService | None = None) -> FastAPI:
     if not token or len(token) < 16:
         raise RuntimeError("CHAINSTAFF_CONSOLE_TOKEN must be set (at least 16 characters)")
     env = dict(os.environ if env is None else env)
@@ -65,9 +68,11 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     started = datetime.now(timezone.utc)
     app = FastAPI(title="ChainStaff console", docs_url=None, redoc_url=None)
 
+    def token_ok(given: str) -> bool:
+        return hmac.compare_digest(given.strip().encode(), token.encode())
+
     def auth(authorization: str = Header(default="")) -> None:
-        given = authorization.removeprefix("Bearer ").strip()
-        if not hmac.compare_digest(given.encode(), token.encode()):
+        if not token_ok(authorization.removeprefix("Bearer ")):
             raise HTTPException(401, "令牌不对")
 
     # The console acts as the owner, so it bypasses the chat-handle owner list.
@@ -98,6 +103,9 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     # The AI workforce terminal: agents, workspaces, tasks, approvals, on-chain records.
     app.state.workforce = workforce or Workforce(store)
     mount_workforce(app, app.state.workforce, auth, OWNER_ID, chain)
+    # BSC realtime data layer: status, monitors, events, and the live WebSocket.
+    app.state.chain = chain_service
+    mount_chain(app, chain_service, auth, token_ok)
 
     # ---- status and overview ----
 
@@ -690,7 +698,11 @@ def _default_app() -> FastAPI:  # pragma: no cover - process entry point
     desk, chain = build_front_desk()
     wf = build_workforce(desk.finance.store, chain)
     wf.start()
-    return create_app(desk.finance, os.environ.get("CHAINSTAFF_CONSOLE_TOKEN", ""), chain, desk=desk, workforce=wf)
+    svc = None
+    if chain and os.environ.get("KAGOU_CHAIN_LISTENER", "1") != "0":
+        svc = ChainService(desk.finance.store, chain, wf)
+        svc.start()
+    return create_app(desk.finance, os.environ.get("CHAINSTAFF_CONSOLE_TOKEN", ""), chain, desk=desk, workforce=wf, chain_service=svc)
 
 
 def __getattr__(name: str):  # pragma: no cover - lets `uvicorn backend.app:app` build lazily

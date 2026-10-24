@@ -55,6 +55,7 @@ class SkillContext:
     logs: list[str] = field(default_factory=list)
     cancelled: Callable[[], bool] | None = None  # true once the task was cancelled or timed out
     deadline: float | None = None  # time.monotonic() after which the running tool gives up
+    events: Any = None  # the BSC listener's event store (agent.bsc.store.ChainStore), when it runs
 
     def check(self) -> None:
         """Raise Cancelled if the task is gone, SkillTimeout past the tool's deadline; the readers call it

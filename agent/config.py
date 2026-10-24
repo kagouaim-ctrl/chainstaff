@@ -99,6 +99,15 @@ class ChainConfig:
     alert_outflow_threshold: dict[str, Decimal] = field(default_factory=dict)
     explorer_api_url: str | None = None
     explorer_tx_url: str | None = None
+    # Realtime data layer: extra HTTP endpoints for failover, WebSocket endpoints for newHeads, blocks to wait
+    # before an event counts as confirmed. Empty rpc_urls means rpc_url alone; empty ws_urls means HTTP polling.
+    rpc_urls: tuple[str, ...] = ()
+    ws_urls: tuple[str, ...] = ()
+    confirmations: int = 3
+
+    @property
+    def http_endpoints(self) -> tuple[str, ...]:
+        return tuple(dict.fromkeys((self.rpc_url, *self.rpc_urls)))
 
 
 def load_chain(path: str | Path) -> ChainConfig:
@@ -118,4 +127,7 @@ def load_chain(path: str | Path) -> ChainConfig:
         alert_outflow_threshold={k: to_amount(str(v)) for k, v in cfg.get("alert_outflow_threshold", {}).items()},
         explorer_api_url=cfg.get("explorer_api_url"),
         explorer_tx_url=cfg.get("explorer_tx_url"),
+        rpc_urls=tuple(cfg.get("rpc_urls", ())),
+        ws_urls=tuple(cfg.get("ws_urls", ())),
+        confirmations=int(cfg.get("confirmations", 3)),
     )

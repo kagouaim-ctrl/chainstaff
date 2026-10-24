@@ -35,6 +35,7 @@ from agent.store import Store, _iso
 from . import db as D
 from .cron import Cron
 from .db import WorkforceDB
+from . import chaintools  # noqa: F401 - registers the extra read-only chain tools
 from .chain import Cancelled
 from .planner import Planner, PlanCancelled, PlanError
 from .runtime import AgentRuntime, AnthropicProvider, Limits
@@ -98,6 +99,7 @@ class Workforce:
         # Agents that reason with a model run here; one provider per configured model API (only Anthropic today).
         self.runtime = AgentRuntime(self, {"anthropic": AnthropicProvider(llm)} if llm else {}, price_per_mtok)
         self.anchor = anchor
+        self.events = None  # set by the BSC listener (agent.bsc) when it runs; chain tools query it
         self.msg_timeout = timedelta(seconds=msg_timeout_s)
         self.instance = D.new_id("eng")  # names this process in planning claims
         self.pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="wf-agent")
@@ -1335,7 +1337,7 @@ class Workforce:
                      text=f"开始：{t['title']}" + (f"（收到 {len(upstream)} 份同事交接的结果）" if upstream else ""))
         self.db.post(workspace_id=wid, kind="tool", event="tool.start", sender=agent_id, task_id=t["id"], text=f"{skill.id} v{skill.version}",
                      data={"skill": skill.id, "input": t["input"]})
-        ctx = SkillContext(None, None, self.tokens, upstream, cancelled=stop.is_set)
+        ctx = SkillContext(None, None, self.tokens, upstream, cancelled=stop.is_set, events=self.events)
         # This run's own reader: it counts only this run's RPC calls and stops reading once the task is cancelled.
         ctx.reader = self.reader.fork(ctx.check) if self.reader else None
         if self.etherscan:
@@ -1731,7 +1733,7 @@ class Workforce:
             raise WorkforceError(f"技能 {s.name} 没有启用")
         if sid == AGENT_TASK:
             raise WorkforceError("自主执行要交给一个员工（它用自己的模型和权限），不能在技能页直接运行")
-        ctx = SkillContext(self.reader, self.etherscan, self.tokens, deadline=time.monotonic() + s.timeout_s)
+        ctx = SkillContext(self.reader, self.etherscan, self.tokens, deadline=time.monotonic() + s.timeout_s, events=self.events)
         try:
             validate(s.input_schema, inp)
             out = s.run(ctx, dict(inp))
