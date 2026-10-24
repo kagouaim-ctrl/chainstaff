@@ -32,6 +32,8 @@ from agent.skills.chain_monitor.monitor import KIND_NAMES, MonitorSettings
 from agent.skills.community_support.support import SupportSettings
 from agent.skills.translator.translator import LANGS, TONES, TranslationError, TranslatorSettings
 from agent.team import ROLE_BY_ID, ROLES, Team
+from agent.workforce import Workforce
+from backend.workforce_api import mount_workforce
 from agent.skills.finance_ops.employee import FinanceOpsEmployee
 from agent.skills.finance_ops.insights import TelegramSettings, overview, payee_stats, rules_diff
 from agent.skills.finance_ops.schedule import HELP
@@ -53,7 +55,7 @@ def _when(v: str | None) -> datetime | None:
 
 
 def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | None = None, env: dict | None = None,
-               desk: FrontDesk | None = None, sybil_background: bool = True) -> FastAPI:
+               desk: FrontDesk | None = None, sybil_background: bool = True, workforce: Workforce | None = None) -> FastAPI:
     if not token or len(token) < 16:
         raise RuntimeError("CHAINSTAFF_CONSOLE_TOKEN must be set (at least 16 characters)")
     env = dict(os.environ if env is None else env)
@@ -92,6 +94,10 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     @app.get("/")
     def index() -> FileResponse:
         return FileResponse(WEB)
+
+    # The AI workforce terminal: agents, workspaces, tasks, approvals, on-chain records.
+    app.state.workforce = workforce or Workforce(store)
+    mount_workforce(app, app.state.workforce, auth, OWNER_ID, chain)
 
     # ---- status and overview ----
 
@@ -679,8 +685,12 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
 def _default_app() -> FastAPI:  # pragma: no cover - process entry point
     from agent.runtime import build_front_desk
 
+    from agent.workforce import build_workforce
+
     desk, chain = build_front_desk()
-    return create_app(desk.finance, os.environ.get("CHAINSTAFF_CONSOLE_TOKEN", ""), chain, desk=desk)
+    wf = build_workforce(desk.finance.store, chain)
+    wf.start()
+    return create_app(desk.finance, os.environ.get("CHAINSTAFF_CONSOLE_TOKEN", ""), chain, desk=desk, workforce=wf)
 
 
 def __getattr__(name: str):  # pragma: no cover - lets `uvicorn backend.app:app` build lazily
