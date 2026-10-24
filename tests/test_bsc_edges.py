@@ -208,7 +208,10 @@ def test_event_store_filters():
 def test_service_monitor_validation_and_lifecycle():
     fake = FakeBSC()
     chain = load_chain(ROOT / "config" / "chain.example.json")
-    svc = ChainService(Store(), chain, rpc=pool(fake), poll_s=0.05)
+    def refuse(url):  # the example config names a real node; keep this test off the network
+        raise OSError("connection refused")
+
+    svc = ChainService(Store(), chain, rpc=pool(fake), connect=refuse, poll_s=0.05)
     for kw, msg in [({"kind": "contract", "target": POOL, "topics": ["0x12"]}, "topic"), ({"kind": "address", "target": WALLET, "min_value": "-1"}, "非负"),
                     ({"kind": "address", "target": WALLET, "min_value": "abc"}, "非负"), ({"kind": "x", "target": WALLET}, "类型"),
                     ({"kind": "address", "target": WALLET, "trigger": {"workspace_id": "w"}}, "没有工作台")]:
