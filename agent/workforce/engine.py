@@ -413,11 +413,14 @@ class Workforce:
         """Drive the loop synchronously until nothing is left to do (tests, CLI)."""
         end = time.monotonic() + timeout_s
         for _ in range(max_rounds):
+            # A worker that finishes while tick() runs posts its result after _deliver() looked,
+            # so idle means: nothing in flight before the tick, nothing done by it, nothing after.
+            busy = any(not f.done() for f in self._inflight.values())
             n = self.tick()
             pending = [f for f in self._inflight.values() if not f.done()]
             for f in pending:
                 f.result(timeout=max(0.1, end - time.monotonic()))
-            if n == 0 and not pending:
+            if n == 0 and not busy and not pending:
                 return
             if time.monotonic() > end:
                 raise TimeoutError("workforce did not go idle")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import Future
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -655,11 +656,22 @@ def test_delivered_but_unprocessed_messages_are_redelivered_and_recovered(wf):
     assert wf.db.message(mid)["status"] == D.PROCESSED  # re-queued then delivered and read
     # crash recovery: a subtask left running and a delivered message go back to the queue
     g = wf.submit_goal(t.ws["id"], f"analyze {EOA}", "owner")
+
+    class Crashed:  # the process dies after delivering the assignment, before the worker runs it
+        def submit(self, *a):
+            f = Future()
+            f.set_result(None)
+            return f
+
+        def shutdown(self, wait=True):
+            pass
+
+    wf.pool = Crashed()
     wf.tick()
     w = [s for s in wf.db.subtasks(g["id"])][0]
     wf.db.transition(w["id"], (D.ASSIGNED,), D.RUNNING)
     m = [x for x in wf.db.messages(task_id=w["id"], limit=10) if x["event"] == "task.assign"][0]
-    wf.db.set_message_status(m["id"], (D.QUEUED,), D.DELIVERED)
+    assert m["status"] == D.DELIVERED
     fresh = Workforce(wf.store, reader=wf.reader)
     assert fresh.recover() == 2
     assert fresh.db.task(w["id"])["status"] == D.ASSIGNED and fresh.db.message(m["id"])["status"] == D.QUEUED
