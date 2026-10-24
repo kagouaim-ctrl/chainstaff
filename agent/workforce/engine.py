@@ -283,6 +283,61 @@ class Workforce:
         self._audit(f"提交任务 {goal['id']}：{goal['title']}", by, {"task": goal["id"]})
         return goal
 
+    def assign_direct(self, aid: str, skill_id: str, inp: dict, by: str, *, workspace_id: str | None = None, title: str = "",
+                      priority: int = 2, budget_usd: Any = "1", timeout_s: int = 600) -> dict:
+        """Give one agent one skill run, without the manager's planning step.
+
+        It is still a goal with one subtask, so it goes through the same bus, executor, budget,
+        deadline, review approval and anchoring as a planned goal; the agent itself owns the goal.
+        """
+        agent = self._agent_or_404(aid)
+        if agent["status"] != D.AGENT_ACTIVE:
+            raise WorkforceError(f"{agent['name']} 不在岗（{agent['status']}）")
+        skill = SKILL_BY_ID.get(skill_id)
+        if skill is None:
+            raise WorkforceError(f"没有技能 {skill_id}")
+        if skill_id == "data_report":
+            raise WorkforceError("数据报告只汇总同一任务里上游员工的结果，不能单独派给员工")
+        reason = self.can_run(agent, skill_id)
+        if reason:
+            raise WorkforceError(reason)
+        try:
+            validate(skill.input_schema, inp)
+        except SkillError as e:
+            raise WorkforceError(f"输入不对：{e}") from e
+        spaces = [w for w in self.db.workspaces() if not w["archived"] and (aid in w["members"] or w["manager_id"] == aid)]
+        if workspace_id:
+            spaces = [w for w in spaces if w["id"] == workspace_id]
+        if not spaces:
+            raise WorkforceError(f"{agent['name']} 不在{'这个' if workspace_id else '任何'}工作区里，先把它加进工作区")
+        wid = spaces[0]["id"]
+        if not (0 <= int(priority) <= 3):
+            raise WorkforceError("优先级只能是 0–3")
+        if not (10 <= int(timeout_s) <= 86400):
+            raise WorkforceError("超时只能是 10 秒到 24 小时")
+        budget = _dec(budget_usd, "预算")
+        target = inp.get("address")
+        title = (title.strip() or f"{skill.name}{' ' + target if target else ''}")[:120]
+        goal = self.db.add_task(workspace_id=wid, kind="goal", title=title, description=f"{title}\n\n直接派给 {agent['name']}：{skill.name}",
+                                assigned_agent=aid, priority=int(priority), status=D.WAITING, max_steps=2, budget_usd=str(budget),
+                                timeout_s=int(timeout_s), deadline_at=_iso(_now() + timedelta(seconds=int(timeout_s))),
+                                planner="direct", started_at=_iso(_now()), created_by=by)
+        sub = self.db.add_task(workspace_id=wid, kind="subtask", parent_id=goal["id"], root_id=goal["id"], title=title, skill=skill_id,
+                               input=dict(inp), assigned_agent=aid, priority=int(priority), status=D.PENDING, created_by=by,
+                               max_steps=1, budget_usd="0", timeout_s=int(timeout_s))
+        self.db.post(workspace_id=wid, kind="user", event="user.instruction", sender="user", task_id=goal["id"],
+                     text=f"{title}（直接派给 {agent['name']}）", data={"by": by, "direct": aid})
+        self.db.post(workspace_id=wid, kind="task", event="task.created", task_id=goal["id"],
+                     text=f"任务 {goal['id']} 已创建，直接派给 {agent['name']}",
+                     data={"priority": goal["priority"], "max_steps": goal["max_steps"], "budget_usd": goal["budget_usd"], "deadline": goal["deadline_at"]})
+        self.db.post(workspace_id=wid, kind="agent", event="plan.created", sender=aid, task_id=goal["id"],
+                     text=f"直接派活，不经过主管拆分：\n1. {title} → {agent['name']}",
+                     data={"planner": "direct", "steps": [{"key": "s1", "task": sub["id"], "title": title, "skill": skill_id,
+                                                           "agent": aid, "depends_on": []}]})
+        self._audit(f"直接派活 {goal['id']} 给 {agent['name']}：{skill.name}", by, {"task": goal["id"], "agent": aid})
+        self._dispatch(goal["id"])
+        return self.db.task(goal["id"])
+
     def cancel(self, tid: str, by: str, reason: str = "") -> dict:
         t = self.task_or_404(tid)
         root = self.db.task(t["root_id"])
@@ -417,7 +472,8 @@ class Workforce:
             pending = [f for f in self._inflight.values() if not f.done()]
             for f in pending:
                 f.result(timeout=max(0.1, end - time.monotonic()))
-            if n == 0 and not pending:
+            # a job that finished after tick() looked is still in _inflight, and its follow-up messages are not delivered yet
+            if n == 0 and not self._inflight:
                 return
             if time.monotonic() > end:
                 raise TimeoutError("workforce did not go idle")
@@ -637,6 +693,8 @@ class Workforce:
             "subtasks": [{"id": s["id"], "title": s["title"], "skill": s["skill"], "agent": s["assigned_agent"], "status": s["status"],
                           "result_hash": s["result_hash"], "error": s["error"]} for s in subs],
         }
+        if goal["planner"] == "direct":
+            result["output"] = done[0]["result"]  # one agent, one skill: the deliverable is that skill's output
         h = report["result"]["sha256"] if report else result_hash(result)
         if not self.db.transition(root_id, (D.WAITING,), D.REVIEW, result=result, result_hash=h):
             return
@@ -1007,6 +1065,7 @@ class Workforce:
 
     def agent_views(self, since: datetime | None = None) -> list[dict]:
         stats = self.db.agent_task_stats(since)
+        last = self.db.last_activity()
         open_rows, _ = self.db.tasks(status=[D.ASSIGNED, D.RUNNING], kind="subtask", limit=500)
         current = {}
         for t in open_rows:
@@ -1023,12 +1082,13 @@ class Workforce:
             if a["status"] != D.AGENT_ACTIVE:
                 live = a["status"]
             elif cur:
-                live = "busy"
+                # a mission parked in review is waiting on the owner, not on this agent
+                live = "review" if cur["status"] == D.REVIEW else "busy"
             elif failed and self.db.tasks(agent=a["id"], status=[D.FAILED], since=_now() - timedelta(hours=24), limit=1)[1]:
                 live = "error"
             else:
                 live = "idle"
-            out.append({**a, "live": live, "current_task": {"id": cur["id"], "title": cur["title"], "status": cur["status"]} if cur else None,
+            out.append({**a, "live": live, "last_activity_at": last.get(a["id"]), "current_task": {"id": cur["id"], "title": cur["title"], "status": cur["status"]} if cur else None,
                         "tasks_completed": done, "tasks_failed": failed,
                         "success_rate": round(done / (done + failed), 4) if done + failed else None,
                         "avg_secs": round(sum(s["secs"]) / len(s["secs"]), 2) if s["secs"] else None})

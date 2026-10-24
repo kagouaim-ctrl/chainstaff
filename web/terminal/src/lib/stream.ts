@@ -27,9 +27,10 @@ function setState(s: State) {
 function scheduleInvalidate(m: Message) {
   touched.add("overview");
   touched.add("activity");
-  if (m.kind === "task" || m.kind === "agent" || m.kind === "tool") ["tasks", "agents", "task", "workspaces"].forEach((k) => touched.add(k));
-  if (m.event.startsWith("approval")) touched.add("approvals");
-  if (m.kind === "chain") ["chain", "records"].forEach((k) => touched.add(k));
+  if (m.kind === "task" || m.kind === "agent" || m.kind === "tool") ["tasks", "agents", "task", "workspaces", "missions"].forEach((k) => touched.add(k));
+  if (m.event.startsWith("approval")) ["approvals", "missions", "task", "ledger"].forEach((k) => touched.add(k));
+  if (m.event === "task.completed" || m.event === "task.failed" || m.event === "goal.review") touched.add("ledger");
+  if (m.kind === "chain") ["chain", "records", "ledger", "missions", "task"].forEach((k) => touched.add(k));
   if (invalidateTimer) return;
   invalidateTimer = window.setTimeout(() => {
     invalidateTimer = undefined;

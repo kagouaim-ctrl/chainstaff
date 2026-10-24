@@ -8,11 +8,15 @@ export interface Route {
   params: URLSearchParams;
 }
 
+// Pages from the first terminal keep working as links: the old dashboard opens the Agent Terminal,
+// the old roster opens Agents with the same agent selected.
+const LEGACY: Record<string, string> = { overview: "terminal", workforce: "agents" };
+
 function parse(): Route {
   const h = location.hash.replace(/^#\/?/, "");
   const [path, qs] = h.split("?");
   const [page, id] = path.split("/");
-  return { page: page || "overview", id: id ? decodeURIComponent(id) : undefined, params: new URLSearchParams(qs || "") };
+  return { page: LEGACY[page] || page || "terminal", id: id ? decodeURIComponent(id) : undefined, params: new URLSearchParams(qs || "") };
 }
 
 export function useRoute(): Route {
@@ -24,6 +28,13 @@ export function useRoute(): Route {
     () => location.hash,
   );
   return useMemo(parse, [h]);
+}
+
+/** Change some query parameters of the current page without touching the rest. */
+export function setParams(route: Route, changes: Record<string, string | null | undefined>, id: string | undefined = route.id) {
+  const p = new URLSearchParams(route.params);
+  for (const [k, v] of Object.entries(changes)) v ? p.set(k, v) : p.delete(k);
+  go(route.page, id, Object.fromEntries(p));
 }
 
 export function go(page: string, id?: string, params?: Record<string, string>) {
@@ -71,7 +82,37 @@ export function useMedia(q: string): boolean {
 
 export const useIsMobile = () => useMedia("(max-width: 760px)");
 
+/** Re-render every `ms` so running clocks tick; one interval per component that shows one. */
+export function useNow(ms = 1000, on = true): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!on) return;
+    const t = window.setInterval(() => setNow(Date.now()), ms);
+    return () => window.clearInterval(t);
+  }, [ms, on]);
+  return now;
+}
+
 // ---------- formatting ----------
+
+export function initials(name?: string | null): string {
+  if (!name) return "?";
+  const words = name.replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return name.slice(0, 2).toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+export function pct(v?: number | null, d = 1): string {
+  return v === null || v === undefined ? "—" : `${(v * 100).toFixed(d)}%`;
+}
+
+export function secs(v?: number | null): string {
+  if (v === null || v === undefined) return "—";
+  if (v < 1) return `${Math.round(v * 1000)}ms`;
+  if (v < 60) return `${v.toFixed(1)}s`;
+  return `${Math.floor(v / 60)}m${Math.round(v % 60)}s`;
+}
 
 export const short = (a?: string | null, n = 6) => (a && a.length > 2 * n + 2 ? `${a.slice(0, n)}…${a.slice(-4)}` : a || "");
 
@@ -85,7 +126,7 @@ export function fmtTime(iso?: string | null, withDate = true): string {
 export function ago(iso?: string | null): string {
   if (!iso) return "—";
   const s = (Date.now() - +new Date(iso)) / 1000;
-  if (s < 5) return "刚刚";
+  if (s < 5) return "now";
   if (s < 60) return `${Math.floor(s)}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
@@ -152,3 +193,5 @@ export function useToasts() {
 }
 
 export const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;

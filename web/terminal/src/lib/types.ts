@@ -21,12 +21,13 @@ export interface Agent {
   onchain: { agent_id?: string; address?: string; network?: string; tx?: string };
   created_at: string;
   updated_at: string;
-  live?: "busy" | "idle" | "error" | "paused" | "archived" | "active";
+  live?: "busy" | "review" | "idle" | "error" | "paused" | "archived" | "active";
   current_task?: { id: string; title: string; status: TaskStatus } | null;
   tasks_completed?: number;
   tasks_failed?: number;
   success_rate?: number | null;
   avg_secs?: number | null;
+  last_activity_at?: string | null;
 }
 
 export interface AgentDetail extends Agent {
@@ -227,4 +228,86 @@ export interface TaskDetail {
   approvals: Approval[];
   chain: ChainRecord[];
   graph: { nodes: { id: string; title: string; status: TaskStatus; agent: string; skill: string }[]; edges: { from: string; to: string }[] };
+}
+
+export type ProofState = "in_progress" | "awaiting_review" | "offchain_completed" | "onchain_pending" | "onchain_confirmed" | "not_completed";
+
+export interface Proof {
+  state: ProofState;
+  result_hash: string | null;
+  record_id: number | null;
+  tx_hash: string | null;
+  tx_url?: string | null;
+  block: number | null;
+  network: string | null;
+  chain_status: "pending" | "confirmed" | "failed" | null;
+  error: string | null;
+  confirmed_at: string | null;
+}
+
+export interface MissionTask {
+  id: string;
+  title: string;
+  skill: string | null;
+  assigned_agent: string | null;
+  status: TaskStatus;
+  depends_on: string[];
+  attempts: number;
+  error: string | null;
+  result_hash: string | null;
+  cost_usd: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+/** A mission is a goal task read through the compatibility layer (/api/wf/missions). */
+export interface Mission {
+  id: string;
+  workspace_id: string;
+  name: string;
+  brief: string;
+  status: TaskStatus;
+  stage: "planning" | "executing" | "review" | "completed" | "failed" | "cancelled";
+  priority: number;
+  owner: string | null;
+  planner: string | null;
+  created_by: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  deadline_at: string | null;
+  updated_at: string;
+  budget_usd: string;
+  cost_usd: string;
+  tokens: number;
+  steps: number;
+  max_steps: number;
+  error: string | null;
+  progress: { total: number; settled: number; completed: number; failed: number; cancelled: number; running: number; pending: number };
+  agents: string[];
+  tasks: MissionTask[];
+  approvals: { id: number; kind: Approval["kind"]; title: string; at: string }[];
+  deliverable: { result_hash: string | null; report: boolean; findings: number; has_output: boolean } | null;
+  proof: Proof;
+}
+
+export interface LedgerRow {
+  mission: string;
+  workspace_id: string;
+  name: string;
+  status: TaskStatus;
+  owner: string | null;
+  finished_at: string | null;
+  result_hash: string | null;
+  proof: Proof;
+  executions: { task: string; title: string; agent: string | null; skill: string | null; status: TaskStatus; result_hash: string | null; error: string | null; finished_at: string | null }[];
+}
+
+export interface TaskPage {
+  items: Task[];
+  total: number;
+  page: number;
+  size: number;
+  counts: Record<TaskStatus, number>;
 }

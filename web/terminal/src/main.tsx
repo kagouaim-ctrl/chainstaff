@@ -1,7 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { lazy, StrictMode, Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
-import { AppShell } from "./components/AppShell";
+import { BrandMark } from "./components/TerminalHeader";
+import { TerminalShell } from "./components/TerminalShell";
 import { Loading, Toasts } from "./components/ui";
 import { api, onAuthChange, queryClient, setToken, token } from "./lib/api";
 import { useMeta } from "./lib/queries";
@@ -11,8 +12,8 @@ import "./styles.css";
 
 // Each page is its own chunk, so the first paint only loads the shell and the current page.
 const PAGES = {
-  overview: lazy(() => import("./pages/Overview")),
-  workforce: lazy(() => import("./pages/Workforce")),
+  terminal: lazy(() => import("./pages/Terminal")),
+  agents: lazy(() => import("./pages/Agents")),
   workspace: lazy(() => import("./pages/Workspace")),
   tasks: lazy(() => import("./pages/Tasks")),
   onchain: lazy(() => import("./pages/OnChain")),
@@ -44,19 +45,22 @@ function Login() {
     }
   };
   return (
-    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 16 }}>
-      <form className="dialog" style={{ position: "static", transform: "none", width: 380, maxWidth: "100%", padding: 20 }} onSubmit={(e) => (e.preventDefault(), submit())}>
-        <div className="row" style={{ gap: 10, marginBottom: 12 }}>
-          <span className="brand-mark">CS</span>
-          <b>ChainStaff Terminal</b>
+    <div className="login">
+      <form onSubmit={(e) => (e.preventDefault(), submit())}>
+        <div className="row" style={{ gap: 10 }}>
+          <BrandMark size={24} />
+          <div className="col gap2">
+            <b style={{ fontSize: 15 }}>ChainStaff</b>
+            <span className="muted xs">AI Workforce Terminal for Web3</span>
+          </div>
         </div>
         <label className="field">
           <span>Access token</span>
           <input className="input mono" type="password" autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="CHAINSTAFF_CONSOLE_TOKEN" />
         </label>
-        {err && <div className="bad" style={{ fontSize: 12, marginBottom: 8 }}>{err}</div>}
-        <button className="btn primary" style={{ width: "100%" }} disabled={!value.trim() || busy}>Sign in</button>
-        <p className="muted" style={{ fontSize: 11, marginBottom: 0 }}>令牌只存在这个标签页里，和经典控制台共用。</p>
+        {err && <div className="bad sm">{err}</div>}
+        <button className="btn primary block" disabled={!value.trim() || busy}>Sign in</button>
+        <p className="muted xs" style={{ margin: 0 }}>令牌只存在这个标签页里，和经典控制台共用。</p>
       </form>
     </div>
   );
@@ -73,13 +77,13 @@ function Terminal() {
     if (meta.data) startStream(meta.data.last_message_id);
     return stopStream;
   }, [meta.data?.last_message_id === undefined]); // start once, when the cursor is known
-  const Page = PAGES[route.page as keyof typeof PAGES] || PAGES.overview;
+  const Page = PAGES[route.page as keyof typeof PAGES] || PAGES.terminal;
   return (
-    <AppShell route={route}>
+    <TerminalShell route={route}>
       <Suspense fallback={<div className="page"><Loading rows={6} /></div>}>
         <Page route={route} />
       </Suspense>
-    </AppShell>
+    </TerminalShell>
   );
 }
 

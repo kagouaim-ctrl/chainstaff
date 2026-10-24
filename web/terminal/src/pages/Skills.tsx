@@ -1,6 +1,6 @@
 import { Play, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Dialog, EmptyState, ErrorState, Loading, Seg, StatusBadge } from "../components/ui";
+import { Dialog, EmptyState, ErrorState, Loading, Seg, Status } from "../components/ui";
 import { post } from "../lib/api";
 import { useAction, useAgentName, useSkills } from "../lib/queries";
 import type { Skill } from "../lib/types";
@@ -24,14 +24,14 @@ export default function Skills() {
   );
   return (
     <div className="page">
-      <div className="page-head">
+      <div className="toolbar">
         <h1>Skills</h1>
-        <span className="muted" style={{ fontSize: 12 }}>内置技能，全部读真实链上数据；第三方技能安装还没做。</span>
+        <span className="sub">Web3 skills your agents can be granted. Built in, read real chain data; third-party install is not built yet.</span>
       </div>
-      <div className="filters">
-        <div className="rel" style={{ width: mobile ? "100%" : 240 }}>
-          <Search size={13} style={{ position: "absolute", left: 8, top: 8 }} className="muted" />
-          <input className="input" style={{ paddingLeft: 26, width: "100%" }} placeholder="搜索技能" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="qab">
+        <div className="search" style={{ width: mobile ? "100%" : 240 }}>
+          <Search size={13} />
+          <input className="input" placeholder="搜索技能" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Seg value={state} onChange={setState} options={[["all", "All"], ["installed", "Installed"], ["enabled", "Enabled"], ["available", "Available"]]} />
         <select className="input" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="分类">
@@ -56,7 +56,7 @@ export default function Skills() {
                   {!mobile && <td className="mono muted" style={{ fontSize: 11 }}>{s.permissions.join(" ")}</td>}
                   {!mobile && <td className="muted">{s.agents.length ? s.agents.map(name).join(", ") : "—"}</td>}
                   <td>
-                    {!s.installed ? <span className="badge">available</span> : s.enabled ? <StatusBadge kind="agent" status="active" /> : <StatusBadge kind="agent" status="paused" />}
+                    {!s.installed ? <span className="badge">available</span> : s.enabled ? <Status status="completed" label="Enabled" /> : <Status status="cancelled" label="Disabled" />}
                     {s.missing.length > 0 && <span className="badge warn" title={`缺少：${s.missing.join(", ")}`}>needs config</span>}
                   </td>
                   <td onClick={(e) => e.stopPropagation()} className="r">

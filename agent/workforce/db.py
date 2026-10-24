@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS wf_messages (
 CREATE INDEX IF NOT EXISTS wf_messages_ws ON wf_messages(workspace_id, id);
 CREATE INDEX IF NOT EXISTS wf_messages_task ON wf_messages(task_id, id);
 CREATE INDEX IF NOT EXISTS wf_messages_inbox ON wf_messages(recipient, status, id);
+CREATE INDEX IF NOT EXISTS wf_messages_sender ON wf_messages(sender, id);
 CREATE TABLE IF NOT EXISTS wf_approvals (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     at           TEXT NOT NULL,
@@ -397,7 +398,7 @@ class WorkforceDB:
         if until:
             where.append("created_at < ?")
             args.append(_iso(until))
-        sort = sort if sort in ("created_at", "priority", "status", "title", "cost_usd", "finished_at", "steps") else "created_at"
+        sort = sort if sort in ("created_at", "updated_at", "priority", "status", "title", "cost_usd", "finished_at", "steps") else "created_at"
         w = (" WHERE " + " AND ".join(where)) if where else ""
         total = self._db.execute(f"SELECT COUNT(*) AS n FROM wf_tasks{w}", tuple(args)).fetchone()["n"]
         order = f"CAST({sort} AS REAL)" if sort == "cost_usd" else sort
@@ -420,6 +421,29 @@ class WorkforceDB:
             s["cost"] += r["cost"] or 0.0
             if r["secs"] is not None and r["status"] == COMPLETED:
                 s["secs"].append(r["secs"])
+        return out
+
+    def status_counts(self, *, kind: str | None = None, agent: str | None = None, q: str | None = None) -> dict[str, int]:
+        where, args = [], []
+        for col, v in (("kind", kind), ("assigned_agent", agent)):
+            if v:
+                where.append(f"{col} = ?")
+                args.append(v)
+        if q:
+            where.append("(id LIKE ? OR title LIKE ? OR description LIKE ?)")
+            args += [f"%{q}%"] * 3
+        sql = "SELECT status, COUNT(*) AS n FROM wf_tasks" + (" WHERE " + " AND ".join(where) if where else "") + " GROUP BY status"
+        return {r["status"]: r["n"] for r in self._db.execute(sql, tuple(args)).fetchall()}
+
+    def tasks_by_root(self, root_ids: list[str]) -> dict[str, list[dict]]:
+        """Subtasks of many goals in one query, grouped by goal."""
+        out: dict[str, list[dict]] = {r: [] for r in root_ids}
+        if not root_ids:
+            return out
+        rows = self._db.execute(f"SELECT * FROM wf_tasks WHERE kind = 'subtask' AND root_id IN ({','.join('?' * len(root_ids))})"
+                                " ORDER BY created_at, id", tuple(root_ids)).fetchall()
+        for r in rows:
+            out[r["root_id"]].append(self._task(r))
         return out
 
     def stale_tasks(self, statuses: tuple[str, ...], older_than: datetime) -> list[dict]:
@@ -487,6 +511,12 @@ class WorkforceDB:
             args += [sender, sender]
         sql = f"SELECT * FROM wf_messages WHERE {' AND '.join(where)} ORDER BY id {'DESC' if newest_first else 'ASC'} LIMIT ?"
         return [self._msg(r) for r in self._db.execute(sql, (*args, limit)).fetchall()]
+
+    def last_activity(self) -> dict[str, str]:
+        """When each sender last did something on the timeline."""
+        rows = self._db.execute("SELECT m.sender, m.at FROM wf_messages m JOIN (SELECT sender, MAX(id) AS id FROM wf_messages GROUP BY sender) x"
+                                " ON m.id = x.id WHERE m.sender NOT IN ('system', 'user')").fetchall()
+        return {r["sender"]: r["at"] for r in rows}
 
     def last_message_id(self) -> int:
         r = self._db.execute("SELECT MAX(id) AS m FROM wf_messages").fetchone()

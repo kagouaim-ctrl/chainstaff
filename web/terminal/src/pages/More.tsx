@@ -1,22 +1,28 @@
-import { ChevronRight } from "lucide-react";
-import { NAV } from "../components/AppShell";
+import { Activity, Blocks, ChevronRight, LogOut, Puzzle, Settings, SquareArrowOutUpRight } from "lucide-react";
+import { setToken } from "../lib/api";
 
-/** Mobile hub for the pages that don't fit in the bottom bar. */
+const ITEMS: [string, string, string, typeof Blocks][] = [
+  ["onchain", "On-Chain", "Execution ledger, transactions, agent registry", Blocks],
+  ["skills", "Skills", "Web3 skills and who can run them", Puzzle],
+  ["activity", "Activity", "Every event, live", Activity],
+  ["settings", "Settings", "Scheduled missions, memory, system", Settings],
+];
+
+/** Phone hub for the pages that don't fit in the bottom bar. */
 export default function More() {
   return (
     <div className="page">
-      <div className="page-head"><h1>More</h1></div>
+      <div className="toolbar"><h1>More</h1></div>
       <div className="m-list">
-        {NAV.filter(([id]) => ["onchain", "skills", "activity", "settings"].includes(id)).map(([id, label, Icon]) => (
-          <a key={id} href={`#/${id}`} className="m-card row sp" style={{ textDecoration: "none", flexDirection: "row" }}>
-            <span className="row"><Icon size={18} /> {label}</span>
+        {ITEMS.map(([id, label, sub, Icon]) => (
+          <a key={id} href={`#/${id}`} className="m-row">
+            <Icon size={18} className="muted" />
+            <span className="col gap2 grow"><span className="strong">{label}</span><span className="muted xs">{sub}</span></span>
             <ChevronRight size={16} className="muted" />
           </a>
         ))}
-        <a href="/" className="m-card row sp" style={{ textDecoration: "none", flexDirection: "row" }}>
-          <span>Classic console</span>
-          <ChevronRight size={16} className="muted" />
-        </a>
+        <a href="/" className="m-row"><SquareArrowOutUpRight size={18} className="muted" /><span className="grow">Classic console</span><ChevronRight size={16} className="muted" /></a>
+        <button className="m-row" onClick={() => setToken("")}><LogOut size={18} className="muted" /><span className="grow">Sign out</span></button>
       </div>
     </div>
   );

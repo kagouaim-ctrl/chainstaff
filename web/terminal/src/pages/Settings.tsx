@@ -1,6 +1,6 @@
 import { LogOut, Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Dialog, EmptyState, ErrorState, Loading, Seg, StatusBadge } from "../components/ui";
+import { Dialog, EmptyState, ErrorState, Loading, Seg, Status, Tabs } from "../components/ui";
 import { del, post, put, setToken } from "../lib/api";
 import { useAction, useAgents, useMemory, useMeta, useSchedules, useWorkspaces } from "../lib/queries";
 import type { Memory } from "../lib/types";
@@ -12,10 +12,8 @@ export default function Settings() {
   const [tab, setTab] = usePref<Tab>("settings-tab", "schedules");
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>Settings</h1>
-        <Seg value={tab} onChange={setTab} options={[["schedules", "Scheduled tasks"], ["memory", "Memory"], ["system", "System"]]} />
-      </div>
+      <div className="toolbar"><h1>Settings</h1></div>
+      <Tabs<Tab> value={tab} onChange={setTab} options={[["schedules", "Scheduled missions"], ["memory", "Memory"], ["system", "System"]]} />
       {tab === "schedules" && <Schedules />}
       {tab === "memory" && <MemoryAdmin />}
       {tab === "system" && <System />}
@@ -31,7 +29,7 @@ function Schedules() {
   const wsName = (id: string) => ws.data?.find((w) => w.id === id)?.name || id;
   return (
     <>
-      <div className="filters">
+      <div className="qab">
         <span className="muted" style={{ fontSize: 12 }}>标准 5 段 cron，按 UTC 计算。到点后把目标交给工作区的 AI 主管；连续失败 3 次自动暂停。</span>
         <div className="grow" />
         <button className="btn primary" disabled={!ws.data?.length} onClick={() => setAdding(true)}><Plus size={13} /> New schedule</button>
@@ -50,10 +48,10 @@ function Schedules() {
                   <td>
                     {s.last_run_at ? <span className="mono muted">{fmtTime(s.last_run_at)}</span> : "—"}{" "}
                     {s.last_task_id && <a className="mono" href={`#/tasks/${s.last_task_id}`}>{s.last_task_id}</a>}{" "}
-                    {s.last_status && <StatusBadge status={s.last_status} />}
+                    {s.last_status && <Status status={s.last_status} />}
                   </td>
                   <td className={`mono ${s.failures ? "bad" : ""}`}>{s.failures}</td>
-                  <td><StatusBadge kind="agent" status={s.enabled ? "active" : "paused"} /></td>
+                  <td><Status status={s.enabled ? "completed" : "cancelled"} label={s.enabled ? "Enabled" : "Paused"} /></td>
                   <td className="r">
                     <div className="row" style={{ justifyContent: "flex-end", gap: 4 }}>
                       <button className="btn sm" disabled={act.isPending} onClick={() => act.mutate({ id: s.id, action: "run" })} title="立即运行"><Play size={12} /></button>
@@ -109,7 +107,7 @@ function MemoryAdmin() {
     m.scope === "agent" ? agents.data?.find((a) => a.id === m.owner)?.name || m.owner : m.scope === "workspace" ? ws.data?.find((w) => w.id === m.owner)?.name || m.owner : m.scope;
   return (
     <>
-      <div className="filters">
+      <div className="qab">
         <input className="input" style={{ width: 260 }} placeholder="全文搜索记忆（至少 3 个字符）" value={q} onChange={(e) => setQ(e.target.value)} />
         <Seg value={scope} onChange={setScope} options={[["", "All"], ["agent", "Agent"], ["workspace", "Workspace"], ["project", "Project"], ["user", "User"]]} />
         <div className="grow" />
@@ -206,10 +204,11 @@ function System() {
       <div className="row"><span className="dim">Table density</span><Seg value={density} onChange={setDensity} options={[["compact", "Compact"], ["detailed", "Detailed"]]} /></div>
       <div className="label">Session</div>
       <div className="row wrap">
-        <button className="btn" onClick={() => (setToken(""), go("overview"))}><LogOut size={13} /> 退出（清除这个标签页的访问令牌）</button>
+        <button className="btn" onClick={() => (setToken(""), go("terminal"))}><LogOut size={13} /> 退出（清除这个标签页的访问令牌）</button>
         <a className="btn ghost" href="/">Classic console</a>
       </div>
       <div className="note">当前是单用户模式：一个访问令牌对应一个所有者。多用户登录、钱包签名登录、按用户隔离工作区和角色权限还没有实现。</div>
     </div>
   );
 }
+

@@ -209,3 +209,34 @@ def test_write_rate_limit_returns_429(tmp_path):
     assert c.post("/api/wf/agents", json={"name": "b"}).status_code == 429
     assert ok(c.get("/api/wf/meta"))["network"] is None
     wf.stop()
+
+
+def test_missions_direct_run_ledger_and_counts_over_http(setup):
+    c, wf, fake = setup
+    mgr = ok(c.post("/api/wf/agents", headers=H, json={"name": "AI Manager", "is_manager": True}))
+    a2 = ok(c.post("/api/wf/agents", headers=H, json={"name": "Contract", "skills": ["contract_analysis", "token_info"], "permissions": ["chain:read"]}))
+    ws = ok(c.post("/api/wf/workspaces", headers=H, json={"name": "Research", "manager_id": mgr["id"], "members": [a2["id"]]}))
+    assert c.post(f"/api/wf/agents/{a2['id']}/run", headers=H, json={"skill": "token_info", "input": {}}).status_code == 400
+    goal = ok(c.post(f"/api/wf/agents/{a2['id']}/run", headers=H, json={"skill": "token_info", "input": {"address": TOKEN}, "title": "KGU token check"}))
+    assert goal["planner"] == "direct" and goal["title"] == "KGU token check"
+    wf.run_until_idle()
+
+    ms = ok(c.get("/api/wf/missions", headers=H, params={"workspace": ws["id"]}))
+    assert len(ms) == 1 and ms[0]["id"] == goal["id"] and ms[0]["stage"] == "review" and ms[0]["progress"]["completed"] == 1
+    assert ms[0]["proof"]["state"] == "awaiting_review" and ms[0]["proof"]["tx_url"] is None
+    assert ok(c.get("/api/wf/missions", headers=H, params={"agent": a2["id"], "status": "review", "q": "KGU"}))
+    m = ok(c.get(f"/api/wf/missions/{goal['id']}", headers=H))
+    assert m["tasks"][0]["assigned_agent"] == a2["id"] and m["approvals"][0]["kind"] == "task_result"
+    sub = m["tasks"][0]["id"]
+    assert c.get(f"/api/wf/missions/{sub}", headers=H).status_code == 404
+    assert c.get("/api/wf/missions/tsk_nope", headers=H).status_code == 400
+
+    ok(c.post(f"/api/wf/approvals/{m['approvals'][0]['id']}", headers=H, json={"approve": True, "anchor": True}))
+    led = ok(c.get("/api/wf/ledger", headers=H))
+    assert led[0]["mission"] == goal["id"] and led[0]["proof"]["state"] == "onchain_pending" and led[0]["proof"]["tx_url"].startswith("https://")
+    assert led[0]["executions"][0]["agent"] == a2["id"]
+
+    tasks = ok(c.get("/api/wf/tasks", headers=H, params={"kind": "subtask"}))
+    assert tasks["counts"]["completed"] == 1 and set(tasks["counts"]) == set(wf.db.status_counts() | {s: 0 for s in tasks["counts"]})
+    agents = ok(c.get("/api/wf/agents", headers=H))
+    assert next(a for a in agents if a["id"] == a2["id"])["last_activity_at"]

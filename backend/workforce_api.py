@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from agent.config import ChainConfig
 from agent.workforce import Workforce, WorkforceError
 from agent.workforce import db as D
+from agent.workforce import missions as M
 from agent.workforce.anchor import decode_calldata
 from agent.workforce.engine import ALL_PERMISSIONS, PROVIDERS
 
@@ -131,6 +132,13 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
         view["audit"] = [e for e in wf.store.events(("audit",), limit=300, employee="workforce") if (e["data"] or {}).get("agent") == aid][:30]
         return view
 
+    @app.post("/api/wf/agents/{aid}/run", dependencies=W)
+    def run_agent(aid: str, body: dict = Body(...)) -> dict:
+        """Direct assignment: one agent, one skill, tracked as a one-task mission."""
+        return run(wf.assign_direct, aid, str(body.get("skill", "")), body.get("input") or {}, owner,
+                   workspace_id=body.get("workspace_id") or None, title=str(body.get("title", "")), priority=int(body.get("priority", 2)),
+                   budget_usd=body.get("budget_usd", "1"), timeout_s=int(body.get("timeout_s", 600)))
+
     @app.put("/api/wf/agents/{aid}", dependencies=W)
     def update_agent(aid: str, body: dict = Body(...)) -> dict:
         return run(wf.update_agent, aid, body, owner)
@@ -202,6 +210,36 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
                   task_id=body.get("task_id"), dedupe_key=body.get("dedupe_key"))
         return {"id": mid, "duplicate": mid is None}
 
+    # ---- missions: a read-only view over goals, so existing data and endpoints stay as they are ----
+
+    def _with_urls(p: dict) -> dict:
+        p["tx_url"] = explorer("tx", p["tx_hash"])
+        return p
+
+    @app.get("/api/wf/missions", dependencies=A)
+    def missions(workspace: str = "", status: str = "", agent: str = "", q: str = "", limit: int = 100) -> list[dict]:
+        out = M.missions(db, workspace_id=workspace or None, status=status.split(",") if status else None, agent=agent or None,
+                         q=q or None, limit=limit)
+        for m in out:
+            _with_urls(m["proof"])
+        return out
+
+    @app.get("/api/wf/missions/{mid}", dependencies=A)
+    def mission(mid: str) -> dict:
+        t = run(wf.task_or_404, mid)
+        if t["kind"] != "goal":
+            raise HTTPException(404, f"{mid} 是任务，不是 Mission；它属于 {t['root_id']}")
+        out = M.mission(db, t)
+        _with_urls(out["proof"])
+        return out
+
+    @app.get("/api/wf/ledger", dependencies=A)
+    def ledger(limit: int = 200) -> list[dict]:
+        out = M.ledger(db, limit=limit)
+        for r in out:
+            _with_urls(r["proof"])
+        return out
+
     # ---- tasks ----
 
     def _task_query(q, status, agent, kind, priority, start, end, sort, order, page, size):
@@ -213,7 +251,8 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
     def tasks(q: str = "", status: str = "", agent: str = "", kind: str = "", priority: int | None = None, start: str | None = None,
               end: str | None = None, sort: str = "created_at", order: str = "desc", page: int = 1, size: int = 50) -> dict:
         items, total = _task_query(q, status, agent, kind, priority, start, end, sort, order, page, size)
-        return {"items": items, "total": total, "page": page, "size": size}
+        counts = db.status_counts(kind=kind or None, agent=agent or None, q=q or None)
+        return {"items": items, "total": total, "page": page, "size": size, "counts": {st: counts.get(st, 0) for st in D.TASK_STATUSES}}
 
     @app.get("/api/wf/tasks.csv", dependencies=A)
     def tasks_csv(q: str = "", status: str = "", agent: str = "", kind: str = "", priority: int | None = None,
