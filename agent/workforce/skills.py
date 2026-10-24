@@ -1,7 +1,12 @@
-"""Skills: the only things an agent can do. Each one declares its input and output schema,
-the permissions it needs and a version, and runs against real chain data.
+"""Skills (tools): the only things an agent can do. Each one declares its input and output schema,
+the permissions it needs, a timeout and a version, and runs against real chain data.
 
-Phase-one skills are read-only. None of them can sign or send a transaction.
+They live in a registry (REGISTRY / SKILL_BY_ID): the built-ins below register on import, and more
+tools register the same way (see chaintools.py) without touching the engine or the agent runtime.
+An agent reasoning with a model calls them as tools; the engine checks permissions on every call.
+
+Every registered tool is read-only. None of them can sign or send a transaction, and the registry
+refuses a tool that says otherwise.
 """
 
 from __future__ import annotations
@@ -9,6 +14,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -27,11 +34,16 @@ PERMISSIONS = {
     "chain:read": "读取链上数据（RPC）",
     "net:etherscan": "调用 Etherscan / BscScan API",
     "report:write": "生成报告并写入工作区记忆",
+    "model:invoke": "调用自己配置的 AI 模型，自主选择工具完成任务",
 }
 
 
 class SkillError(Exception):
     """A skill could not run; the message is shown to the user as-is."""
+
+
+class SkillTimeout(Exception):
+    """A tool ran past its own timeout. Treated like a network blip: retried, then reassigned."""
 
 
 @dataclass
@@ -42,11 +54,15 @@ class SkillContext:
     upstream: list[dict] = field(default_factory=list)  # results handed over by other agents
     logs: list[str] = field(default_factory=list)
     cancelled: Callable[[], bool] | None = None  # true once the task was cancelled or timed out
+    deadline: float | None = None  # time.monotonic() after which the running tool gives up
 
     def check(self) -> None:
-        """Raise Cancelled if the task is gone; skills and the readers call it between steps."""
+        """Raise Cancelled if the task is gone, SkillTimeout past the tool's deadline; the readers call it
+        around every RPC request, so a tool stops at its next request instead of running on."""
         if self.cancelled and self.cancelled():
             raise Cancelled("任务已取消")
+        if self.deadline is not None and time.monotonic() > self.deadline:
+            raise SkillTimeout("工具执行超时")
 
     def log(self, line: str) -> None:
         self.logs.append(f"{datetime.now(timezone.utc).strftime('%H:%M:%S')} {line}")
@@ -68,15 +84,57 @@ class Skill:
     permissions: tuple[str, ...]
     version: str
     run: Callable[[SkillContext, dict], dict]
-    developer: str = "ChainStaff"
+    developer: str = "KAGOU"
     compatibility: str = "BSC 主网 / 测试网"
     requires: tuple[str, ...] = ()  # environment the deployment needs, e.g. ETHERSCAN_API_KEY
+    timeout_s: float = 30.0  # one run, all its RPC calls included
+    read_only: bool = True  # registry refuses anything else: agents never sign or send
+    agent_tool: bool = True  # offered to agents that reason with a model (aggregators like data_report are not)
 
     def public(self) -> dict:
         return {"id": self.id, "name": self.name, "category": self.category, "description": self.description,
                 "input_schema": self.input_schema, "output_schema": self.output_schema, "permissions": list(self.permissions),
                 "version": self.version, "developer": self.developer, "compatibility": self.compatibility,
-                "requires": list(self.requires)}
+                "requires": list(self.requires), "timeout_s": self.timeout_s, "read_only": self.read_only,
+                "agent_tool": self.agent_tool}
+
+    def tool_param(self) -> dict:
+        """The tool as the model sees it (Messages API tool definition)."""
+        return {"name": self.id, "description": f"{self.name}: {self.description}", "input_schema": self.input_schema}
+
+
+class ToolRegistry:
+    """Every tool the platform knows. Register a Skill to add a tool; nothing else needs to change."""
+
+    def __init__(self) -> None:
+        self.by_id: dict[str, Skill] = {}
+        self._lock = threading.Lock()
+
+    def register(self, skill: Skill, *, replace: bool = False) -> Skill:
+        if not re.fullmatch(r"[a-z][a-z0-9_]{1,63}", skill.id):
+            raise ValueError(f"工具 id 只能用小写字母、数字和下划线：{skill.id}")
+        if not skill.read_only:
+            raise ValueError(f"{skill.id}：本阶段只允许只读工具，链上写操作需要单独的审批流程")
+        unknown = [p for p in skill.permissions if p not in PERMISSIONS]
+        if unknown:
+            raise ValueError(f"{skill.id}：未知权限 {unknown}")
+        if skill.input_schema.get("type") != "object":
+            raise ValueError(f"{skill.id}：input_schema 必须是 object")
+        with self._lock:
+            if skill.id in self.by_id and not replace:
+                raise ValueError(f"工具 {skill.id} 已经注册")
+            self.by_id[skill.id] = skill
+        return skill
+
+    def unregister(self, sid: str) -> None:
+        with self._lock:
+            self.by_id.pop(sid, None)
+
+    def get(self, sid: str) -> Skill | None:
+        return self.by_id.get(sid)
+
+    def all(self) -> list[Skill]:
+        return list(self.by_id.values())
 
 
 def validate(schema: dict, value: Any, path: str = "input") -> None:
@@ -249,7 +307,14 @@ def onchain_monitor(ctx: SkillContext, inp: dict) -> dict:
             "addresses": rows}
 
 
-SECTION = {"wallet_analysis": "钱包", "token_info": "代币", "contract_analysis": "合约权限", "tx_history": "交易历史",
+AGENT_TASK = "agent_task"
+
+
+def _agent_task(ctx: SkillContext, inp: dict) -> dict:
+    raise SkillError("自主执行由 Agent Runtime 运行，不能当普通技能直接调用")
+
+
+SECTION = {"agent_task": "自主分析", "wallet_analysis": "钱包", "token_info": "代币", "contract_analysis": "合约权限", "tx_history": "交易历史",
            "contract_events": "合约事件", "onchain_monitor": "链上状态"}
 
 
@@ -288,6 +353,11 @@ def data_report(ctx: SkillContext, inp: dict) -> dict:
         elif skill == "contract_events":
             lines.append(f"- 区块 {res['from_block']}–{res['to_block']} 共 {res['count']} 条事件：" +
                          ("，".join(f"{k} {v}" for k, v in res["by_event"].items()) or "无"))
+        elif skill == "agent_task":
+            lines.append(str(res.get("answer") or "（没有结论）").strip())
+            used = [c.get("tool") for c in res.get("tool_calls") or []]
+            if used:
+                lines.append(f"\n（调用了 {len(used)} 次工具：{', '.join(dict.fromkeys(used))}）")
         elif skill == "onchain_monitor":
             lines.append(f"- 区块 {res['block']}，Gas {res['gas_price_gwei']} gwei")
             for x in res["addresses"]:
@@ -326,6 +396,15 @@ SKILLS: tuple[Skill, ...] = (
           {"type": "object", "properties": {"block": {"type": "integer"}}}, ("chain:read",), "1.0.0", onchain_monitor),
     Skill("data_report", "数据报告", "Reporting", "汇总其他员工交来的结果，生成报告和 SHA-256 哈希（可审批后上链）。",
           {"type": "object", "properties": {"title": {"type": "string"}}}, {"type": "object", "properties": {"report_md": {"type": "string"}, "sha256": {"type": "string"}}},
-          ("report:write",), "1.0.0", data_report, compatibility="任意网络"),
+          ("report:write",), "1.0.0", data_report, compatibility="任意网络", agent_tool=False),
+    Skill(AGENT_TASK, "自主执行（AI 推理）", "Agent",
+          "把任务交给员工自己的模型：它理解任务，从自己被授权的工具里选择要调用的，读取真实结果后决定下一步，最后给出结论。",
+          {"type": "object", "required": ["instruction"], "properties": {"instruction": {"type": "string"}}},
+          {"type": "object", "properties": {"answer": {"type": "string"}, "tool_calls": {"type": "array"}}},
+          ("model:invoke",), "1.0.0", _agent_task, compatibility="需要 Anthropic 模型", agent_tool=False, timeout_s=900),
 )
-SKILL_BY_ID = {s.id: s for s in SKILLS}
+REGISTRY = ToolRegistry()
+for _s in SKILLS:
+    REGISTRY.register(_s)
+# The live table: tools registered later appear here too.
+SKILL_BY_ID = REGISTRY.by_id

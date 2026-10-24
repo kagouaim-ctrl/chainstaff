@@ -37,7 +37,8 @@ from .cron import Cron
 from .db import WorkforceDB
 from .chain import Cancelled
 from .planner import Planner, PlanCancelled, PlanError
-from .skills import ADDRESS_RE, PERMISSIONS, SKILL_BY_ID, SKILLS, SkillContext, SkillError, validate
+from .runtime import AgentRuntime, AnthropicProvider, Limits
+from .skills import ADDRESS_RE, AGENT_TASK, PERMISSIONS, REGISTRY, SKILL_BY_ID, SkillContext, SkillError, validate
 
 EXTRA_PERMISSIONS = {"message:peers": "可以直接给同工作区的其他员工发消息"}
 ALL_PERMISSIONS = {**PERMISSIONS, **EXTRA_PERMISSIONS}
@@ -94,6 +95,8 @@ class Workforce:
         self.tokens = tokens or {}
         self.planner = Planner(llm, price_per_mtok, timeout_s=plan_timeout_s, retries=plan_retries)
         self.llm = llm
+        # Agents that reason with a model run here; one provider per configured model API (only Anthropic today).
+        self.runtime = AgentRuntime(self, {"anthropic": AnthropicProvider(llm)} if llm else {}, price_per_mtok)
         self.anchor = anchor
         self.msg_timeout = timedelta(seconds=msg_timeout_s)
         self.instance = D.new_id("eng")  # names this process in planning claims
@@ -133,7 +136,7 @@ class Workforce:
             mc = body["model_config"] or {}
             if not isinstance(mc, dict):
                 raise WorkforceError("模型配置必须是对象")
-            f["model_config"] = {k: mc[k] for k in ("max_tokens", "effort") if k in mc}
+            f["model_config"] = {k: mc[k] for k in ("effort", *(b[0] for b in Limits.BOUNDS)) if k in mc}
         if "skills" in body:
             skills = list(dict.fromkeys(body["skills"] or []))
             bad = [s for s in skills if s not in SKILL_BY_ID]
@@ -250,6 +253,8 @@ class Workforce:
         missing = [p for p in skill.permissions if p not in agent["permissions"]]
         if missing:
             return f"{agent['name']} 缺少权限：{', '.join(ALL_PERMISSIONS[p] for p in missing)}"
+        if skill_id == AGENT_TASK:
+            return self.runtime.available(agent)
         return None
 
     # =====================================================================
@@ -1339,7 +1344,11 @@ class Workforce:
         try:
             validate(skill.input_schema, t["input"])
             ctx.check()
-            out = skill.run(ctx, dict(t["input"]))
+            if t["skill"] == AGENT_TASK:
+                out = self.runtime.run(agent, t, ctx)  # the agent reasons and calls its own tools; each has its own timeout
+            else:
+                ctx.deadline = time.monotonic() + skill.timeout_s
+                out = skill.run(ctx, dict(t["input"]))
             ctx.check()
             if t["skill"] == "data_report" and agent["provider"] == "anthropic" and self.llm and self.over_budget(agent) is None:
                 summary, usage = self.planner.summarize(agent, out["report_md"])
@@ -1662,19 +1671,22 @@ class Workforce:
 
     def _seed_skills(self) -> None:
         states = self.db.skill_states()
-        for s in SKILLS:
+        for s in REGISTRY.all():
             if s.id not in states:
                 self.db.set_skill_state(s.id, True, True, s.version)
 
     def skill_state(self, sid: str) -> dict:
         st = self.db.skill_states().get(sid)
+        if st is None and sid in SKILL_BY_ID:  # a tool registered after start: installed and enabled, like the built-ins
+            self.db.set_skill_state(sid, True, True, SKILL_BY_ID[sid].version)
+            st = self.db.skill_states().get(sid)
         return {"installed": bool(st and st["installed"]), "enabled": bool(st and st["enabled"]), "version": st["version"] if st else None}
 
     def skills_view(self) -> list[dict]:
         states = self.db.skill_states()
         agents = self.db.agents(include_archived=False)
         out = []
-        for s in SKILLS:
+        for s in REGISTRY.all():
             st = states.get(s.id) or {}
             missing = [e for e in s.requires if not self._requirement_met(e)]
             out.append({**s.public(), "installed": bool(st.get("installed")), "enabled": bool(st.get("enabled")),
@@ -1717,7 +1729,9 @@ class Workforce:
             raise WorkforceError(f"没有技能 {sid}")
         if not self.skill_state(sid)["enabled"]:
             raise WorkforceError(f"技能 {s.name} 没有启用")
-        ctx = SkillContext(self.reader, self.etherscan, self.tokens)
+        if sid == AGENT_TASK:
+            raise WorkforceError("自主执行要交给一个员工（它用自己的模型和权限），不能在技能页直接运行")
+        ctx = SkillContext(self.reader, self.etherscan, self.tokens, deadline=time.monotonic() + s.timeout_s)
         try:
             validate(s.input_schema, inp)
             out = s.run(ctx, dict(inp))

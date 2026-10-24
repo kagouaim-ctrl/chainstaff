@@ -151,6 +151,9 @@ class Planner:
             "\nSplit the user's goal into at most 12 subtasks. Each subtask runs exactly one skill, assigned to one agent that has it."
             " Use depends_on (step keys) only when a step needs another step's result; independent steps run in parallel."
             " If a data_report skill is available, end with one data_report step that depends on all analysis steps."
+            " The agent_task skill hands an agent a natural-language instruction: that agent reasons with its own model and"
+            " chooses among its own tools, so use it for open questions; it sees the results of the steps it depends_on."
+            " Use fixed skills for well-defined reads."
             " input_json must be a JSON object string valid for the skill's input_schema. Never invent addresses.")
         user = json.dumps({"goal": goal, "team": roster, "skills": skills}, ensure_ascii=False)
         ids = [r["agent_id"] for r in roster]
@@ -189,10 +192,10 @@ class Planner:
             deps = [str(d) for d in r["depends_on"]]
             if any(d not in seen for d in deps):
                 raise PlanError(f"{key} 依赖了不存在或排在后面的步骤")  # also rules out cycles
-            # Addresses must come from the goal, not from the model's imagination.
-            for v in json.dumps(inp).lower().split('"'):
-                if ADDRESS_RE.fullmatch(v) and v not in goal.lower():
-                    raise PlanError(f"{key} 用了目标里没有的地址 {v}")
+            # Addresses must come from the goal, not from the model's imagination (also inside instructions).
+            for v in ADDRESS_RE.findall(json.dumps(inp, ensure_ascii=False)):
+                if v.lower() not in goal.lower():
+                    raise PlanError(f"{key} 用了目标里没有的地址 {v.lower()}")
             steps.append(Step(key, str(r["title"])[:120], r["skill"], agent["id"], inp, deps))
             seen.add(key)
         return Plan(steps, "model", [], usage)
