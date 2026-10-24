@@ -1,0 +1,27 @@
+# TLS is automatic (Let's Encrypt) once app.kagouai.com resolves to this server.
+# WebSocket upgrades (/api/chain/ws) and the SSE stream (/api/wf/stream) pass through reverse_proxy as is.
+app.kagouai.com {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# The console token is a bearer secret: keep it out of access logs.
+	log {
+		output stdout
+		format filter {
+			request>headers>Authorization delete
+		}
+	}
+
+	reverse_proxy kagou:8000 {
+		flush_interval -1
+		health_uri /healthz
+	}
+}

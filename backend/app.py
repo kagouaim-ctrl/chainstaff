@@ -96,6 +96,11 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     def index() -> FileResponse:
         return FileResponse(WEB)
 
+    @app.get("/healthz")
+    def healthz() -> dict:
+        """Liveness for the container and the reverse proxy. No auth and nothing private: just that the app answers."""
+        return {"ok": True}
+
     # The AI workforce terminal: agents, workspaces, tasks, approvals, on-chain records.
     app.state.workforce = workforce or Workforce(store)
     mount_workforce(app, app.state.workforce, auth, OWNER_ID, chain)

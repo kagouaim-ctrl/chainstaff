@@ -1,5 +1,7 @@
 # 上 BSC 主网（小额试运行）
 
+> **KAGOU 说明（2026-10）：** Telegram 已从 KAGOU 移除，付款请求原来只从群里进来，现在没有入口；下面的实盘付款步骤暂时不适用。本阶段只做链上读取，链上写操作要先单独设计权限和人工审批。启动命令改为 `uvicorn backend.app:app`。部署 app.kagouai.com 见 [deploy-kagou.md](deploy-kagou.md)。
+
 主网会动真钱。代码会强制检查三件事：老板设置了 `CHAINSTAFF_ALLOW_MAINNET=yes`、用的是 Turnkey 钱包、RPC 返回的链 ID 是 56。
 
 钱的安全靠三层：
@@ -43,7 +45,6 @@ python3 scripts/turnkey_policy.py --user-id 你的UserID
 ## 4. 启动
 
 ```bash
-export TELEGRAM_BOT_TOKEN=...
 export CHAINSTAFF_CHAIN=config/chain.json
 export CHAINSTAFF_LIVE=1
 export CHAINSTAFF_WALLET=turnkey
@@ -52,7 +53,7 @@ export TURNKEY_ORG_ID=...
 export TURNKEY_SIGN_WITH=0x...              # 第 1 步的钱包地址
 export TURNKEY_API_PUBLIC_KEY=...
 export TURNKEY_API_PRIVATE_KEY=...          # 只放在环境变量里
-python3 -m bot.main
+uvicorn backend.app:app --port 8000
 ```
 
 日志里出现 `live=True` 后，先付自己 1 USDT 试一笔，在 bscscan.com 上确认到账。

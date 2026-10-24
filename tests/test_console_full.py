@@ -242,6 +242,10 @@ def test_employee_without_chain(emp):
     assert e["network"] is None and e["wallet_url"] is None and "USDT" in e["tokens"]
 
 
+def test_healthz_needs_no_token(c):
+    assert c.get("/healthz").json() == {"ok": True}
+
+
 def test_telegram_is_gone_and_treasury_alerts_toggle(c, emp):
     # KAGOU has no Telegram: no bot status, no group, no outgoing messages.
     for method, path in (("get", "/api/telegram"), ("put", "/api/telegram/settings"), ("put", "/api/telegram/chat"),
