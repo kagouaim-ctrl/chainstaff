@@ -23,9 +23,11 @@
 | `agent/store.py` | SQLite 账本：先记账后付款，重启不丢，同一请求不会付两次 |
 | `bot/` | Telegram 机器人：付款请求和财务命令，`/faq` `/tx` `/human` `/tickets`，`/watch` `/alerts` `/brief`，`/translate` `/post` `/discard`，`/team` `/help`；定时周报、简报和预警 |
 | `backend/` + `web/` | 老板控制台：团队总览（雇佣、停用、改称呼、岗位库）、社区客服（设置、FAQ、骗局试算、工单）、链上监控（盯盘地址、预警线、预警、简报）、公告翻译（写公告、草稿核对、术语表、分语言发群）、营销结算（名单核对预览、批次、导出 Safe 文件、标记执行）、空投反女巫（检查进度、团伙、逐个地址理由、导出、判定规则、导入链上资料）；财务的总览、审批、账本筛选和 CSV、收款人、规则和试算、国库预警、员工档案、Telegram 管理（通知群、自动通知、发消息、群聊模拟器、消息记录）、报告、审计日志、一键暂停 |
+| `agent/workforce/` + `backend/workforce_api.py` | AI 员工平台引擎：自定义员工（角色、模型、技能、权限、预算、链上身份）、工作区、AI 主管拆分任务并按依赖并行分配、员工之间持久化消息（去重、投递状态、超时、重试）、8 种任务状态、人工审批、分范围的长期记忆（全文检索、过期）、cron 定时任务、7 个读真实链上数据的技能、审批后把结果哈希写到 BSC 测试网。[说明](docs/workforce.md) |
+| `web/terminal/` | 新的 React 终端（`/terminal/`）：Overview、Workforce、Workspace、Tasks、On-Chain、Skills、Activity、Settings，实时事件流，手机端独立布局 |
 | `scripts/register_agent.py` | 用 bnbagent SDK 注册 ERC-8004 链上工号（测试网免 gas） |
 | `scripts/stage0_gate.py` | 读阶段 0 访谈记录表，算漏斗、中位数和关卡 A 是否通过 |
-| `tests/` | 310 个用例，覆盖率 99.9%；CI 跑测试、pip-audit、Semgrep |
+| `tests/` | 349 个用例，覆盖率 99.5%；CI 跑测试、pip-audit、Semgrep，以及终端的类型检查、构建和 npm audit |
 
 没配置钱包时一切都在测试模式，不碰链。
 
@@ -49,6 +51,15 @@ export CHAINSTAFF_CONSOLE_TOKEN=$(python3 -c "import secrets;print(secrets.token
 uvicorn backend.app:app --port 8000      # 打开 http://localhost:8000，粘贴令牌
 ```
 
+AI 员工终端（React）：
+
+```bash
+cd web/terminal && npm ci && npm run build && cd ../..
+uvicorn backend.app:app --port 8000      # 打开 http://localhost:8000/terminal/，用同一个令牌登录
+```
+
+开发时 `npm run dev` 会把 `/api` 代理到 8000 端口。终端用到的环境变量见 [docs/workforce.md](docs/workforce.md)。
+
 控制台和机器人共用同一个账本文件（`CHAINSTAFF_DB`），所以在控制台改的通知群、自动通知、要发到群里的消息，机器人几秒内就会执行。员工档案页另外读 `CHAINSTAFF_AGENT_ID`（ERC-8004 工号）和 `CHAINSTAFF_WALLET_ADDRESS`（测试模式下显示的钱包地址）。
 
 其他员工需要的环境变量（都是可选的，没设置时控制台会提示）：链上监控员读转账和授权、空投反女巫查地址资料要 `ETHERSCAN_API_KEY`；营销结算员导出 Safe 文件要在链配置里填 `safe_address` 和代币合约地址；公告翻译员要 `ANTHROPIC_API_KEY`。社区客服要删骗子消息时，把机器人设为群管理员并给「删除消息」权限。
@@ -67,7 +78,8 @@ agent/
   store.py             # SQLite 账本
   config.py runtime.py # 配置加载和组装
 bot/                   # Telegram 机器人
-backend/ web/          # 控制台
+agent/workforce/       # AI 员工平台：员工、任务图、消息总线、主管、技能、上链
+backend/ web/          # 控制台（web/terminal/ 是新的 React 终端）
 config/                # 示例配置（真实配置不提交）
 scripts/               # ERC-8004 注册
 docs/                  # 规格、部署、安全清单

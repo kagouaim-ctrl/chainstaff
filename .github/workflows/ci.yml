@@ -24,3 +24,21 @@ jobs:
         run: |
           pip install semgrep
           semgrep scan --config p/python --config p/secrets --error agent bot backend scripts
+
+  terminal:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/terminal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/terminal/package-lock.json
+      - run: npm ci
+      - name: Type check and production build
+        run: npm run build
+      - name: Dependency vulnerability scan
+        run: npm audit --audit-level=moderate
