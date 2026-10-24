@@ -81,11 +81,15 @@ class ChainProcessor:
                 self.hub.publish("gap", from_block=start, to_block=n - self.max_backfill - 1,
                                  text=f"离线太久，跳过了 {n - self.max_backfill - start} 个区块（只补最近 {self.max_backfill} 个）")
                 start = n - self.max_backfill
-            for k in range(start, n):
-                if not self._process(k, received):
-                    return  # a reorg was handled and the cursor is already caught up
-                self.counters["backfilled"] += 1
-            self._process(n, received, hash_=h)
+            if start > last + 1:
+                self.store.set("cursor", start - 1)
+            # Walk the cursor up to n; a reorg found on the way rewinds it, and the walk carries on from there.
+            while (k := self.store.get("cursor") + 1) <= n:
+                if k == n:
+                    self._process(n, received, hash_=h)
+                    break
+                if self._process(k, received):
+                    self.counters["backfilled"] += 1
 
     def ingest_number(self, n: int) -> None:
         """Catch up to block `n` (used by polling and right after a reconnect)."""
@@ -301,7 +305,7 @@ class ChainListener:
         if self._loop:
             try:
                 self._loop.call_soon_threadsafe(lambda: None)
-            except RuntimeError:
+            except RuntimeError:  # pragma: no cover - the loop already closed
                 pass
         if self._thread:
             self._thread.join(timeout)

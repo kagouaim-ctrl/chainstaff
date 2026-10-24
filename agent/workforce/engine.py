@@ -1111,7 +1111,7 @@ class Workforce:
             if gone():
                 written = None
             elif self.db.subtasks(goal_id):
-                return  # already planned (cannot happen with one claim, but never write a second set of subtasks)
+                return  # pragma: no cover - already planned (cannot happen with one claim, but never write a second set of subtasks)
             else:
                 written = self._write_plan(goal, manager, plan)
         if written is None:
