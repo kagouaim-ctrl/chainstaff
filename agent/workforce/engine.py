@@ -35,12 +35,23 @@ from . import db as D
 from .cron import Cron
 from .db import WorkforceDB
 from .planner import Planner, PlanError
-from .skills import PERMISSIONS, SKILL_BY_ID, SKILLS, SkillContext, SkillError, validate
+from .skills import ADDRESS_RE, PERMISSIONS, SKILL_BY_ID, SKILLS, SkillContext, SkillError, validate
 
 EXTRA_PERMISSIONS = {"message:peers": "可以直接给同工作区的其他员工发消息"}
 ALL_PERMISSIONS = {**PERMISSIONS, **EXTRA_PERMISSIONS}
 PROVIDERS = ("none", "anthropic")
 AUDIT = "workforce"
+
+# Squad policy. Each one changes what the engine does for the squad's missions.
+SQUAD_PERMISSIONS = {
+    "manager_executes": "主管有对应技能时也可以亲自执行任务",
+    "peer_messages": "成员之间可以直接发消息，不经过主管",
+    "anchor_results": "审批通过后可以把结果哈希写到 BSC 测试网",
+}
+DEFAULT_SQUAD_PERMISSIONS = ["manager_executes", "anchor_results"]
+# Skills the rule planner can plan with (it only understands addresses in the goal).
+RULE_SKILLS = ("wallet_analysis", "contract_analysis", "token_info", "contract_events", "tx_history")
+MAX_ATTACHMENT_CHARS = 12000
 
 
 class WorkforceError(ValueError):
@@ -88,6 +99,7 @@ class Workforce:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._seed_skills()
+        self._migrate_squads()
 
     # =====================================================================
     # agents
@@ -128,6 +140,14 @@ class Workforce:
             f["is_manager"] = int(bool(body["is_manager"]))
         if "budget_usd" in body:
             f["budget_usd"] = str(_dec(body["budget_usd"] or 0, "预算"))
+        if "max_concurrency" in body:
+            try:
+                n = int(body["max_concurrency"])
+            except (TypeError, ValueError):
+                raise WorkforceError("并发上限必须是整数") from None
+            if not 1 <= n <= 20:
+                raise WorkforceError("并发上限只能是 1–20")
+            f["max_concurrency"] = n
         if "onchain" in body:
             oc = body["onchain"] or {}
             f["onchain"] = {k: str(oc[k])[:80] for k in ("agent_id", "address", "network", "tx") if oc.get(k)}
@@ -150,7 +170,8 @@ class Workforce:
 
     def duplicate_agent(self, aid: str, by: str) -> dict:
         src = self._agent_or_404(aid)
-        keep = ("role", "description", "system_prompt", "provider", "model", "model_config", "skills", "permissions", "is_manager", "budget_usd")
+        keep = ("role", "description", "system_prompt", "provider", "model", "model_config", "skills", "permissions", "is_manager", "budget_usd",
+                "max_concurrency")
         a = self.db.add_agent(name=(src["name"] + " 副本")[:40], **{k: src[k] for k in keep})
         self._audit(f"复制员工 {src['name']} → {a['id']}", by, {"agent": a["id"], "from": aid})
         return a
@@ -173,10 +194,15 @@ class Workforce:
         if self.db.tasks(agent=aid, limit=1)[1]:
             raise WorkforceError("这个员工有历史任务，删除会丢失执行记录；请改为归档")
         self.db.delete_agent(aid)
+        for sq in self.db.squads(include_deleted=True):
+            if aid in sq["members"] or sq["manager_id"] == aid:
+                self.db.update_squad(sq["id"], members=[m for m in sq["members"] if m != aid],
+                                     manager_id=None if sq["manager_id"] == aid else sq["manager_id"])
         for ws in self.db.workspaces():
             if aid in ws["members"] or ws["manager_id"] == aid:
                 self.db.update_workspace(ws["id"], members=[m for m in ws["members"] if m != aid],
                                          manager_id=None if ws["manager_id"] == aid else ws["manager_id"])
+            self._sync_workspace(ws["id"])
         self._audit(f"删除员工 {a['name']}（{aid}）", by, {"agent": aid})
 
     def _agent_or_404(self, aid: str) -> dict:
@@ -215,9 +241,13 @@ class Workforce:
             raise WorkforceError("工作区名称不能为空")
         manager, members = self._check_members(body.get("manager_id"), body.get("members") or [])
         ws = self.db.add_workspace(name, str(body.get("description", ""))[:500], manager, members)
+        if manager or members:
+            # A roster given with the workspace becomes its first squad, so missions have a team.
+            self.db.add_squad(workspace_id=ws["id"], name="Core squad", manager_id=manager, members=members,
+                              permissions=list(DEFAULT_SQUAD_PERMISSIONS))
         self.db.post(workspace_id=ws["id"], kind="system", event="workspace.created", text=f"工作区 {name} 已建立", data={"members": members, "manager": manager})
         self._audit(f"建立工作区 {name}", by, {"workspace": ws["id"]})
-        return ws
+        return self._sync_workspace(ws["id"])
 
     def update_workspace(self, wid: str, body: dict, by: str) -> dict:
         ws = self.workspace_or_404(wid)
@@ -226,11 +256,18 @@ class Workforce:
             f["name"] = str(body["name"]).strip()[:60] or ws["name"]
         if "description" in body:
             f["description"] = str(body["description"])[:500]
-        if "manager_id" in body or "members" in body:
-            f["manager_id"], f["members"] = self._check_members(body.get("manager_id", ws["manager_id"]), body.get("members", ws["members"]))
         if "archived" in body:
             f["archived"] = int(bool(body["archived"]))
         ws = self.db.update_workspace(wid, **f)
+        if "manager_id" in body or "members" in body:
+            # The old roster API edits the workspace's default squad.
+            manager, members = self._check_members(body.get("manager_id", ws["manager_id"]), body.get("members", ws["members"]))
+            sq = self.default_squad(wid)
+            if sq:
+                self.db.update_squad(sq["id"], manager_id=manager, members=members)
+            else:
+                self.db.add_squad(workspace_id=wid, name="Core squad", manager_id=manager, members=members, permissions=list(DEFAULT_SQUAD_PERMISSIONS))
+            ws = self._sync_workspace(wid)
         self._audit(f"修改工作区 {ws['name']}", by, {"workspace": wid})
         return ws
 
@@ -249,21 +286,339 @@ class Workforce:
             raise WorkforceError(f"没有工作区 {wid}")
         return ws
 
+    def _sync_workspace(self, wid: str) -> dict:
+        """The workspace roster is the union of its squads; older code paths read it from the workspace row."""
+        squads = self.db.squads(wid)
+        if squads:
+            main = self.default_squad(wid)
+            manager = main["manager_id"] if main else None
+            ids = [x for sq in squads for x in [sq["manager_id"], *sq["members"]] if x]
+            self.db.update_workspace(wid, manager_id=manager, members=[x for x in dict.fromkeys(ids) if x != manager])
+        return self.db.workspace(wid)
+
+    def _migrate_squads(self) -> None:
+        """Workspaces from before squads existed: their roster becomes a squad, their missions belong to it."""
+        rows = self.db._db.execute("SELECT id FROM wf_workspaces").fetchall()
+        for r in rows:
+            ws = self.db.workspace(r["id"])
+            if self.db.squads(ws["id"], include_deleted=True) or not (ws["manager_id"] or ws["members"]):
+                continue
+            sq = self.db.add_squad(workspace_id=ws["id"], name="Core squad", manager_id=ws["manager_id"],
+                                   members=[m for m in ws["members"] if m != ws["manager_id"]], permissions=list(DEFAULT_SQUAD_PERMISSIONS))
+            self.db._db.execute("UPDATE wf_tasks SET squad_id = ? WHERE workspace_id = ? AND kind = 'goal' AND squad_id IS NULL", (sq["id"], ws["id"]))
+
     # =====================================================================
-    # goals: submit, cancel, retry
+    # squads: a manager and members that take missions together
     # =====================================================================
 
+    def squad_or_404(self, sid: str) -> dict:
+        sq = self.db.squad(sid)
+        if sq is None or sq["status"] == D.SQUAD_DELETED:
+            raise WorkforceError(f"没有 Squad {sid}")
+        return sq
+
+    def default_squad(self, wid: str) -> dict | None:
+        squads = self.db.squads(wid)
+        return next((s for s in squads if s["status"] == D.SQUAD_ACTIVE and s["manager_id"]), None) or (squads[0] if squads else None)
+
+    def _squad_roster(self, manager_id: Any, members: Any) -> tuple[str | None, list[str]]:
+        if not isinstance(members, list):
+            raise WorkforceError("成员必须是员工编号列表")
+        members = list(dict.fromkeys(str(m) for m in members if m))
+        manager_id = str(manager_id) if manager_id else None
+        for m in members + ([manager_id] if manager_id else []):
+            a = self.db.agent(m)
+            if a is None:
+                raise WorkforceError(f"没有员工 {m}")
+            if a["status"] == D.AGENT_ARCHIVED:
+                raise WorkforceError(f"{a['name']} 已归档，不能加入 Squad")
+        return manager_id, [m for m in members if m != manager_id]
+
+    @staticmethod
+    def _squad_policy(perms: Any) -> list[str]:
+        if not isinstance(perms, list):
+            raise WorkforceError("Squad 权限必须是列表")
+        bad = [p for p in perms if p not in SQUAD_PERMISSIONS]
+        if bad:
+            raise WorkforceError(f"没有这些 Squad 权限：{', '.join(map(str, bad))}")
+        return list(dict.fromkeys(perms))
+
+    @staticmethod
+    def _parallel(v: Any) -> int:
+        try:
+            n = int(v or 0)
+        except (TypeError, ValueError):
+            raise WorkforceError("并行上限必须是整数") from None
+        if not 0 <= n <= 50:
+            raise WorkforceError("并行上限只能是 0–50（0 表示不限）")
+        return n
+
+    def create_squad(self, body: dict, by: str) -> dict:
+        ws = self.workspace_or_404(str(body.get("workspace_id") or ""))
+        name = str(body.get("name", "")).strip()[:60]
+        if not name:
+            raise WorkforceError("Squad 名称不能为空")
+        manager, members = self._squad_roster(body.get("manager_id"), body.get("members") or [])
+        sq = self.db.add_squad(workspace_id=ws["id"], name=name, description=str(body.get("description", ""))[:500], manager_id=manager,
+                               members=members, permissions=self._squad_policy(body.get("permissions", DEFAULT_SQUAD_PERMISSIONS)),
+                               max_parallel=self._parallel(body.get("max_parallel")))
+        self._sync_workspace(ws["id"])
+        self.db.post(workspace_id=ws["id"], kind="system", event="squad.created", sender="user",
+                     text=f"Squad {name} 已建立：主管 {self._name(manager)}，{len(members)} 名成员", data={"squad": sq["id"]})
+        self._audit(f"建立 Squad {name}（{sq['id']}）", by, {"squad": sq["id"], "workspace": ws["id"]})
+        return sq
+
+    def update_squad(self, sid: str, body: dict, by: str) -> dict:
+        sq = self.squad_or_404(sid)
+        f: dict[str, Any] = {}
+        if "name" in body:
+            f["name"] = str(body["name"]).strip()[:60] or sq["name"]
+        if "description" in body:
+            f["description"] = str(body["description"])[:500]
+        if "permissions" in body:
+            f["permissions"] = self._squad_policy(body["permissions"])
+        if "max_parallel" in body:
+            f["max_parallel"] = self._parallel(body["max_parallel"])
+        if "manager_id" in body or "members" in body:
+            manager, members = self._squad_roster(body.get("manager_id", sq["manager_id"]), body.get("members", sq["members"]))
+            for gone in set([sq["manager_id"], *sq["members"]]) - set([manager, *members]) - {None}:
+                self._check_can_leave(sq, gone)
+            f["manager_id"], f["members"] = manager, members
+        sq = self.db.update_squad(sid, **f)
+        self._sync_workspace(sq["workspace_id"])
+        self._audit(f"修改 Squad {sq['name']}：{', '.join(f) or '无变化'}", by, {"squad": sid})
+        return sq
+
+    def _check_can_leave(self, sq: dict, aid: str) -> None:
+        busy = self.db._db.execute(
+            "SELECT COUNT(*) AS n FROM wf_tasks s JOIN wf_tasks g ON g.id = s.root_id WHERE s.kind = 'subtask' AND s.assigned_agent = ?"
+            " AND s.status IN (?, ?) AND g.squad_id = ?", (aid, D.ASSIGNED, D.RUNNING, sq["id"])).fetchone()["n"]
+        if busy:
+            raise WorkforceError(f"{self._name(aid)} 正在执行这个 Squad 的任务，等任务结束再移出")
+
+    def squad_add_member(self, sid: str, aid: str, by: str) -> dict:
+        sq = self.squad_or_404(sid)
+        if aid == sq["manager_id"] or aid in sq["members"]:
+            raise WorkforceError(f"{self._name(aid)} 已经在 Squad {sq['name']} 里")
+        _, members = self._squad_roster(sq["manager_id"], sq["members"] + [aid])
+        sq = self.db.update_squad(sid, members=members)
+        self._sync_workspace(sq["workspace_id"])
+        self.db.post(workspace_id=sq["workspace_id"], kind="system", event="squad.member_added", sender="user",
+                     text=f"{self._name(aid)} 加入 Squad {sq['name']}", data={"squad": sid, "agent": aid})
+        self._audit(f"Squad {sq['name']} 加入 {self._name(aid)}", by, {"squad": sid, "agent": aid})
+        return sq
+
+    def squad_remove_member(self, sid: str, aid: str, by: str) -> dict:
+        sq = self.squad_or_404(sid)
+        if aid == sq["manager_id"]:
+            raise WorkforceError(f"{self._name(aid)} 是这个 Squad 的主管，先指定新主管再移出")
+        if aid not in sq["members"]:
+            raise WorkforceError(f"{self._name(aid)} 不在 Squad {sq['name']} 里")
+        self._check_can_leave(sq, aid)
+        sq = self.db.update_squad(sid, members=[m for m in sq["members"] if m != aid])
+        self._sync_workspace(sq["workspace_id"])
+        self.db.post(workspace_id=sq["workspace_id"], kind="system", event="squad.member_removed", sender="user",
+                     text=f"{self._name(aid)} 离开 Squad {sq['name']}", data={"squad": sid, "agent": aid})
+        self._audit(f"Squad {sq['name']} 移出 {self._name(aid)}", by, {"squad": sid, "agent": aid})
+        return sq
+
+    def set_squad_manager(self, sid: str, aid: str, by: str) -> dict:
+        """The new manager leaves the member list; the old one stays on as a member."""
+        sq = self.squad_or_404(sid)
+        a = self._agent_or_404(aid)
+        if a["status"] == D.AGENT_ARCHIVED:
+            raise WorkforceError(f"{a['name']} 已归档，不能当主管")
+        old = sq["manager_id"]
+        members = [m for m in sq["members"] if m != aid] + ([old] if old and old != aid else [])
+        sq = self.db.update_squad(sid, manager_id=aid, members=members)
+        self._sync_workspace(sq["workspace_id"])
+        self.db.post(workspace_id=sq["workspace_id"], kind="system", event="squad.manager", sender="user",
+                     text=f"{a['name']} 成为 Squad {sq['name']} 的主管", data={"squad": sid, "agent": aid, "previous": old})
+        self._audit(f"Squad {sq['name']} 主管 → {a['name']}", by, {"squad": sid, "agent": aid})
+        return sq
+
+    def set_squad_status(self, sid: str, status: str, by: str) -> dict:
+        if status not in (D.SQUAD_ACTIVE, D.SQUAD_PAUSED):
+            raise WorkforceError("状态只能是 active / paused")
+        sq = self.squad_or_404(sid)
+        sq = self.db.update_squad(sid, status=status)
+        verb = "恢复" if status == D.SQUAD_ACTIVE else "暂停"
+        self.db.post(workspace_id=sq["workspace_id"], kind="system", event=f"squad.{status}", sender="user",
+                     text=f"Squad {sq['name']} 已{verb}" + ("：进行中的 Mission 不再派新任务，正在执行的会做完" if status == D.SQUAD_PAUSED else ""),
+                     data={"squad": sid})
+        self._audit(f"{verb} Squad {sq['name']}", by, {"squad": sid})
+        if status == D.SQUAD_ACTIVE:
+            for g in self.db.tasks(squad_id=sid, kind="goal", status=[D.WAITING], limit=200)[0]:
+                self._dispatch(g["id"])
+        return sq
+
+    def delete_squad(self, sid: str, by: str) -> None:
+        sq = self.squad_or_404(sid)
+        if self.db.tasks(squad_id=sid, kind="goal", status=[D.PENDING, D.RUNNING, D.WAITING, D.REVIEW], limit=1)[1]:
+            raise WorkforceError(f"Squad {sq['name']} 还有没结束的 Mission，先取消或等它们结束")
+        if self.db.tasks(squad_id=sid, kind="goal", limit=1)[1]:
+            self.db.update_squad(sid, status=D.SQUAD_DELETED)  # keeps the name on its finished missions
+        else:
+            self.db.delete_squad(sid)
+        self._sync_workspace(sq["workspace_id"])
+        self.db.post(workspace_id=sq["workspace_id"], kind="system", event="squad.deleted", sender="user", text=f"Squad {sq['name']} 已删除", data={"squad": sid})
+        self._audit(f"删除 Squad {sq['name']}", by, {"squad": sid})
+
+    def _executors(self, squad: dict | None, manager_id: str | None = None, ws: dict | None = None) -> list[str]:
+        """Who may be given a task: the members, and the manager too when the squad allows it."""
+        if squad:
+            mgr = manager_id or squad["manager_id"]
+            ids = list(squad["members"]) + ([squad["manager_id"]] if squad["manager_id"] else [])
+            if "manager_executes" not in squad["permissions"]:
+                ids = [x for x in ids if x != mgr]
+            return list(dict.fromkeys(ids))
+        return list(ws["members"]) if ws else []
+
+    def _roster(self, goal: dict) -> list[dict]:
+        sq = self.db.squad(goal["squad_id"]) if goal.get("squad_id") else None
+        ids = self._executors(sq, goal["assigned_agent"], self.db.workspace(goal["workspace_id"]))
+        return [a for a in (self.db.agent(x) for x in ids) if a and a["status"] == D.AGENT_ACTIVE]
+
+    def squad_views(self, workspace_id: str | None = None) -> list[dict]:
+        stats = self.db.squad_mission_stats()
+        names = {w["id"]: w["name"] for w in self.db.workspaces()}
+        out = []
+        for sq in self.db.squads(workspace_id):
+            st = stats.get(sq["id"], {"by_status": {}, "cost": 0.0})
+            by = st["by_status"]
+            done, failed = by.get(D.COMPLETED, 0), by.get(D.FAILED, 0)
+            check = self.preflight(sq["workspace_id"], squad_id=sq["id"])
+            able = [self.db.agent(x) for x in check["executors"]]
+            skills = sorted({s for a in able if a for s in a["skills"] if self.can_run(a, s) is None})
+            out.append({**sq, "workspace_name": names.get(sq["workspace_id"], sq["workspace_id"]),
+                        "missions": {"active": sum(by.get(s, 0) for s in (D.PENDING, D.RUNNING, D.WAITING)), "review": by.get(D.REVIEW, 0),
+                                     "completed": done, "failed": failed, "cancelled": by.get(D.CANCELLED, 0)},
+                        "success_rate": round(done / (done + failed), 4) if done + failed else None, "cost_usd": round(st["cost"], 6),
+                        "skills": skills, "executors": check["executors"], "running": self.db.running_subtasks(squad_id=sq["id"]),
+                        "ready": check["ready"], "issues": [c for c in check["checks"] if c["level"] == "error"]})
+        return out
+
+    # =====================================================================
+    # missions: check before creating, then submit
+    # =====================================================================
+
+    def preflight(self, wid: str, *, squad_id: str | None = None, manager_id: str | None = None, text: str = "",
+                  budget_usd: Any = "1") -> dict:
+        """Everything a mission needs, checked before it exists, so a mission is never created to fail.
+
+        Each check says what is wrong and which fix the terminal should offer:
+        create_squad, configure_squad, resume_squad, assign_manager, add_agent, create_agent, configure_manager.
+        `ready` is the squad's state; `ok` also covers the goal text and the budget.
+        """
+        checks: list[dict] = []
+
+        def add(key: str, level: str, msg: str, fix: str | None = None) -> None:
+            checks.append({"key": key, "level": level, "text": msg, "fix": fix})
+
+        out = {"ok": False, "ready": False, "workspace_id": wid, "squad_id": None, "manager_id": None, "planner": None,
+               "executors": [], "checks": checks}
+        ws = self.db.workspace(wid) if wid else None
+        if ws is None or ws["archived"]:
+            add("workspace", "error", f"没有工作区 {wid}" if wid else "先选一个工作区", "create_squad")
+            return out
+        sq = self.db.squad(squad_id) if squad_id else self.default_squad(wid)
+        if squad_id and (sq is None or sq["status"] == D.SQUAD_DELETED or sq["workspace_id"] != wid):
+            add("squad", "error", f"工作区 {ws['name']} 里没有 Squad {squad_id}", "configure_squad")
+            return out
+        if sq is None:
+            add("squad", "error", f"工作区 {ws['name']} 还没有 Squad：先建一个 Squad，指定主管并加入员工", "create_squad")
+            return out
+        out["squad_id"] = sq["id"]
+        if sq["status"] == D.SQUAD_PAUSED:
+            add("squad", "error", f"Squad {sq['name']} 已暂停，恢复后才能接 Mission", "resume_squad")
+        else:
+            add("squad", "ok", f"Squad {sq['name']}")
+        mid = manager_id or sq["manager_id"]
+        manager = self.db.agent(mid) if mid else None
+        if not mid:
+            add("manager", "error", f"Squad {sq['name']} 还没有 AI 主管，先指定一个主管", "assign_manager")
+        elif manager is None:
+            add("manager", "error", f"没有员工 {mid}", "assign_manager")
+        elif mid != sq["manager_id"] and mid not in sq["members"]:
+            add("manager", "error", f"{manager['name']} 不在 Squad {sq['name']} 里，不能当这个 Mission 的主管", "assign_manager")
+            manager = None
+        elif manager["status"] != D.AGENT_ACTIVE:
+            add("manager", "error", f"主管 {manager['name']} 不在岗（{manager['status']}）", "assign_manager")
+            manager = None
+        else:
+            add("manager", "ok", f"主管 {manager['name']}")
+        out["manager_id"] = manager["id"] if manager else None
+
+        # Who can actually take a task, and if nobody, exactly why not.
+        ids = self._executors(sq, mid)
+        able, paused, unable = [], [], []
+        for x in ids:
+            a = self.db.agent(x)
+            if a is None:
+                continue
+            runnable = [s for s in a["skills"] if self.can_run(a, s) is None]
+            if a["status"] != D.AGENT_ACTIVE:
+                paused.append(f"{a['name']}（{a['status']}）")
+            elif not runnable:
+                why = next((self.can_run(a, s) for s in a["skills"]), None) or f"{a['name']} 没有任何技能"
+                unable.append(why)
+            else:
+                able.append(a)
+        out["executors"] = [a["id"] for a in able]
+        if not able:
+            if not sq["members"]:
+                why = f"Squad {sq['name']} 里除了主管还没有成员" + ("，主管自己也没有可用的技能" if ids else "") + "：先把有技能的员工加进来"
+            else:
+                why = f"Squad {sq['name']} 里没有能执行任务的员工：" + "；".join(([f"{'、'.join(paused)} 不在岗"] if paused else []) + unable)
+            add("executors", "error", why, "add_agent")
+        else:
+            add("executors", "ok", f"{len(able)} 名员工可以执行：" + "、".join(a["name"] for a in able))
+            if paused:
+                add("executors_paused", "warn", f"{'、'.join(paused)} 不在岗，不会被分配任务", "configure_squad")
+            busy = [a for a in able if self.db.running_subtasks(agent=a["id"]) >= a.get("max_concurrency", 2)]
+            if len(busy) == len(able):
+                add("capacity", "warn", "所有能执行的员工都在满负荷，新任务会排队等他们空出来")
+
+        # How the manager will plan, and whether that plan can work for this goal.
+        uses_model = bool(manager and manager["provider"] == "anthropic" and self.llm)
+        out["planner"] = "model" if uses_model else "rules"
+        if manager and manager["provider"] == "anthropic" and not self.llm:
+            add("planner_model", "warn", "主管配置了 Anthropic，但服务器没有 ANTHROPIC_API_KEY，会改用规则规划")
+        rule_able = [a for a in able if any(self.can_run(a, s) is None for s in RULE_SKILLS)]
+        if uses_model:
+            add("planner", "ok", f"主管用模型（{manager['model'] or self.planner.model}）拆分任务")
+        elif text.strip() and not ADDRESS_RE.search(text):
+            add("planner", "error", "没有模型时，主管只能拆分带 0x 地址的链上分析任务；在目标里写上地址，"
+                                    "或给主管配置 Anthropic 模型（并在服务器设置 ANTHROPIC_API_KEY）", "configure_manager")
+        elif able and not rule_able:
+            add("planner", "error", "团队里没有能做链上分析的员工（需要钱包分析、合约分析、代币信息、合约事件或交易历史技能）", "add_agent")
+        elif able:
+            add("planner", "ok", "规则规划：按目标里的地址分派链上分析" + ("" if any(self.can_run(a, "data_report") is None for a in able) else "；团队里没有会数据报告的员工，结果不会汇总成报告"))
+        if able and not uses_model and self.reader is None:
+            add("chain", "error", "服务器没有配置链（CHAINSTAFF_CHAIN），链上分析技能都会失败", None)
+
+        try:
+            b = _dec(budget_usd, "预算")
+            add("budget", "warn" if b == 0 else "ok", "预算 0 表示不设上限" if b == 0 else f"预算 ${b}")
+        except WorkforceError as e:
+            add("budget", "error", str(e))
+        if self.anchor is None:
+            add("anchor", "info", "没有配置测试网钱包：审批通过后是链下完成，不能上链")
+        elif "anchor_results" not in sq["permissions"]:
+            add("anchor", "info", f"Squad {sq['name']} 没有上链权限：审批通过后只在链下完成")
+
+        squad_errors = [c for c in checks if c["level"] == "error" and c["key"] not in ("planner", "budget", "chain")]
+        out["ready"] = not squad_errors
+        out["ok"] = bool(text.strip()) and not any(c["level"] == "error" for c in checks)
+        return out
+
     def submit_goal(self, wid: str, text: str, by: str, *, priority: int = 2, max_steps: int = 20,
-                    budget_usd: Any = "1", timeout_s: int = 600) -> dict:
-        ws = self.workspace_or_404(wid)
+                    budget_usd: Any = "1", timeout_s: int = 600, squad_id: str | None = None, manager_id: str | None = None,
+                    attachments: list[dict] | None = None) -> dict:
+        self.workspace_or_404(wid)
         text = text.strip()
         if not text:
             raise WorkforceError("任务内容不能为空")
-        if not ws["manager_id"]:
-            raise WorkforceError("这个工作区还没有 AI 主管，先指定一个主管")
-        manager = self.db.agent(ws["manager_id"])
-        if manager["status"] != D.AGENT_ACTIVE:
-            raise WorkforceError(f"主管 {manager['name']} 不在岗（{manager['status']}）")
         if not (0 <= int(priority) <= 3):
             raise WorkforceError("优先级只能是 0–3")
         if not (1 <= int(max_steps) <= 100):
@@ -271,17 +626,46 @@ class Workforce:
         if not (10 <= int(timeout_s) <= 86400):
             raise WorkforceError("超时只能是 10 秒到 24 小时")
         budget = _dec(budget_usd, "预算")
+        files = self._attachments(attachments)
+        full = text + "".join(f"\n\n--- 附件 {f['name']} ---\n{f['text']}" for f in files)
+        check = self.preflight(wid, squad_id=squad_id, manager_id=manager_id, text=full, budget_usd=budget)
+        errors = [c["text"] for c in check["checks"] if c["level"] == "error"]
+        if errors:
+            raise WorkforceError(errors[0] if len(errors) == 1 else "；".join(errors[:3]))
+        manager = self.db.agent(check["manager_id"])
+        squad = self.db.squad(check["squad_id"])
         deadline = _now() + timedelta(seconds=int(timeout_s))
-        goal = self.db.add_task(workspace_id=wid, kind="goal", title=text.splitlines()[0][:120], description=text[:4000],
+        goal = self.db.add_task(workspace_id=wid, kind="goal", title=text.splitlines()[0][:120], description=full[:4000 + MAX_ATTACHMENT_CHARS],
                                 assigned_agent=manager["id"], priority=int(priority), status=D.PENDING, max_steps=int(max_steps),
-                                budget_usd=str(budget), timeout_s=int(timeout_s), deadline_at=_iso(deadline), created_by=by)
-        self.db.post(workspace_id=wid, kind="user", event="user.instruction", sender="user", text=text, task_id=goal["id"], data={"by": by})
-        self.db.post(workspace_id=wid, kind="task", event="task.created", task_id=goal["id"], text=f"任务 {goal['id']} 已创建，交给主管 {manager['name']}",
-                     data={"priority": goal["priority"], "max_steps": goal["max_steps"], "budget_usd": goal["budget_usd"], "deadline": goal["deadline_at"]})
+                                budget_usd=str(budget), timeout_s=int(timeout_s), deadline_at=_iso(deadline), created_by=by, squad_id=squad["id"])
+        self.db.post(workspace_id=wid, kind="user", event="user.instruction", sender="user", text=text, task_id=goal["id"],
+                     data={"by": by, "squad": squad["id"], "attachments": [{"name": f["name"], "chars": len(f["text"])} for f in files]})
+        self.db.post(workspace_id=wid, kind="task", event="task.created", task_id=goal["id"],
+                     text=f"任务 {goal['id']} 已创建，交给 Squad {squad['name']} 的主管 {manager['name']}",
+                     data={"priority": goal["priority"], "max_steps": goal["max_steps"], "budget_usd": goal["budget_usd"], "deadline": goal["deadline_at"],
+                           "squad": squad["id"], "executors": check["executors"]})
         self.db.post(workspace_id=wid, kind="agent", event="goal.submitted", sender="user", recipient=manager["id"], task_id=goal["id"],
                      text=text, dedupe_key=f"goal:{goal['id']}")
-        self._audit(f"提交任务 {goal['id']}：{goal['title']}", by, {"task": goal["id"]})
+        self._audit(f"提交任务 {goal['id']}：{goal['title']}（Squad {squad['name']}）", by, {"task": goal["id"], "squad": squad["id"]})
         return goal
+
+    @staticmethod
+    def _attachments(files: Any) -> list[dict]:
+        """Text attachments travel with the goal, so the manager and the planner read them."""
+        if not files:
+            return []
+        if not isinstance(files, list) or len(files) > 5:
+            raise WorkforceError("附件最多 5 个")
+        out, total = [], 0
+        for f in files:
+            if not isinstance(f, dict) or not str(f.get("name", "")).strip():
+                raise WorkforceError("附件要有文件名和文本内容")
+            body = str(f.get("text", ""))
+            total += len(body)
+            if total > MAX_ATTACHMENT_CHARS:
+                raise WorkforceError(f"附件文本太长（合计上限 {MAX_ATTACHMENT_CHARS} 字符）")
+            out.append({"name": str(f["name"]).strip()[:80], "text": body})
+        return out
 
     def assign_direct(self, aid: str, skill_id: str, inp: dict, by: str, *, workspace_id: str | None = None, title: str = "",
                       priority: int = 2, budget_usd: Any = "1", timeout_s: int = 600) -> dict:
@@ -311,6 +695,13 @@ class Workforce:
         if not spaces:
             raise WorkforceError(f"{agent['name']} 不在{'这个' if workspace_id else '任何'}工作区里，先把它加进工作区")
         wid = spaces[0]["id"]
+        squads = [q for w in spaces for q in self.db.squads(w["id"]) if aid == q["manager_id"] or aid in q["members"]]
+        live = [q for q in squads if q["status"] == D.SQUAD_ACTIVE]
+        if squads and not live:
+            raise WorkforceError(f"{agent['name']} 所在的 Squad 已暂停，恢复后才能派活")
+        squad = live[0] if live else None
+        if squad:
+            wid = squad["workspace_id"]
         if not (0 <= int(priority) <= 3):
             raise WorkforceError("优先级只能是 0–3")
         if not (10 <= int(timeout_s) <= 86400):
@@ -321,7 +712,7 @@ class Workforce:
         goal = self.db.add_task(workspace_id=wid, kind="goal", title=title, description=f"{title}\n\n直接派给 {agent['name']}：{skill.name}",
                                 assigned_agent=aid, priority=int(priority), status=D.WAITING, max_steps=2, budget_usd=str(budget),
                                 timeout_s=int(timeout_s), deadline_at=_iso(_now() + timedelta(seconds=int(timeout_s))),
-                                planner="direct", started_at=_iso(_now()), created_by=by)
+                                planner="direct", started_at=_iso(_now()), created_by=by, squad_id=squad["id"] if squad else None)
         sub = self.db.add_task(workspace_id=wid, kind="subtask", parent_id=goal["id"], root_id=goal["id"], title=title, skill=skill_id,
                                input=dict(inp), assigned_agent=aid, priority=int(priority), status=D.PENDING, created_by=by,
                                max_steps=1, budget_usd="0", timeout_s=int(timeout_s))
@@ -397,8 +788,12 @@ class Workforce:
             shared = [w for w in self.db.workspaces() if {sender, recipient} <= set(w["members"] + [w["manager_id"]])]
             if not shared:
                 raise WorkforceError(f"{snd['name']} 和 {rec['name']} 不在同一个工作区")
-            if not (snd["is_manager"] or rec["is_manager"] or "message:peers" in snd["permissions"]):
-                raise WorkforceError(f"{snd['name']} 没有给同事直接发消息的权限（message:peers）")
+            peer_squad = any({sender, recipient} <= set(q["members"] + [q["manager_id"]]) and "peer_messages" in q["permissions"]
+                             for q in self.db.squads() if q["status"] == D.SQUAD_ACTIVE)
+            managing = any(sender == q["manager_id"] or recipient == q["manager_id"] for q in self.db.squads()
+                           if {sender, recipient} <= set(q["members"] + [q["manager_id"]]))
+            if not (snd["is_manager"] or rec["is_manager"] or managing or peer_squad or "message:peers" in snd["permissions"]):
+                raise WorkforceError(f"{snd['name']} 没有给同事直接发消息的权限（message:peers，或 Squad 开启成员互发消息）")
             wid = shared[0]["id"]
         else:
             ws = [w for w in self.db.workspaces() if recipient in w["members"] + [w["manager_id"]]]
@@ -461,6 +856,7 @@ class Workforce:
             n += self._enforce_deadlines()
             n += self._expire_messages()
             n += self._deliver()
+            n += self._redispatch()
             n += self._poll_anchors()
             return n
 
@@ -552,11 +948,11 @@ class Workforce:
         self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
         if goal is None or not self.db.transition(goal["id"], (D.PENDING,), D.RUNNING):
             return
-        ws = self.db.workspace(goal["workspace_id"])
-        members = [a for a in (self.db.agent(x) for x in ws["members"]) if a and a["status"] == D.AGENT_ACTIVE]
+        members = self._roster(goal)
         wid = goal["workspace_id"]
         self.db.post(workspace_id=wid, kind="agent", event="agent.started", sender=manager["id"], task_id=goal["id"],
-                     text="收到任务，正在拆分工作流")
+                     text=f"收到任务，正在按 {len(members)} 名在岗员工的技能拆分工作流",
+                     data={"executors": [a["id"] for a in members], "squad": goal.get("squad_id")})
         try:
             plan = self.planner.plan(goal["description"], manager, members, self)
         except PlanError as e:
@@ -604,6 +1000,25 @@ class Workforce:
                                  text=f"{s['title']} 取消：前置任务没有完成")
                     continue
                 goal = self.db.task(root_id)
+                squad = self.db.squad(goal["squad_id"]) if goal.get("squad_id") else None
+                if squad and squad["status"] == D.SQUAD_PAUSED:
+                    self.db.post(workspace_id=goal["workspace_id"], kind="system", event="squad.holding", task_id=root_id,
+                                 text=f"Squad {squad['name']} 已暂停，{s['title']} 等恢复后再派", dedupe_key=f"hold:{root_id}:{s['id']}:{s['attempts']}")
+                    break
+                s = self._ensure_available(goal, s)
+                if s is None:
+                    continue
+                agent = self.db.agent(s["assigned_agent"])
+                if self.db.running_subtasks(agent=agent["id"]) >= agent.get("max_concurrency", 2):
+                    self.db.post(workspace_id=goal["workspace_id"], kind="task", event="task.queued", task_id=s["id"], sender=goal["assigned_agent"],
+                                 text=f"{s['title']} 排队：{agent['name']} 手上已有 {agent.get('max_concurrency', 2)} 个任务（并发上限）",
+                                 dedupe_key=f"queued:{s['id']}:{s['attempts']}:agent")
+                    continue
+                if squad and squad["max_parallel"] and self.db.running_subtasks(squad_id=squad["id"]) >= squad["max_parallel"]:
+                    self.db.post(workspace_id=goal["workspace_id"], kind="task", event="task.queued", task_id=s["id"], sender=goal["assigned_agent"],
+                                 text=f"{s['title']} 排队：Squad {squad['name']} 同时最多执行 {squad['max_parallel']} 个任务",
+                                 dedupe_key=f"queued:{s['id']}:{s['attempts']}:squad")
+                    break
                 if goal["steps"] + 1 > goal["max_steps"]:
                     self._end_goal(goal, D.FAILED, f"达到最大执行步数 {goal['max_steps']}")
                     return n
@@ -650,8 +1065,7 @@ class Workforce:
         follow = ["contract_analysis", "token_info", "contract_events"] if done["result"].get("is_contract") else ["tx_history"]
         if done["result"].get("is_contract"):
             follow.append("tx_history")
-        ws = self.db.workspace(root["workspace_id"])
-        members = [a for a in (self.db.agent(x) for x in ws["members"]) if a and a["status"] == D.AGENT_ACTIVE]
+        members = self._roster(root)
         subs = self.db.subtasks(root["id"])
         reports = [s for s in subs if s["skill"] == "data_report" and s["status"] == D.PENDING]
         added, skipped = [], []
@@ -729,7 +1143,7 @@ class Workforce:
         if reason:
             self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
             self.db.transition(t["id"], (D.ASSIGNED,), D.RUNNING)
-            self._fail_attempt(self.db.task(t["id"]), f"权限拒绝：{reason}", transient=False)
+            self._fail_attempt(self.db.task(t["id"]), f"权限拒绝：{reason}", transient=False, reassignable=True)
             return
         if not self.db.transition(t["id"], (D.ASSIGNED,), D.RUNNING):
             return
@@ -797,7 +1211,11 @@ class Workforce:
                      task_id=t["id"], dedupe_key=f"result:{t['id']}:{t['attempts']}:{'ok' if ok else 'fail'}",
                      text=f"{t['title']}：{'完成' if ok else '失败'}")
 
-    def _fail_attempt(self, t: dict, error: str, transient: bool) -> None:
+    def _fail_attempt(self, t: dict, error: str, transient: bool, reassignable: bool | None = None) -> None:
+        """A failed attempt: retry the same agent if it may be a blip, else let the manager hand it to someone else.
+
+        Errors that come from the input itself (a SkillError) are not reassigned: another agent would fail the same way.
+        """
         wid = t["workspace_id"]
         if transient and t["attempts"] < t["max_attempts"]:
             if self.db.transition(t["id"], (D.RUNNING, D.ASSIGNED), D.PENDING, error=error[:500]):
@@ -805,8 +1223,19 @@ class Workforce:
                              text=f"{t['title']} 第 {t['attempts']} 次失败，稍后重试：{error}"[:500])
                 self._dispatch(t["root_id"])
             return
+        if reassignable if reassignable is not None else transient:
+            root = self.db.task(t["root_id"])
+            alt = self._pick_other(root, t)
+            if alt and self.db.transition(t["id"], (D.RUNNING, D.ASSIGNED), D.PENDING, error=error[:500], max_attempts=t["attempts"] + 1):
+                self._reassign(root, self.db.task(t["id"]), alt, f"{self._name(t['assigned_agent'])} 没能完成（{error[:120]}）")
+                self._dispatch(t["root_id"])
+                return
         if not self.db.transition(t["id"], (D.RUNNING, D.ASSIGNED), D.FAILED, error=error[:500]):
             return
+        self._announce_failure(t, error)
+
+    def _announce_failure(self, t: dict, error: str) -> None:
+        wid = t["workspace_id"]
         self.db.post(workspace_id=wid, kind="task", event="task.failed", task_id=t["id"], sender=t["assigned_agent"],
                      text=f"{t['title']} 失败：{error}"[:500])
         # Dependent tasks that tolerate failures (the report) still need to hear about it.
@@ -818,6 +1247,59 @@ class Workforce:
                              data={"task": t["id"], "skill": t["skill"], "agent": t["assigned_agent"], "agent_name": self._name(t["assigned_agent"]),
                                    "result": None, "error": error})
         self._report_to_manager(self.db.task(t["id"]), t["assigned_agent"], ok=False)
+
+    # ---- the manager keeping work moving when an agent drops out ----
+
+    def _tried_agents(self, tid: str) -> set[str]:
+        return {(m["data"] or {}).get("agent") for m in self.db.messages(task_id=tid, limit=500) if m["event"] == "task.assigned"} - {None}
+
+    def _pick_other(self, goal: dict, t: dict) -> dict | None:
+        """Another in-squad agent that can run the task and has not tried it yet; never for a direct assignment."""
+        if goal["planner"] == "direct":
+            return None
+        tried = self._tried_agents(t["id"]) | {t["assigned_agent"]}
+        return self.planner.pick([a for a in self._roster(goal) if a["id"] not in tried], t["skill"], self)
+
+    def _reassign(self, goal: dict, t: dict, alt: dict, why: str) -> None:
+        old = t["assigned_agent"]
+        self.db.update_task(t["id"], assigned_agent=alt["id"])
+        self.db.reroute_handoffs(t["id"], alt["id"])  # results handed to the old agent go to the new one
+        self.db.post(workspace_id=t["workspace_id"], kind="agent", event="task.reassigned", sender=goal["assigned_agent"], task_id=t["id"],
+                     text=f"{why}；主管把 {t['title']} 改派给 {alt['name']}", data={"from": old, "to": alt["id"]})
+
+    def _ensure_available(self, goal: dict, t: dict) -> dict | None:
+        """Before handing out a task: is its agent still on duty, in the squad and able to run it? If not, reassign or fail it."""
+        a = self.db.agent(t["assigned_agent"]) if t["assigned_agent"] else None
+        if a is None:
+            reason = "已被删除"
+        elif a["status"] != D.AGENT_ACTIVE:
+            reason = f"不在岗（{a['status']}）"
+        else:
+            reason = self.can_run(a, t["skill"])
+            if reason is None and goal["planner"] != "direct" and goal.get("squad_id") and a["id"] not in {x["id"] for x in self._roster(goal)}:
+                reason = "已不在这个 Squad 里"
+            if reason and reason.startswith(a["name"]):
+                reason = reason[len(a["name"]):].strip()
+        if reason is None:
+            return t
+        who = a["name"] if a else (t["assigned_agent"] or "—")
+        alt = self._pick_other(goal, t)
+        if alt:
+            self._reassign(goal, t, alt, f"{who} {reason}")
+            return self.db.task(t["id"])
+        skill = SKILL_BY_ID.get(t["skill"])
+        error = f"{who} {reason}，Squad 里没有其他能做{skill.name if skill else t['skill']}的在岗员工"
+        if self.db.transition(t["id"], (D.PENDING,), D.FAILED, error=error[:500]):
+            self._announce_failure(self.db.task(t["id"]), error)
+        return None
+
+    def _redispatch(self) -> int:
+        """Tasks held back by a concurrency cap or a paused squad go out as soon as there is room."""
+        n = 0
+        for g in self.db.open_goals():
+            if g["status"] == D.WAITING and any(x["status"] == D.PENDING for x in self.db.subtasks(g["id"])):
+                n += self._dispatch(g["id"])
+        return n
 
     def _charge(self, task_id: str, agent_id: str, usage: dict | None) -> None:
         if not usage:
@@ -844,6 +1326,8 @@ class Workforce:
             raise WorkforceError("驳回时不能上链")
         if anchor and a["kind"] == "task_result" and self.anchor is None:
             raise WorkforceError("没有配置测试网钱包，不能把结果哈希写上链（见 CHAINSTAFF_ANCHOR_WALLET）")
+        if anchor and goal:
+            self._check_anchor_allowed(goal)
         if not self.db.decide_approval(approval_id, "approved" if approve else "rejected", by, note):
             raise WorkforceError(f"审批 #{approval_id} 刚被处理")
         wid = a["workspace_id"]
@@ -874,6 +1358,7 @@ class Workforce:
             raise WorkforceError("只有审批通过的任务才能上链")
         if self.anchor is None:
             raise WorkforceError("没有配置测试网钱包，不能写上链")
+        self._check_anchor_allowed(goal)
         existing = [r for r in self.db.chain_records(task_id=tid) if r["status"] in ("pending", "confirmed")]
         if existing:
             raise WorkforceError(f"这个任务的哈希已经上链或正在确认：{existing[0]['tx_hash']}")
@@ -883,6 +1368,11 @@ class Workforce:
                      data=rec)
         self._audit(f"任务 {tid} 结果哈希上链：{rec.get('tx_hash') or rec.get('error')}", by, {"task": tid, "record": rec["id"]})
         return rec
+
+    def _check_anchor_allowed(self, goal: dict) -> None:
+        sq = self.db.squad(goal["squad_id"]) if goal.get("squad_id") else None
+        if sq and "anchor_results" not in sq["permissions"]:
+            raise WorkforceError(f"Squad {sq['name']} 没有上链权限（anchor_results），这个结果只能链下完成")
 
     def _poll_anchors(self) -> int:
         if self.anchor is None:
@@ -1073,6 +1563,18 @@ class Workforce:
         managing, _ = self.db.tasks(status=[D.RUNNING, D.WAITING, D.REVIEW], kind="goal", limit=500)
         for g in managing:
             current.setdefault(g["assigned_agent"], g)
+        waiting_rows, _ = self.db.tasks(status=[D.PENDING], kind="subtask", limit=1000)
+        open_roots = {g["id"] for g in self.db.open_goals()}
+        waiting = {}
+        for t in waiting_rows:
+            if t["root_id"] in open_roots:
+                waiting.setdefault(t["assigned_agent"], t)
+        squads_of: dict[str, list[dict]] = {}
+        for q in self.db.squads():
+            for x in [q["manager_id"], *q["members"]]:
+                if x:
+                    squads_of.setdefault(x, []).append({"id": q["id"], "name": q["name"], "workspace_id": q["workspace_id"],
+                                                        "role": "manager" if x == q["manager_id"] else "member", "status": q["status"]})
         out = []
         for a in self.db.agents():
             s = stats.get(a["id"], {"by_status": {}, "secs": [], "cost": 0.0})
@@ -1084,12 +1586,15 @@ class Workforce:
             elif cur:
                 # a mission parked in review is waiting on the owner, not on this agent
                 live = "review" if cur["status"] == D.REVIEW else "busy"
+            elif waiting.get(a["id"]):
+                live, cur = "waiting", waiting[a["id"]]  # has work queued behind a dependency or a concurrency cap
             elif failed and self.db.tasks(agent=a["id"], status=[D.FAILED], since=_now() - timedelta(hours=24), limit=1)[1]:
                 live = "error"
             else:
                 live = "idle"
             out.append({**a, "live": live, "last_activity_at": last.get(a["id"]), "current_task": {"id": cur["id"], "title": cur["title"], "status": cur["status"]} if cur else None,
-                        "tasks_completed": done, "tasks_failed": failed,
+                        "tasks_completed": done, "tasks_failed": failed, "squads": squads_of.get(a["id"], []),
+                        "running": self.db.running_subtasks(agent=a["id"]),
                         "success_rate": round(done / (done + failed), 4) if done + failed else None,
                         "avg_secs": round(sum(s["secs"]) / len(s["secs"]), 2) if s["secs"] else None})
         return out
@@ -1106,10 +1611,13 @@ class Workforce:
         return {
             "agents": {"total": len([a for a in agents if a["status"] != D.AGENT_ARCHIVED]), "active": sum(a["status"] == D.AGENT_ACTIVE for a in agents),
                        "busy": sum(a["live"] == "busy" for a in agents), "idle": sum(a["live"] == "idle" for a in agents),
+                       "waiting": sum(a["live"] == "waiting" for a in agents),
                        "error": sum(a["live"] == "error" for a in agents), "paused": sum(a["status"] == D.AGENT_PAUSED for a in agents)},
             "tasks": {s: counts.get(s, 0) for s in D.TASK_STATUSES},
             "running": counts.get(D.RUNNING, 0) + counts.get(D.ASSIGNED, 0) + counts.get(D.WAITING, 0),
             "pending_approvals": len(self.db.approvals(status="pending")),
+            "squads": len(self.db.squads()),
+            "running_missions": len([g for g in self.db.open_goals() if g["status"] != D.REVIEW]),
             "cost_usd": round(goals_cost["c"], 6), "tokens": int(goals_cost["t"]),
             "series": [{"hour": r["h"], "status": r["status"], "n": r["n"]} for r in series],
             "performance": sorted(agents, key=lambda a: -(a["tasks_completed"] or 0))[:10],

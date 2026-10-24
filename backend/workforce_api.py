@@ -26,7 +26,7 @@ from agent.workforce import Workforce, WorkforceError
 from agent.workforce import db as D
 from agent.workforce import missions as M
 from agent.workforce.anchor import decode_calldata
-from agent.workforce.engine import ALL_PERMISSIONS, PROVIDERS
+from agent.workforce.engine import ALL_PERMISSIONS, PROVIDERS, SQUAD_PERMISSIONS
 
 TERMINAL = Path(__file__).resolve().parent.parent / "web" / "terminal" / "dist"
 RANGES = {"1h": timedelta(hours=1), "24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
@@ -94,7 +94,7 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
 
     @app.get("/api/wf/meta", dependencies=A)
     def meta() -> dict:
-        return {"providers": list(PROVIDERS), "permissions": ALL_PERMISSIONS, "task_statuses": list(D.TASK_STATUSES),
+        return {"providers": list(PROVIDERS), "permissions": ALL_PERMISSIONS, "squad_permissions": SQUAD_PERMISSIONS, "task_statuses": list(D.TASK_STATUSES),
                 "message_kinds": list(D.MSG_KINDS), "default_model": wf.planner.model,
                 "skills": [{"id": s["id"], "name": s["name"], "permissions": s["permissions"]} for s in wf.skills_view()],
                 "engine": wf.overview()["engine"], "network": chain.network if chain else None,
@@ -175,7 +175,8 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
         out = []
         for w in db.workspaces():
             goals, total = db.tasks(workspace_id=w["id"], kind="goal", limit=50)
-            out.append({**w, "goals": goals, "goal_count": total})
+            out.append({**w, "goals": goals, "goal_count": total,
+                        "squads": [{"id": q["id"], "name": q["name"], "status": q["status"], "manager_id": q["manager_id"]} for q in db.squads(w["id"])]})
         return out
 
     @app.post("/api/wf/workspaces", dependencies=W)
@@ -195,10 +196,81 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
             return db.messages(workspace_id=wid, after=after, root_id=task, limit=min(limit, 500))
         return db.messages(workspace_id=wid, root_id=task, limit=min(limit, 500), newest_first=True)[::-1]
 
+    def _int(body: dict, key: str, default: int) -> int:
+        try:
+            return int(body.get(key, default))
+        except (TypeError, ValueError):
+            raise HTTPException(400, f"{key} 必须是整数") from None
+
+    def _submit(wid: str, body: dict, squad_id: str | None = None) -> dict:
+        return run(wf.submit_goal, wid, str(body.get("text", "")), owner, priority=_int(body, "priority", 2),
+                   max_steps=_int(body, "max_steps", 20), budget_usd=body.get("budget_usd", "1"), timeout_s=_int(body, "timeout_s", 600),
+                   squad_id=squad_id or body.get("squad_id") or None, manager_id=body.get("manager_id") or None,
+                   attachments=body.get("attachments") or None)
+
     @app.post("/api/wf/workspaces/{wid}/goals", dependencies=W)
     def submit_goal(wid: str, body: dict = Body(...)) -> dict:
-        return run(wf.submit_goal, wid, str(body.get("text", "")), owner, priority=int(body.get("priority", 2)),
-                   max_steps=int(body.get("max_steps", 20)), budget_usd=body.get("budget_usd", "1"), timeout_s=int(body.get("timeout_s", 600)))
+        return _submit(wid, body)
+
+    # ---- squads: the team a mission is given to ----
+
+    @app.get("/api/wf/squads", dependencies=A)
+    def squads(workspace: str = "") -> list[dict]:
+        return wf.squad_views(workspace or None)
+
+    @app.post("/api/wf/squads", dependencies=W)
+    def create_squad(body: dict = Body(...)) -> dict:
+        return run(wf.create_squad, body, owner)
+
+    def _squad_view(sid: str) -> dict:
+        sq = run(wf.squad_or_404, sid)
+        return next(v for v in wf.squad_views(sq["workspace_id"]) if v["id"] == sid)
+
+    @app.get("/api/wf/squads/{sid}", dependencies=A)
+    def squad(sid: str) -> dict:
+        return _squad_view(sid)
+
+    @app.put("/api/wf/squads/{sid}", dependencies=W)
+    def update_squad(sid: str, body: dict = Body(...)) -> dict:
+        run(wf.update_squad, sid, body, owner)
+        return _squad_view(sid)
+
+    @app.delete("/api/wf/squads/{sid}", dependencies=W)
+    def delete_squad(sid: str) -> dict:
+        run(wf.delete_squad, sid, owner)
+        return {"ok": True}
+
+    @app.post("/api/wf/squads/{sid}/members", dependencies=W)
+    def add_member(sid: str, body: dict = Body(...)) -> dict:
+        run(wf.squad_add_member, sid, str(body.get("agent_id", "")), owner)
+        return _squad_view(sid)
+
+    @app.delete("/api/wf/squads/{sid}/members/{aid}", dependencies=W)
+    def remove_member(sid: str, aid: str) -> dict:
+        run(wf.squad_remove_member, sid, aid, owner)
+        return _squad_view(sid)
+
+    @app.post("/api/wf/squads/{sid}/manager", dependencies=W)
+    def set_manager(sid: str, body: dict = Body(...)) -> dict:
+        run(wf.set_squad_manager, sid, str(body.get("agent_id", "")), owner)
+        return _squad_view(sid)
+
+    @app.post("/api/wf/squads/{sid}/status", dependencies=W)
+    def squad_status(sid: str, body: dict = Body(...)) -> dict:
+        run(wf.set_squad_status, sid, str(body.get("status", "")), owner)
+        return _squad_view(sid)
+
+    @app.post("/api/wf/squads/{sid}/missions", dependencies=W)
+    def squad_mission(sid: str, body: dict = Body(...)) -> dict:
+        sq = run(wf.squad_or_404, sid)
+        return _submit(sq["workspace_id"], body, sid)
+
+    @app.post("/api/wf/missions/preflight", dependencies=A)
+    def preflight(body: dict = Body(...)) -> dict:
+        """What would stop this mission, checked without creating anything (the composer calls it as you type)."""
+        return wf.preflight(str(body.get("workspace_id") or ""), squad_id=body.get("squad_id") or None, manager_id=body.get("manager_id") or None,
+                            text=str(body.get("text", "")) + "".join(f"\n{f.get('text', '')}" for f in (body.get("attachments") or []) if isinstance(f, dict)),
+                            budget_usd=body.get("budget_usd", "1"))
 
     @app.post("/api/wf/workspaces/{wid}/notes", dependencies=W)
     def note(wid: str, body: dict = Body(...)) -> dict:
@@ -217,8 +289,8 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
         return p
 
     @app.get("/api/wf/missions", dependencies=A)
-    def missions(workspace: str = "", status: str = "", agent: str = "", q: str = "", limit: int = 100) -> list[dict]:
-        out = M.missions(db, workspace_id=workspace or None, status=status.split(",") if status else None, agent=agent or None,
+    def missions(workspace: str = "", squad: str = "", status: str = "", agent: str = "", q: str = "", limit: int = 100) -> list[dict]:
+        out = M.missions(db, workspace_id=workspace or None, squad_id=squad or None, status=status.split(",") if status else None, agent=agent or None,
                          q=q or None, limit=limit)
         for m in out:
             _with_urls(m["proof"])

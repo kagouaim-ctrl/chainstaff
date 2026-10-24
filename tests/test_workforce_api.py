@@ -240,3 +240,50 @@ def test_missions_direct_run_ledger_and_counts_over_http(setup):
     assert tasks["counts"]["completed"] == 1 and set(tasks["counts"]) == set(wf.db.status_counts() | {s: 0 for s in tasks["counts"]})
     agents = ok(c.get("/api/wf/agents", headers=H))
     assert next(a for a in agents if a["id"] == a2["id"])["last_activity_at"]
+
+
+def test_squads_and_preflight_over_http(setup):
+    c, wf, fake = setup
+    mgr = ok(c.post("/api/wf/agents", headers=H, json={"name": "Lead", "is_manager": True}))
+    a1 = ok(c.post("/api/wf/agents", headers=H, json={"name": "Chain", "skills": ["wallet_analysis"], "permissions": ["chain:read"], "max_concurrency": 3}))
+    a2 = ok(c.post("/api/wf/agents", headers=H, json={"name": "Report", "skills": ["data_report"], "permissions": ["report:write"]}))
+    assert a1["max_concurrency"] == 3
+    ws = ok(c.post("/api/wf/workspaces", headers=H, json={"name": "Desk"}))
+    # the bug as the terminal saw it: a workspace with no team; now refused with the reason, nothing created
+    pf = ok(c.post("/api/wf/missions/preflight", headers=H, json={"workspace_id": ws["id"], "text": f"check {EOA}"}))
+    assert not pf["ok"] and pf["checks"][0]["fix"] == "create_squad"
+    r = c.post(f"/api/wf/workspaces/{ws['id']}/goals", headers=H, json={"text": f"check {EOA}"})
+    assert r.status_code == 400 and "Squad" in r.json()["detail"]
+    assert "manager_executes" in ok(c.get("/api/wf/meta", headers=H))["squad_permissions"]
+
+    sq = ok(c.post("/api/wf/squads", headers=H, json={"workspace_id": ws["id"], "name": "BSC", "description": "d"}))
+    sq = ok(c.post(f"/api/wf/squads/{sq['id']}/manager", headers=H, json={"agent_id": mgr["id"]}))
+    sq = ok(c.post(f"/api/wf/squads/{sq['id']}/members", headers=H, json={"agent_id": a1["id"]}))
+    sq = ok(c.post(f"/api/wf/squads/{sq['id']}/members", headers=H, json={"agent_id": a2["id"]}))
+    assert sq["ready"] and sq["members"] == [a1["id"], a2["id"]] and "wallet_analysis" in sq["skills"] and sq["workspace_name"] == "Desk"
+    assert c.post(f"/api/wf/squads/{sq['id']}/members", headers=H, json={"agent_id": a1["id"]}).status_code == 400
+    assert [s["id"] for s in ok(c.get("/api/wf/squads", headers=H, params={"workspace": ws["id"]}))] == [sq["id"]]
+    assert ok(c.get("/api/wf/workspaces", headers=H))[0]["squads"][0]["id"] == sq["id"]
+    pf = ok(c.post("/api/wf/missions/preflight", headers=H, json={"workspace_id": ws["id"], "squad_id": sq["id"], "text": "write a poem"}))
+    assert not pf["ok"] and pf["ready"]  # the squad is fine; the goal is what the rule planner cannot do
+    pf = ok(c.post("/api/wf/missions/preflight", headers=H, json={"workspace_id": ws["id"], "squad_id": sq["id"], "text": "see file",
+                                                                   "attachments": [{"name": "a.txt", "text": EOA}]}))
+    assert pf["ok"] and pf["executors"] == [a1["id"], a2["id"]]
+    g = ok(c.post(f"/api/wf/squads/{sq['id']}/missions", headers=H, json={"text": f"check {EOA}", "budget_usd": "0.5", "timeout_s": 1800}))
+    assert g["squad_id"] == sq["id"] and g["timeout_s"] == 1800
+    assert c.post(f"/api/wf/squads/{sq['id']}/missions", headers=H, json={"text": f"check {EOA}", "priority": "x"}).status_code == 400
+    wf.run_until_idle()
+    assert ok(c.get("/api/wf/missions", headers=H, params={"squad": sq["id"]}))[0]["squad_id"] == sq["id"]
+    assert ok(c.get(f"/api/wf/squads/{sq['id']}", headers=H))["missions"]["review"] == 1
+    agent = next(a for a in ok(c.get("/api/wf/agents", headers=H)) if a["id"] == a1["id"])
+    assert agent["squads"][0]["id"] == sq["id"] and agent["live"] in ("idle", "error")
+    sq = ok(c.post(f"/api/wf/squads/{sq['id']}/status", headers=H, json={"status": "paused"}))
+    assert sq["status"] == "paused" and not sq["ready"]
+    assert c.post(f"/api/wf/squads/{sq['id']}/missions", headers=H, json={"text": f"check {EOA}"}).status_code == 400
+    ok(c.post(f"/api/wf/squads/{sq['id']}/status", headers=H, json={"status": "active"}))
+    sq = ok(c.put(f"/api/wf/squads/{sq['id']}", headers=H, json={"name": "BSC desk", "permissions": ["manager_executes"], "max_parallel": 2}))
+    assert sq["name"] == "BSC desk" and sq["max_parallel"] == 2
+    sq = ok(c.delete(f"/api/wf/squads/{sq['id']}/members/{a2['id']}", headers=H))
+    assert sq["members"] == [a1["id"]]
+    assert c.delete(f"/api/wf/squads/{sq['id']}", headers=H).status_code == 400  # a mission is still awaiting review
+    assert c.get("/api/wf/squads/sqd_nope", headers=H).status_code == 400
