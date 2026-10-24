@@ -45,14 +45,14 @@ function Login() {
   };
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 16 }}>
-      <form className="dialog" style={{ position: "static", width: 380, maxWidth: "100%" }} onSubmit={(e) => (e.preventDefault(), submit())}>
+      <form className="dialog" style={{ position: "static", transform: "none", width: 380, maxWidth: "100%", padding: 20 }} onSubmit={(e) => (e.preventDefault(), submit())}>
         <div className="row" style={{ gap: 10, marginBottom: 12 }}>
           <span className="brand-mark">CS</span>
           <b>ChainStaff Terminal</b>
         </div>
         <label className="field">
           <span>Access token</span>
-          <input className="input mono" type="password" autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="CHAINSTAFF_WEB_TOKEN" />
+          <input className="input mono" type="password" autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="CHAINSTAFF_CONSOLE_TOKEN" />
         </label>
         {err && <div className="bad" style={{ fontSize: 12, marginBottom: 8 }}>{err}</div>}
         <button className="btn primary" style={{ width: "100%" }} disabled={!value.trim() || busy}>Sign in</button>
