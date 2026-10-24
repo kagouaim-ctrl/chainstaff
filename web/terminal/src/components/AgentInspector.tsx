@@ -43,7 +43,7 @@ export function AgentInspector({ id, onClose, onConfigure, fav, onFav, action, o
           <div className="col gap2 grow">
             <div className="row gap6">
               <h2 className="ellipsis">{a.name}</h2>
-              {a.is_manager && <span className="tag acc">MANAGER</span>}
+              {a.is_manager && <span className="badge acc">Manager</span>}
             </div>
             <div className="row gap6 xs muted">
               <AgentStatus agent={a} />
@@ -73,7 +73,7 @@ export function AgentInspector({ id, onClose, onConfigure, fav, onFav, action, o
           <button className="btn ghost sm icon" onClick={() => onConfigure(a)} title="Configure" aria-label="配置"><Settings2 size={13} /></button>
         </div>
         {action && (
-          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
+          <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
             <RunPanel agent={a} mode={action} onMode={(m) => onAction?.(m)} presetSkill={preset} />
           </div>
         )}
@@ -136,7 +136,7 @@ function CurrentExecution({ a, full }: { a: AgentDetail; full?: boolean }) {
         {task && task.attempts > 1 && <span className="muted">attempt {task.attempts}</span>}
       </div>
       {m && m.id !== cur.id && (
-        <button className="row gap6 xs" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "inherit", textAlign: "left" }} onClick={() => go("workspace", m.workspace_id, { m: m.id, t: cur.id })}>
+        <button className="row gap6 xs plain-btn" onClick={() => go("workspace", m.workspace_id, { m: m.id, t: cur.id })}>
           <span className="muted">Mission</span>
           <span className="ellipsis dim grow">{m.name}</span>
           <Progress done={m.progress.completed} failed={m.progress.failed} total={m.progress.total} />

@@ -181,7 +181,7 @@ export function AddMemberDialog({ squad, onClose }: { squad: Squad; onClose: () 
                 <span className="muted ellipsis" style={{ width: 100 }}>{a.role || "—"}</span>
                 <AgentStatus agent={a} />
                 <span className="row gap4 grow ellipsis">{r.length ? r.slice(0, 3).map((s) => <span key={s} className="tag">{skillName(s)}</span>) : <span className="warn xs">没有可用技能</span>}</span>
-                <button className="btn sm outline-acc" disabled={add.isPending} onClick={() => add.mutate(a.id)}><UserPlus size={12} /> Add</button>
+                <button className="btn sm" disabled={add.isPending} onClick={() => add.mutate(a.id)}><UserPlus size={12} /> Add</button>
               </div>
             );
           })}

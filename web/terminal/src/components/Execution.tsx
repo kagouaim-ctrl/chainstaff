@@ -40,7 +40,7 @@ export function ExecutionSteps({ d, selected, onSelect }: { d: TaskDetail; selec
           {lane.map((s) => {
             const waiting = s.depends_on.filter((x) => d.subtasks.find((y) => y.id === x && !FINAL.includes(y.status))).length;
             return (
-              <div key={s.id} className={`list-row ${onSelect ? "click" : ""}`} onClick={() => onSelect?.(s.id)} aria-selected={selected === s.id} style={selected === s.id ? { background: "var(--accent-bg)" } : undefined}>
+              <div key={s.id} className={`list-row ${onSelect ? "click" : ""}`} onClick={() => onSelect?.(s.id)} aria-selected={selected === s.id}>
                 <Pipe status={s.status} />
                 <div className="col gap2 grow">
                   <span className="ellipsis" title={s.title}>{s.title}</span>

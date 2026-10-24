@@ -17,20 +17,16 @@ export function TransactionStatus({ proof, compact }: { proof: Proof; compact?: 
   const sent = s === "onchain_pending" || s === "onchain_confirmed";
   const conf = s === "onchain_confirmed";
   const step = (on: boolean, live: boolean, label: string, sub?: string, tone = "ok") => (
-    <div className="col gap2" style={{ flex: 1, minWidth: 0 }}>
-      <div className="row gap4">
-        <span className={`ind ${on ? tone : live ? "warn live" : ""}`} />
-        <span className={`xs nowrap ${on ? "strong" : live ? "acc" : "muted"}`}>{label}</span>
-      </div>
-      {!compact && <span className="muted xs mono ellipsis">{sub || "—"}</span>}
+    <div className={`vstep ${on ? `on ${tone}` : live ? "live" : ""}`}>
+      <span className="vbar" />
+      <span className="vt">{label}</span>
+      {!compact && <span className="vs">{sub || "—"}</span>}
     </div>
   );
   return (
-    <div className="row gap6" style={{ alignItems: "flex-start" }} aria-label="Verification">
+    <div className="vsteps" aria-label="Verification">
       {step(approved, s === "awaiting_review", "Off-chain done", approved ? "human approved" : s === "awaiting_review" ? "awaiting review" : undefined, "info")}
-      <span className="muted xs" style={{ paddingTop: 1 }}>→</span>
-      {step(sent, false, "Broadcast", proof.tx_hash ? short(proof.tx_hash, 6) : undefined, "warn")}
-      <span className="muted xs" style={{ paddingTop: 1 }}>→</span>
+      {step(sent, false, "Broadcast", proof.tx_hash ? short(proof.tx_hash, 6) : undefined, "info")}
       {step(conf, s === "onchain_pending", "Confirmed", proof.block ? `block ${num(proof.block)}` : undefined)}
     </div>
   );
@@ -59,7 +55,7 @@ export function ChainPanel({ d, proof }: { d: TaskDetail; proof?: Proof | null }
 
 export function RecordView({ r }: { r: ChainRecord }) {
   return (
-    <div className="col gap4" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+    <div className="col gap4" style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
       <div className="row sp"><Status kind="chain" status={r.status} /><span className="muted xs mono">{fmtTime(r.confirmed_at || r.at)}</span></div>
       <dl className="kv">
         <dt>Network</dt><dd>{r.network} ({r.chain_id})</dd>

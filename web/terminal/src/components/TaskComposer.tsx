@@ -154,8 +154,8 @@ export function TaskComposer({ ws, squadId, onSquad, onSubmitted, autoFocus, row
           </>
         )}
         <div className="grow" />
-        <button className="btn primary sm" onClick={submit} disabled={!canLaunch || send.isPending} title={errors[0]?.text}>
-          <Send size={12} /> {mode === "mission" ? "Launch" : "Post"}
+        <button className={`btn primary ${send.isPending ? "loading" : ""}`} onClick={submit} disabled={!canLaunch || send.isPending} title={errors[0]?.text}>
+          <Send size={14} /> {mode === "mission" ? "Launch" : "Post"}
         </button>
       </div>
       {opts && mode === "mission" && (
@@ -197,7 +197,7 @@ function PreflightLine({ checks, errors, warns, loading, hasText, onFix, planner
           <div key={c.key} className="pf-row bad">
             <AlertTriangle size={12} />
             <span className="grow">{c.text}</span>
-            {c.fix && <button className="btn xs outline-acc" onClick={() => onFix(c.fix!)}>{FIX_LABEL[c.fix]}</button>}
+            {c.fix && <button className="btn xs" onClick={() => onFix(c.fix!)}>{FIX_LABEL[c.fix]}</button>}
             {c.key === "executors" && <button className="btn xs" onClick={() => onFix("create_agent")}>Create agent</button>}
           </div>
         ))}
@@ -259,7 +259,7 @@ export function NewMissionDialog({ onClose, workspaceId, squadId }: { onClose: (
             </label>
           )}
           {current && (
-            <div style={{ margin: "0 -16px -14px" }}>
+            <div>
               <TaskComposer ws={current} squadId={sq || (firstReady?.workspace_id === wid ? firstReady.id : undefined)} onSquad={setSq} autoFocus rows={4}
                 onSubmitted={(t) => (onClose(), go("workspace", t.workspace_id, { m: t.id, ...(t.squad_id ? { s: t.squad_id } : {}) }))} />
             </div>

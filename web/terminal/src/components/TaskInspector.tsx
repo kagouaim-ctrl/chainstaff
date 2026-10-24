@@ -31,15 +31,15 @@ export function TaskInspector({ id, onClose }: { id: string; onClose?: () => voi
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div className="col gap4 grow">
             <div className="row gap6">
-              <span className="tag">{isMission ? "MISSION" : "TASK"}</span>
+              <span className="tag">{isMission ? "Mission" : "Task"}</span>
               {isMission && mission.data ? <MissionStage m={mission.data} /> : <Status status={t.status} />}
               <Priority p={t.priority} />
               <span className="mono muted xs">{t.id}</span>
             </div>
             <h2 className="clamp2" title={t.title}>{t.title}</h2>
             {!isMission && (
-              <button className="row gap6 xs" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "inherit", textAlign: "left" }} onClick={() => go("workspace", d.root.workspace_id, { m: d.root.id, t: t.id })}>
-                <span className="muted">in mission</span><span className="dim ellipsis">{d.root.title}</span><ArrowRight size={11} className="muted" />
+              <button className="row gap6 xs plain-btn" onClick={() => go("workspace", d.root.workspace_id, { m: d.root.id, t: t.id })}>
+                <span className="muted nowrap">in mission</span><span className="dim ellipsis">{d.root.title}</span><ArrowRight size={11} className="muted" />
               </button>
             )}
           </div>
@@ -99,8 +99,8 @@ function Overview({ d, t, proof, progress }: { d: TaskDetail; t: Task; proof?: i
           <dt>Finished</dt><dd>{fmtTime(t.finished_at)}</dd>
           {isMission && <><dt>Budget</dt><dd className="mono">{usd(t.cost_usd)} / {usd(t.budget_usd)}</dd><dt>Deadline</dt><dd>{fmtTime(t.deadline_at)}</dd></>}
           <dt>Result hash</dt><dd><Addr value={t.result_hash} n={8} /></dd>
-          {t.error && <><dt>Error</dt><dd className="bad">{t.error}</dd></>}
         </dl>
+        {t.error && <div className="err-callout"><span className="label">失败原因</span><span className="msg">{t.error}</span></div>}
       </div>
       {proof && <div className="insp-sec"><span className="label">Verification</span><TransactionStatus proof={proof} /></div>}
       {!isMission && Object.keys(t.input || {}).length > 0 && <div className="insp-sec"><span className="label">Input</span><Json value={t.input} /></div>}

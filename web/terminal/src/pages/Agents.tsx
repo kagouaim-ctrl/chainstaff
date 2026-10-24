@@ -92,7 +92,7 @@ export default function Agents({ route }: { route: Route }) {
         </div>
         <Tabs<Filter> value={filter} onChange={(f) => setParams(route, { f: f === "roster" ? null : f })} options={[["roster", "Roster", n("roster")], ["managers", "Managers", n("managers")], ["paused", "Paused", n("paused")], ["archived", "Archived", n("archived")]]} />
         {sel.size > 0 && (
-          <div className="qab" style={{ background: "var(--accent-bg)" }}>
+          <div className="qab sel">
             <span className="sm">{sel.size} selected</span>
             <span className="sep" />
             <button className="btn sm" onClick={() => bulk.mutate("active", { onSuccess: () => setSel(new Set()) })}>Activate</button>

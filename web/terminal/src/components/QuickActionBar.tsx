@@ -4,8 +4,25 @@ import { useAgents, useApprovals, useMissions, useOverview } from "../lib/querie
 import { go, usd, usePref } from "../lib/util";
 import { Cell } from "./ui";
 
-/** The workforce at a glance plus the three things people start from: a mission, the review queue, a new agent. */
-export function QuickActionBar({ onNewMission, onNewAgent, onView }: { onNewMission: () => void; onNewAgent: () => void; onView?: (v: string) => void }) {
+/** The three things people start from: the review queue (when it has work), a new agent, a new mission. */
+export function QuickActions({ onNewMission, onNewAgent }: { onNewMission: () => void; onNewAgent: () => void }) {
+  const approvals = useApprovals("pending");
+  const review = approvals.data?.length || 0;
+  return (
+    <div className="row gap8">
+      {review > 0 && (
+        <button className="btn accent-soft" onClick={() => go("tasks", undefined, { f: "review", kind: "goal" })}>
+          <ShieldCheck size={14} /> Review <span className="mono">{review}</span>
+        </button>
+      )}
+      <button className="btn" onClick={onNewAgent}><Plus size={14} /> New agent</button>
+      <button className="btn primary" onClick={onNewMission}><Send size={14} /> New mission</button>
+    </div>
+  );
+}
+
+/** The workforce at a glance: four numbers, more on demand. */
+export function QuickActionBar({ onView }: { onView?: (v: string) => void }) {
   const agents = useAgents();
   const approvals = useApprovals("pending");
   const running = useMissions({ status: "pending,running,waiting", limit: 200 });
@@ -27,7 +44,7 @@ export function QuickActionBar({ onNewMission, onNewAgent, onView }: { onNewMiss
   return (
     <div className="strip-wrap" role="toolbar" aria-label="Workforce summary">
       <div className="strip">
-        <Cell label="Active agents" value={<>{c.busy}<span className="muted">/{c.online}</span></>} sub={`${c.busy} running · ${c.online} on duty`} tone={c.busy ? "acc" : ""} onClick={() => onView?.("running")} />
+        <Cell label="Active agents" value={<>{c.busy}<span className="muted">/{c.online}</span></>} sub={`${c.busy} running · ${c.online} on duty`} tone={c.busy ? "info" : ""} onClick={() => onView?.("running")} />
         <Cell label="Running missions" value={running.data?.length ?? "—"} onClick={() => go("tasks", undefined, { f: "running", kind: "goal" })} />
         <Cell label="Pending approvals" value={review} tone={review ? "acc" : ""} onClick={() => go("tasks", undefined, { f: "review", kind: "goal" })} />
         <Cell label="Execution cost" value={ov.data ? usd(ov.data.cost_usd) : "—"} sub="last 24h" />
@@ -43,16 +60,9 @@ export function QuickActionBar({ onNewMission, onNewAgent, onView }: { onNewMiss
         )}
       </div>
       <div className="strip-act">
-        <button className="btn ghost sm icon" onClick={() => setMore(!more)} aria-expanded={more} title={more ? "收起指标" : "更多指标"} aria-label={more ? "收起指标" : "更多指标"}>
-          {more ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+        <button className="btn ghost icon" onClick={() => setMore(!more)} aria-expanded={more} title={more ? "收起指标" : "更多指标"} aria-label={more ? "收起指标" : "更多指标"}>
+          {more ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
         </button>
-        {review > 0 && (
-          <button className="btn sm outline-acc" onClick={() => go("tasks", undefined, { f: "review", kind: "goal" })}>
-            <ShieldCheck size={12} /> Review {review}
-          </button>
-        )}
-        <button className="btn sm" onClick={onNewAgent}><Plus size={12} /> New agent</button>
-        <button className="btn sm primary" onClick={onNewMission}><Send size={12} /> New mission</button>
       </div>
     </div>
   );

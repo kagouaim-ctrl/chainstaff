@@ -1,4 +1,4 @@
-import { ChevronDown, Crown, PanelRight, Plus, Settings2, UserMinus, UserPlus, Users } from "lucide-react";
+import { ChevronDown, CircleAlert, Crown, Inbox, PanelRight, Plus, Settings2, UserMinus, UserPlus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AgentStatus } from "../components/AgentStatus";
 import { ExecutionLogs } from "../components/Execution";
@@ -9,7 +9,7 @@ import { AddMemberDialog, SquadForm } from "../components/SquadForm";
 import { TaskComposer } from "../components/TaskComposer";
 import { Avatar, Dialog, EmptyState, ErrorState, Loading, Progress, Seg, Sheet } from "../components/ui";
 import { api, del, post } from "../lib/api";
-import { useAction, useAgents, useMission, useMissions, useSquads, useTask, useWorkspaces } from "../lib/queries";
+import { useAction, useAgentName, useAgents, useMission, useMissions, useSquads, useTask, useWorkspaces } from "../lib/queries";
 import type { Agent, Mission, Squad, TaskDetail, Workspace as WS } from "../lib/types";
 import { ago, go, setParams, useIsMobile, usePref, type Route } from "../lib/util";
 
@@ -36,7 +36,7 @@ export default function Workspace({ route }: { route: Route }) {
   if (!current)
     return (
       <div className="page">
-        <EmptyState title="还没有工作区">
+        <EmptyState title="还没有工作区" icon={<Users size={18} />}>
           <span>工作区装着一个或多个 Squad；每个 Squad 是一位 AI 主管加几位员工，一起接 Mission。</span>
           <button className="btn primary" onClick={() => setCreating(true)}><Plus size={13} /> 建立工作区</button>
         </EmptyState>
@@ -157,7 +157,7 @@ function SquadPanel({ ws, all, squads, squad, members, missions, current, scope,
         <button className="btn ghost sm icon" onClick={onNewSquad} title="新建 Squad" aria-label="新建 Squad"><Users size={13} /></button>
         {squad && <button className="btn ghost sm icon" onClick={onEditSquad} title="编辑 Squad" aria-label="编辑 Squad"><Settings2 size={13} /></button>}
       </div>
-      {squad && !squad.ready && squad.issues[0] && <div className="note bad xs" style={{ margin: "8px 10px 0" }}>{squad.issues[0].text}</div>}
+      {squad && !squad.ready && squad.issues[0] && <div className="note bad xs" style={{ margin: "4px 16px 8px" }}>{squad.issues[0].text}</div>}
       <div className="pane-h">
         <span className="label">Squad</span><span className="mono muted xs">{members.length}</span>
         <div className="grow" />
@@ -176,7 +176,6 @@ function SquadPanel({ ws, all, squads, squad, members, missions, current, scope,
                 <span className="row gap2" style={{ marginLeft: "auto" }} onClick={(e) => e.stopPropagation()}>
                   {!mgr && <button className="btn ghost xs icon sq-act" title="设为主管" aria-label="设为主管" onClick={() => promote.mutate(a.id)}><Crown size={10} /></button>}
                   {!mgr && <button className="btn ghost xs icon sq-act" title="移出 Squad" aria-label="移出 Squad" onClick={() => remove.mutate(a.id)}><UserMinus size={10} /></button>}
-                  <AgentStatus agent={a} label={false} />
                 </span>
               </span>
               <span className={`what ellipsis ${a.current_task ? "" : "muted"}`}>
@@ -186,25 +185,26 @@ function SquadPanel({ ws, all, squads, squad, members, missions, current, scope,
             </div>
           );
         })}
-        {squad && !members.length && <div className="muted xs" style={{ padding: 12 }}>还没有成员。<button className="btn ghost xs" onClick={onAdd}>Add agent</button></div>}
-        {!squad && <div className="muted xs" style={{ padding: 12 }}>先建一个 Squad：一位主管加几位有技能的员工。<button className="btn ghost xs" onClick={onNewSquad}>Create squad</button></div>}
+        {squad && !members.length && <EmptyState small title="还没有成员"><button className="btn sm" onClick={onAdd}><UserPlus size={13} /> Add agent</button></EmptyState>}
+        {!squad && <EmptyState small title="先建一个 Squad"><span className="xs">一位主管加几位有技能的员工。</span><button className="btn sm primary" onClick={onNewSquad}>Create squad</button></EmptyState>}
       </div>
-      <div className="pane-h" style={{ borderTop: "1px solid var(--line)" }}>
+      <div className="pane-h sub-h">
         <span className="label">Missions</span>
-        <span className="mono muted xs nowrap">{live.length} live · {missions.length}</span>
+        <span className="mono muted xs">{missions.length}</span>
+        {live.length > 0 && <span className="badge info">{live.length} live</span>}
         <div className="grow" />
-        <Seg value={scope} onChange={onScope} options={[["squad", "Squad"], ["all", "All"]]} />
-        <button className="btn ghost xs" onClick={() => onPick("new")}><Plus size={11} /> New</button>
+        <button className="btn ghost sm icon" onClick={() => onPick("new")} title="New mission" aria-label="New mission"><Plus size={14} /></button>
       </div>
+      <div className="rail-filter"><Seg value={scope} onChange={onScope} options={[["squad", "This squad"], ["all", "All squads"]]} /></div>
       <div className="scroll squad-missions">
         {missions.map((m) => (
           <button key={m.id} className="mission-item" aria-current={m.id === current} onClick={() => onPick(m.id)}>
-            <span className="row gap6"><span className="t ellipsis grow">{m.name}</span>{m.approvals.length > 0 && <span className="badge acc">REVIEW</span>}</span>
+            <span className="row gap6"><span className="t ellipsis grow">{m.name}</span>{m.approvals.length > 0 && <span className="badge acc">Review</span>}</span>
             <span className="row gap6 xs muted"><MissionStage m={m} /><span className="grow" /><span className="mono">{ago(m.created_at)}</span></span>
             {m.progress.total > 0 && <Progress done={m.progress.completed} failed={m.progress.failed} total={m.progress.total} />}
           </button>
         ))}
-        {!missions.length && <div className="muted xs" style={{ padding: 12 }}>还没有 Mission</div>}
+        {!missions.length && <EmptyState small title="还没有 Mission" icon={<Inbox size={16} />}><span className="xs">在中间写下目标，交给这个 Squad。</span></EmptyState>}
       </div>
     </>
   );
@@ -225,11 +225,12 @@ function MissionView({ m, d, ws, squad, taskId, onTask, onLaunched, onSquad, mob
         {!d ? <Loading rows={8} /> : (
           <>
             <section className="msec">
-              <div className="msec-h"><h3>Execution</h3><span className="muted xs">{d.subtasks.length} tasks · {new Set(d.subtasks.map((s) => s.assigned_agent)).size} agents</span>
+              <FailureSummary m={m} d={d} onTask={onTask} />
+              <div className="msec-h"><h3>Execution</h3><span className="muted xs"><span className="mono">{d.subtasks.length}</span> tasks · <span className="mono">{new Set(d.subtasks.map((s) => s.assigned_agent)).size}</span> agents</span>
                 <div className="grow" />
                 {mobile && <button className="btn ghost xs" onClick={() => setLogs(!logs)}>{logs ? "Hide logs" : "Logs"}</button>}
               </div>
-              <div className="brief">{d.messages.find((x) => x.event === "user.instruction")?.text || m.brief}</div>
+              <div className="brief"><span className="label">Brief</span>{d.messages.find((x) => x.event === "user.instruction")?.text || m.brief}</div>
               <ExecutionFeed d={d} onTask={(id) => onTask(id)} />
               {mobile && logs && <div style={{ marginTop: 10 }}><ExecutionLogs d={d} /></div>}
             </section>
@@ -242,6 +243,30 @@ function MissionView({ m, d, ws, squad, taskId, onTask, onLaunched, onSquad, mob
       </div>
       <TaskComposer ws={ws} squadId={squad?.id} onSquad={onSquad} onSubmitted={(t) => onLaunched(t.id)} />
     </>
+  );
+}
+
+/** What broke and why, in plain words, before the timeline: one line per failed task with its reason. */
+function FailureSummary({ m, d, onTask }: { m: Mission; d: TaskDetail; onTask: (id: string | null) => void }) {
+  const name = useAgentName();
+  const failed = d.subtasks.filter((s) => s.status === "failed");
+  if (!failed.length && m.stage !== "failed") return null;
+  const index = new Map(d.subtasks.map((s, i) => [s.id, i + 1]));
+  return (
+    <div className="fail-sum" role="alert">
+      <div className="fail-sum-h"><CircleAlert size={15} /> {failed.length ? `${failed.length} 个任务失败` : "Mission 失败"}
+        {failed.length > 0 && m.stage !== "failed" && <span className="muted xs">· 其余任务继续执行，结果里会注明缺失部分</span>}
+      </div>
+      {failed.map((s) => (
+        <div key={s.id} className="fail-item">
+          <span className="mono muted">#{index.get(s.id)}</span>
+          <button className="task-ref what" onClick={() => onTask(s.id)} title="在 Inspector 中查看">{s.title}</button>
+          <span className="muted xs nowrap">{name(s.assigned_agent)} · <span className="mono">{s.skill}</span></span>
+          <span className="why">{s.error || "没有返回错误信息，打开 Logs 查看工具输出。"}</span>
+        </div>
+      ))}
+      {!failed.length && <div className="fail-item"><span className="why" style={{ gridColumn: "1 / -1" }}>{m.error || "没有返回错误信息"}</span></div>}
+    </div>
   );
 }
 
@@ -277,7 +302,7 @@ function Launcher({ ws, squad, missions, loading, onPick, onSquad, onNewSquad }:
       <div className="toolbar"><h1>New mission</h1><span className="sub">{squad ? `for ${squad.name} · ${ws.name}` : ws.name}</span></div>
       <div className="scroll">
         {!squad ? (
-          <EmptyState title="这个工作区还没有 Squad">
+          <EmptyState title="这个工作区还没有 Squad" icon={<Users size={18} />}>
             <span>Mission 交给一个 Squad：主管拆分任务，成员按技能执行并交接结果。</span>
             <button className="btn primary" onClick={onNewSquad}><Users size={13} /> Create squad</button>
           </EmptyState>

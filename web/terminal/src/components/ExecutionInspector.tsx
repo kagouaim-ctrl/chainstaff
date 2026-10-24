@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { PanelRight, X } from "lucide-react";
 import { useAgentName } from "../lib/queries";
 import type { Mission, TaskDetail } from "../lib/types";
 import { duration, fmtTime, usd } from "../lib/util";
@@ -18,13 +18,13 @@ export function ExecutionInspector({ m, d, taskId, onTask, tab, onTab }: {
   onTab: (t: ExecTab) => void;
 }) {
   const name = useAgentName();
-  if (!m) return <EmptyState title="选一个 Mission">左侧选一个 Mission，或在中间交给主管一个新的目标。</EmptyState>;
+  if (!m) return <EmptyState title="选一个 Mission" icon={<PanelRight size={18} />}>左侧选一个 Mission，或在中间交给主管一个新的目标。</EmptyState>;
   if (!d) return <Loading rows={8} />;
   const t = taskId ? d.subtasks.find((s) => s.id === taskId) : null;
   const logs = d.messages.filter((x) => x.kind === "tool" && x.event !== "tool.start" && (!t || x.task_id === t.id)).length;
   return (
     <>
-      <div className="pane-h">
+      <div className="pane-h title">
         <span className="label">Execution inspector</span>
         <div className="grow" />
         {t && (
@@ -37,8 +37,8 @@ export function ExecutionInspector({ m, d, taskId, onTask, tab, onTab }: {
       <div className="insp-b">
         {tab === "overview" && (t ? (
           <div className="insp-sec">
-            <div className="row gap6"><Pipe status={t.status} /><Status status={t.status} /><span className="mono muted xs">{t.id}</span></div>
-            <div className="strong">{t.title}</div>
+            <div className="row gap8"><Pipe status={t.status} /><Status status={t.status} /><span className="mono muted xs">{t.id}</span></div>
+            <h3>{t.title}</h3>
             <dl className="kv">
               <dt>Agent</dt><dd>{name(t.assigned_agent)}</dd>
               <dt>Skill</dt><dd className="mono">{t.skill}</dd>
@@ -48,8 +48,8 @@ export function ExecutionInspector({ m, d, taskId, onTask, tab, onTab }: {
               <dt>Duration</dt><dd className="mono">{t.started_at ? duration(t.started_at, t.finished_at) : "—"}</dd>
               <dt>Cost</dt><dd className="mono">{usd(t.cost_usd)} · {t.tokens} tok</dd>
               <dt>Result hash</dt><dd><Addr value={t.result_hash} n={8} /></dd>
-              {t.error && <><dt>Error</dt><dd className="bad">{t.error}</dd></>}
             </dl>
+            {t.error && <div className="err-callout"><span className="label">失败原因</span><span className="msg">{t.error}</span></div>}
             <span className="label">Input</span>
             <Json value={t.input} />
           </div>
@@ -75,8 +75,8 @@ export function ExecutionInspector({ m, d, taskId, onTask, tab, onTab }: {
                 <dt>Planner</dt><dd>{m.planner === "model" ? "Model" : m.planner === "rules" ? "Rules (no model)" : m.planner === "direct" ? "Direct assignment" : "—"}</dd>
                 <dt>Created</dt><dd>{fmtTime(m.created_at)}</dd>
                 <dt>Deadline</dt><dd>{fmtTime(m.deadline_at)}</dd>
-                {m.error && <><dt>Error</dt><dd className="bad">{m.error}</dd></>}
               </dl>
+              {m.error && <div className="err-callout"><span className="label">失败原因</span><span className="msg">{m.error}</span></div>}
             </div>
           </>
         ))}

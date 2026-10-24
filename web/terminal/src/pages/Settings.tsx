@@ -30,7 +30,7 @@ function Schedules() {
   return (
     <>
       <div className="qab">
-        <span className="muted" style={{ fontSize: 12 }}>标准 5 段 cron，按 UTC 计算。到点后把目标交给工作区的 AI 主管；连续失败 3 次自动暂停。</span>
+        <span className="muted xs">标准 5 段 cron，按 UTC 计算。到点后把目标交给工作区的 AI 主管；连续失败 3 次自动暂停。</span>
         <div className="grow" />
         <button className="btn primary" disabled={!ws.data?.length} onClick={() => setAdding(true)}><Plus size={13} /> New schedule</button>
       </div>
@@ -41,7 +41,7 @@ function Schedules() {
             <tbody>
               {q.data!.map((s) => (
                 <tr key={s.id}>
-                  <td><div style={{ fontWeight: 500 }}>{s.name}</div><div className="muted ellipsis" style={{ maxWidth: 300, fontSize: 11 }}>{s.goal}</div></td>
+                  <td><div className="medium">{s.name}</div><div className="muted xs ellipsis" style={{ maxWidth: 300 }}>{s.goal}</div></td>
                   <td>{wsName(s.workspace_id)}</td>
                   <td className="mono">{s.cron}</td>
                   <td className="mono muted">{s.enabled ? fmtTime(s.next_run_at) : "—"}</td>
@@ -124,7 +124,7 @@ function MemoryAdmin() {
                 <td><span className="tag">{m.scope}</span></td>
                 <td>{owner(m)}</td>
                 <td className="ellipsis" style={{ maxWidth: 420 }} title={m.text}>{m.text}</td>
-                <td className="mono muted" style={{ fontSize: 11 }}>{m.source}</td>
+                <td className="mono muted xs">{m.source}</td>
                 <td className="mono muted">{fmtTime(m.created_at)}</td>
                 <td className="mono muted">{m.expires_at ? fmtTime(m.expires_at) : "never"}</td>
                 <td className="r">

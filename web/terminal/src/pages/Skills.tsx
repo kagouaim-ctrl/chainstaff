@@ -48,12 +48,12 @@ export default function Skills() {
               {rows.map((s) => (
                 <tr key={s.id} className="click" onClick={() => setOpen(s)}>
                   <td>
-                    <div style={{ fontWeight: 500 }}>{s.name}</div>
-                    <div className="muted ellipsis" style={{ maxWidth: mobile ? 200 : 380, fontSize: 11 }}>{s.description}</div>
+                    <div className="medium">{s.name}</div>
+                    <div className="muted xs ellipsis" style={{ maxWidth: mobile ? 200 : 380 }}>{s.description}</div>
                   </td>
-                  {!mobile && <td><span className="tag">{s.category}</span></td>}
+                  {!mobile && <td><span className="badge">{s.category}</span></td>}
                   {!mobile && <td className="mono">{s.installed_version || s.version}{s.update_available && <span className="acc"> → {s.version}</span>}</td>}
-                  {!mobile && <td className="mono muted" style={{ fontSize: 11 }}>{s.permissions.join(" ")}</td>}
+                  {!mobile && <td className="mono muted xs">{s.permissions.join(" ")}</td>}
                   {!mobile && <td className="muted">{s.agents.length ? s.agents.map(name).join(", ") : "—"}</td>}
                   <td>
                     {!s.installed ? <span className="badge">available</span> : s.enabled ? <Status status="completed" label="Enabled" /> : <Status status="cancelled" label="Disabled" />}

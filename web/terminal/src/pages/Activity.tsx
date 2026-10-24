@@ -45,7 +45,7 @@ export default function Activity() {
     <div className="page" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div className="toolbar">
         <h1>Activity</h1>
-        <span className="mono muted xs">{rows.length} events · double-click a row for raw JSON</span>
+        <span className="muted xs"><span className="mono">{rows.length}</span> events · 双击一行查看原始 JSON</span>
         <div className="grow" />
         <button className={`btn sm ${paused ? "primary" : ""}`} onClick={() => setPaused(!paused)}>
           {paused ? <Play size={12} /> : <Pause size={12} />} {paused ? "Resume autoscroll" : "Pause autoscroll"}
@@ -53,7 +53,7 @@ export default function Activity() {
       </div>
       <div className="qab">
         {KINDS.map((k) => (
-          <button key={k} className="chip" aria-pressed={kinds.includes(k)} onClick={() => toggle(k)}>{k}</button>
+          <button key={k} className="chip" aria-pressed={kinds.includes(k)} onClick={() => toggle(k)}>{k[0].toUpperCase() + k.slice(1)}</button>
         ))}
         <select className="input sm" value={agent} onChange={(e) => setAgent(e.target.value)} aria-label="员工">
           <option value="">All senders</option>

@@ -82,8 +82,8 @@ function SquadList({ list, current }: { list: Squad[]; current?: string }) {
               <span className="row gap6">
                 <span className={`ind ${s.status === "paused" ? "" : s.ready ? "ok" : "bad"}`} title={s.status === "paused" ? "已暂停" : s.ready ? "可以接 Mission" : s.issues[0]?.text} />
                 <span className="t ellipsis grow">{s.name}</span>
-                {s.status === "paused" && <span className="badge line">PAUSED</span>}
-                {s.missions.review > 0 && <span className="badge acc">REVIEW {s.missions.review}</span>}
+                {s.status === "paused" && <span className="badge line">Paused</span>}
+                {s.missions.review > 0 && <span className="badge acc">Review {s.missions.review}</span>}
               </span>
               <span className="row gap6 xs muted">
                 <Users size={11} /> {s.members.length + (s.manager_id ? 1 : 0)}
@@ -168,7 +168,7 @@ function SquadMembers({ s }: { s: Squad }) {
         </table>
         {!team.length && <EmptyState title="这个 Squad 还没有成员"><button className="btn primary" onClick={() => setAdding(true)}><UserPlus size={12} /> Add agent</button></EmptyState>}
         {!s.manager_id && team.length > 0 && <div className="note bad" style={{ margin: 12 }}>还没有主管：在上面的成员里点 Manager 指定一位，或编辑 Squad。</div>}
-        <div className="group-h" style={{ borderTop: "1px solid var(--line)", marginTop: 8 }}>Other agents · 拖进上面的表格或点 Add</div>
+        <div className="group-h" style={{ marginTop: 8 }}>Other agents · 拖进上面的表格或点 Add</div>
         <div className="m-list">
           {outside.map((a) => (
             <div key={a.id} className="pick-row" draggable onDragStart={(e) => e.dataTransfer.setData("text/agent", a.id)}>
@@ -205,7 +205,7 @@ function SquadInspector({ s, onEdit }: { s: Squad; onEdit: () => void }) {
       <div className="insp-h">
         <div className="row gap6">
           <h2 className="ellipsis grow">{s.name}</h2>
-          {s.status === "paused" ? <span className="badge line">PAUSED</span> : s.ready ? <span className="badge ok">READY</span> : <span className="badge bad">NOT READY</span>}
+          {s.status === "paused" ? <span className="badge line">Paused</span> : s.ready ? <span className="badge ok"><span className="dot" />Ready</span> : <span className="badge bad"><span className="dot" />Not ready</span>}
         </div>
         <div className="muted xs">{s.workspace_name} · <span className="mono">{s.id}</span></div>
         <div className="row gap6 wrap">

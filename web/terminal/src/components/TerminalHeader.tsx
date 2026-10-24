@@ -83,7 +83,7 @@ function MoreMenu({ route }: { route: Route }) {
         <div className="menu" style={{ left: 0, right: "auto", top: "calc(100% + 2px)" }} onClick={() => setOpen(false)}>
           <a href="#/activity"><Activity size={13} /> Activity</a>
           <a href="#/settings"><Settings size={13} /> Settings</a>
-          <div className="pop-sep" style={{ margin: "4px 0" }} />
+          <div className="pop-sep" />
           <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
           <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
         </div>
@@ -101,10 +101,10 @@ function NetworkPill() {
     <button className="pill d-only" onClick={() => go("onchain")} title={rpc?.error || (rpc?.ok ? `RPC ${rpc.latency_ms}ms` : "没有配置链（CHAINSTAFF_CHAIN）")}>
       <span className={`ind ${tone}`} />
       <span>{chain.data?.network || "No chain"}</span>
-      {rpc?.ok && <span className="mono muted hide-l">#{num(rpc.block)}</span>}
-      <span className="pop-sep" style={{ width: 1, height: 14, background: "var(--line)" }} />
+      {rpc?.ok && <span className="mono muted hide-xl">#{num(rpc.block)}</span>}
+      <span className="sep" />
       <span className={`ind ${live === "live" ? "ok" : "warn live"}`} title={live === "live" ? "实时连接正常" : "正在重新连接实时流"} />
-      <span className="mono muted">{live === "live" ? "LIVE" : "SYNC"}</span>
+      <span>{live === "live" ? "Live" : "Syncing"}</span>
     </button>
   );
 }
@@ -116,10 +116,10 @@ function RunningPill() {
   const busy = agents.data?.filter((a) => a.live === "busy").length || 0;
   return (
     <button className={`pill d-only ${n ? "acc" : ""}`} onClick={() => go("tasks", undefined, { f: "running" })} title={`${n} 个 Mission 正在执行，${busy} 个员工在工作`}>
-      <span className={`ind ${n ? "warn live" : ""}`} />
+      <span className={`ind ${n ? "info live" : ""}`} />
       <span className="mono">{n}</span>
       <span className="hide-l">running</span>
-      <span className="muted mono hide-l">· {busy} busy</span>
+      <span className="muted mono hide-xl">· {busy} busy</span>
     </button>
   );
 }
@@ -154,7 +154,7 @@ function Notifications() {
       {open && (
         <div className="pop" style={{ width: 360 }}>
           <div className="pop-h">
-            <span className="label grow">Needs you · {pending.length}</span>
+            <span className="label grow">Needs you · <span className="mono">{pending.length}</span></span>
             <a className="btn ghost xs" href="#/tasks?f=review" onClick={() => setOpen(false)}>Review queue</a>
           </div>
           <div className="pop-b">
@@ -167,8 +167,8 @@ function Notifications() {
                 </span>
               </button>
             ))}
-            {!pending.length && <div className="muted sm" style={{ padding: "10px 12px" }}>没有等你处理的事项</div>}
-            <div className="pop-h" style={{ borderTop: "1px solid var(--line)" }}><span className="label">Recent</span></div>
+            {!pending.length && <div className="pop-empty">没有等你处理的事项</div>}
+            <div className="pop-h sep"><span className="label">Recent</span></div>
             {(events.data || []).map((m) => (
               <button key={m.id} className="pop-item" onClick={() => (setOpen(false), m.task_id ? go("tasks", m.task_id) : go("activity"))}>
                 <span className={`ind ${m.event.includes("fail") || m.event.includes("error") || m.event.includes("expired") ? "bad" : m.event.startsWith("chain.confirmed") ? "ok" : "warn"}`} />

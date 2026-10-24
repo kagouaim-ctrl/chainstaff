@@ -58,7 +58,7 @@ export function AgentTable({ rows, selected, favorites, onFavorite, onSelect, on
         </a>
       ) : <span className="muted">{a.last_activity_at ? `idle · ${ago(a.last_activity_at)}` : "—"}</span>,
     },
-    { id: "done", header: "Tasks", align: "r", title: "completed / failed · running", sort: (a) => a.tasks_completed || 0, cell: (a) => <span className="mono">{a.tasks_completed ?? 0}<span className="muted">/{a.tasks_failed ?? 0}</span>{a.running ? <span className="acc"> ·{a.running}</span> : null}</span> },
+    { id: "done", header: "Tasks", align: "r", title: "completed / failed · running", sort: (a) => a.tasks_completed || 0, cell: (a) => <span className="mono">{a.tasks_completed ?? 0}<span className="muted">/{a.tasks_failed ?? 0}</span>{a.running ? <span className="info"> ·{a.running}</span> : null}</span> },
     { id: "rate", header: "Success", align: "r", sort: (a) => a.success_rate ?? -1, cell: (a) => <span className={`mono ${a.success_rate == null ? "muted" : a.success_rate >= 0.95 ? "ok" : a.success_rate < 0.8 ? "bad" : ""}`}>{pct(a.success_rate)}</span> },
     { id: "avg", header: "Avg duration", align: "r", sort: (a) => a.avg_secs ?? 1e9, cell: (a) => <span className="mono">{secs(a.avg_secs)}</span> },
     { id: "cost", header: "Cost", align: "r", sort: (a) => Number(a.cost_usd), cell: (a) => <span className="mono">{usd(a.cost_usd)}</span> },
@@ -101,11 +101,11 @@ const RowActions = memo(function RowActions({ a, onAction, onConfigure, onView }
   return (
     <span className="acts" onClick={(e) => e.stopPropagation()}>
       {!a.is_manager && (
-        <button className="btn xs outline-acc" disabled={off} title="Run：让它马上执行一个技能" onClick={() => onAction(a, "run")}>
+        <button className="btn xs" disabled={off} title="Run：让它马上执行一个技能" onClick={() => onAction(a, "run")}>
           <Zap size={10} /> Run
         </button>
       )}
-      <button className="btn xs" disabled={off} title="Assign：交给它所在 Squad 一个 Mission" onClick={() => onAction(a, "assign")}>
+      <button className="btn xs ghost" disabled={off} title="Assign：交给它所在 Squad 一个 Mission" onClick={() => onAction(a, "assign")}>
         <ArrowRight size={10} /> Assign
       </button>
       {a.status === "active" ? (
@@ -126,9 +126,9 @@ export const AgentRow = memo(function AgentRow({ agent: a, onOpen }: { agent: Ag
       <Avatar name={a.name} mgr={a.is_manager} />
       <div className="col gap2 grow">
         <div className="row gap6"><span className="strong ellipsis">{a.name}</span><AgentStatus agent={a} label={false} /></div>
-        <span className={`xs ellipsis ${a.current_task ? "acc" : "muted"}`}>{a.current_task ? a.current_task.title : `${a.role || "—"} · ${a.tasks_completed ?? 0} done`}</span>
+        <span className={`xs ellipsis ${a.current_task ? "dim" : "muted"}`}>{a.current_task ? a.current_task.title : `${a.role || "—"} · ${a.tasks_completed ?? 0} done`}</span>
       </div>
-      <button className="btn sm outline-acc" disabled={a.status !== "active"} onClick={(e) => (e.stopPropagation(), onOpen(a, a.is_manager ? "assign" : "run"))} aria-label={`给 ${a.name} 派活`}>
+      <button className="btn sm tertiary" disabled={a.status !== "active"} onClick={(e) => (e.stopPropagation(), onOpen(a, a.is_manager ? "assign" : "run"))} aria-label={`给 ${a.name} 派活`}>
         <Zap size={12} /> {a.is_manager ? "Assign" : "Run"}
       </button>
     </div>
