@@ -730,7 +730,7 @@ const PAGES=[
   ['translator','公告翻译','AI 员工','announcement_translator'],
   ['payouts','营销结算','AI 员工','campaign_payouts'],
   ['sybil','空投反女巫','AI 员工','airdrop_sybil'],
-  ['chat','群聊','通用',''],['telegram','Telegram','通用',''],['audit','审计日志','通用',''],['settings','设置','通用','']];
+  ['audit','审计日志','通用',''],['settings','设置','通用','']];
 // 16px line icons, drawn for this console
 const NAV_ICON={
   team:'<circle cx="6" cy="6" r="2.5"/><circle cx="11.5" cy="7" r="2"/><path d="M1.5 14c.5-2.5 2.3-4 4.5-4s4 1.5 4.5 4M10 10.3c2 .1 3.6 1.4 4 3.7"/>',
@@ -946,7 +946,7 @@ VIEWS.approvals=async()=>{
   const rows=await api('/api/payments?status=pending_approval&limit=500');
   const recent=await api('/api/payments?status=approved,rejected&limit=10');
   return `
-  <div class="note info">员工不能自己签多签。老板在 Safe 里签字执行后，点「已签字」把这笔记进账本；不付就点「驳回」。Telegram 群里发 <code>/approve 编号</code> 效果一样。</div>
+  <div class="note info">员工不能自己签多签。老板在 Safe 里签字执行后，点「已签字」把这笔记进账本；不付就点「驳回」。</div>
   ${rows.length?rows.map(r=>`<section class="card"><div class="hd"><span class="mono">${esc(r.request_id)}</span>${st(r.status)}<span class="grow"></span><span class="muted" style="font-size:12px">${fmtTime(r.created_at)} · ${esc(r.requester)}</span></div>
     <div class="bd grid g2">
       <dl class="kv"><dt>收款方</dt><dd>${r.payee_name?`<b>${esc(r.payee_name)}</b> `:''}${addr(r.payee)}</dd><dt>金额</dt><dd style="font-size:18px">${fmtAmt(r.amount,r.token)}</dd><dt>用途</dt><dd>${esc(r.memo||'—')} ${r.category?`<span class="chip">${esc(r.category)}</span>`:''}</dd>${r.safe_tx_hash?`<dt>Safe 交易哈希</dt><dd>${addr(r.safe_tx_hash)}</dd>`:''}</dl>
@@ -1095,7 +1095,7 @@ VIEWS.rules=async()=>{const r=S.rules,tokens=[...new Set([...Object.keys(r.singl
     <label class="f"><span>需审批类别（逗号分隔）</span><input id="cats" value="${esc((r.approval_categories||[]).join(', '))}" placeholder="KOL, 空投"></label>
     <label class="f"><span>重复付款检测（天）</span><input id="dup" type="number" min="1" max="365" value="${esc(r.duplicate_window_days||30)}"></label>
     <label class="f"><span>时区（"每日"按这个时区算）</span><select id="tz">${[...new Set([r.timezone,...TZS])].map(z=>`<option ${z===r.timezone?'selected':''}>${esc(z)}</option>`).join('')}</select></label>
-    <label class="f"><span>老板 Telegram 用户名（逗号分隔，只有他们能审批和暂停）</span><input id="owners" value="${esc((r.owners||[]).join(', '))}"></label>
+    <label class="f"><span>老板（签字人）名单，逗号分隔：只有他们能审批和暂停</span><input id="owners" value="${esc((r.owners||[]).join(', '))}"></label>
     <label class="switch"><input type="checkbox" id="ro" ${r.read_only?'checked':''}> 试用只读：员工不自动付任何钱，全部要老板确认</label>
   </div>`)}
   <div class="row"><button class="btn primary" id="saveRules">保存规则</button><button class="btn ghost" id="resetRules">撤销修改</button><span id="dirty" class="review" hidden>有未保存的修改</span></div>
@@ -1103,7 +1103,7 @@ VIEWS.rules=async()=>{const r=S.rules,tokens=[...new Set([...Object.keys(r.singl
   </div>
   <div class="stack" style="gap:16px">
   ${card('规则试算',`<div class="stack">
-    <p class="muted" style="margin:0">输入一句群里会出现的付款请求，看员工会怎么处理。只是试算：不记账、不付款、不发到群里。按的是<b>已保存</b>的规则。</p>
+    <p class="muted" style="margin:0">输入一句付款请求，看员工会怎么处理。只是试算：不记账、不付款。按的是<b>已保存</b>的规则。</p>
     <div class="row"><input id="simText" class="grow" style="width:auto" placeholder="付 Alice 300 USDT 设计费"><button class="btn signal" id="simGo">试算</button></div>
     <div class="row" id="simEx">${['付 Alice 300 USDT 设计费','付 Alice 800 USDT 视频','付 Mia 200 USDT KOL 推广','付 0x9f3c000000000000000000000000000000004a21 50 USDT','给 bob 0.1 BNB gas'].map(x=>`<button class="btn sm ghost" data-ex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
     <div id="simOut"></div></div>`)}
@@ -1126,18 +1126,18 @@ BIND.rules=async()=>{
     const [l,c]=OUTCOME[r.outcome];
     $('#simOut').innerHTML=`<div class="stack"><div class="row"><span class="pill ${c}"><span class="dot"></span>${l}</span><span>${r.payee_name?esc(r.payee_name):`<span class="mono">${esc(short(r.payee))}</span>`} · ${fmtAmt(r.amount,r.token)}</span>${r.category?`<span class="chip">${esc(r.category)}</span>`:''}</div>
       ${r.messages.length?`<div class="row">${r.messages.map(m=>`<span class="chip ${c}">${esc(m)}</span>`).join('')}</div>`:'<span class="muted">所有规则都通过</span>'}
-      <span class="label">员工在群里会这样回</span><div class="chat" style="height:auto;max-height:260px"><div class="msg me"><span class="who">你</span>${esc(text)}</div><div class="msg bot"><span class="who">KAGOU 员工</span>${esc(r.reply)}</div></div></div>`}catch(e){toast(e.message,true)}};
+      <span class="label">员工会这样回</span><div class="chat" style="height:auto;max-height:260px"><div class="msg me"><span class="who">你</span>${esc(text)}</div><div class="msg bot"><span class="who">KAGOU 员工</span>${esc(r.reply)}</div></div></div>`}catch(e){toast(e.message,true)}};
   $('#simGo').onclick=sim;$('#simText').onkeydown=e=>{if(e.key==='Enter')sim()};
   document.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{$('#simText').value=b.dataset.ex;sim()});
   try{$('#rulesText').textContent=(await api('/api/preview/rules')).text}catch(e){$('#rulesText').textContent=e.message}};
 
 // ---------- 06 treasury ----------
-VIEWS.treasury=async()=>{const t=await api('/api/treasury'),tg=await api('/api/telegram');
+VIEWS.treasury=async()=>{const t=await api('/api/treasury');
   return `
   <div class="grid g3">
     <section class="card kpi"><span class="label">国库余额</span><span class="v">${t.balance?fmtMoved(t.balance):'—'}</span><span class="s">${t.error?`<span class="block">读取失败：${esc(t.error)}</span>`:t.balance?'所有国库地址合计，实时读链':'部署时没配置国库地址或代币'}</span></section>
     <section class="card kpi"><span class="label">实时监控</span><span class="v ${t.monitoring?'ok':'muted'}">${t.monitoring?'开启':'未开启'}</span><span class="s">${t.monitoring?'每 5 分钟检查一次国库转账':'需要国库地址、浏览器 API 和 ETHERSCAN_API_KEY'}</span></section>
-    <section class="card kpi"><span class="label">发到群里</span><span class="v ${t.alerts_enabled?'':'muted'}">${t.alerts_enabled?'开':'关'}</span><span class="s"><label class="switch"><input type="checkbox" id="alertsOn" ${t.alerts_enabled?'checked':''}> 预警发到 Telegram 群</label></span></section>
+    <section class="card kpi"><span class="label">金库预警</span><span class="v ${t.alerts_enabled?'':'muted'}">${t.alerts_enabled?'开':'关'}</span><span class="s"><label class="switch"><input type="checkbox" id="alertsOn" ${t.alerts_enabled?'checked':''}> 记录到控制台预警</label></span></section>
   </div>
   <div class="grid g2">
     ${card('国库地址',t.addresses.length?`<div class="stack">${t.addresses.map(a=>addr(a.address,a.url)).join('')}</div>`:'<p class="muted" style="margin:0">还没配置。在部署的 <code>config/chain.json</code> 里填 <code>treasury_addresses</code>（一般是你们的 Safe 地址）。</p>')}
@@ -1147,7 +1147,7 @@ VIEWS.treasury=async()=>{const t=await api('/api/treasury'),tg=await api('/api/t
       <li>地址投毒：收到首尾和常用地址相同的小额转账</li></ul><p class="muted" style="margin:8px 0 0;font-size:12px">同一笔交易只提醒一次，重启也不会重复。</p>`)}
   </div>
   ${card(`预警记录 · ${t.alerts.length}`,feed(t.alerts,'还没有预警。国库有大额转出、陌生地址或投毒时会出现在这里。'),{flush:true})}`};
-BIND.treasury=()=>{$('#alertsOn').onchange=async e=>{try{const tg=await api('/api/telegram');await put('/api/telegram/settings',{...tg.settings,treasury_alerts:e.target.checked});toast(e.target.checked?'预警会发到群里':'预警只记在控制台，不发群');render()}catch(err){toast(err.message,true)}}};
+BIND.treasury=()=>{$('#alertsOn').onchange=async e=>{try{await put('/api/treasury/alerts',{enabled:e.target.checked});toast(e.target.checked?'金库预警已打开':'金库预警已关闭');render()}catch(err){toast(err.message,true)}}};
 
 // ---------- 07 employee ----------
 const WALLET={turnkey:'Turnkey（限额写在签名层）',evm:'本地密钥（只用于测试网）',test:'测试模式（不签名）'};
@@ -1175,225 +1175,19 @@ VIEWS.employee=async()=>{const e=await api('/api/employee');
   </div>
   ${card('今日额度',`<table><thead><tr><th>币种</th><th class="r">单笔上限</th><th class="r">每日上限</th><th class="r">今日已自动付</th><th style="width:30%">使用</th></tr></thead><tbody>${e.limits.map(l=>{const p=Number(l.daily)>0?Math.min(100,Number(l.spent_today)/Number(l.daily)*100):0;return `<tr><td class="mono">${esc(l.token)}</td><td class="r num">${fmtNum(l.single)}</td><td class="r num">${fmtNum(l.daily)}</td><td class="r num">${fmtNum(l.spent_today)}</td><td><div class="bar ${p>=100?'over':p>=80?'warn':''}"><i style="width:${p}%"></i></div></td></tr>`}).join('')}</tbody></table>`,{flush:true,cls:'scroll',right:'<a class="btn sm" href="#rules">改限额</a>'})}`};
 
-// ---------- 08 telegram ----------
-VIEWS.telegram=async()=>{const t=await api('/api/telegram');S.tg=t;const s=t.settings;
-  const steps=[
-    [!!t.bot,'在 @BotFather 新建机器人，把 token 设成服务器的 TELEGRAM_BOT_TOKEN，启动机器人'],
-    [t.bot&&t.bot.reads_all_group_messages,'在 @BotFather 发 /setprivacy 选 Disable，机器人才能看到群里的付款请求和骗子消息'],
-    [!!t.chat,'把机器人拉进群，在下面填群 ID（周报、简报、预警和公告发到这里）'],
-    ...(member('community_support')?[[false,'社区客服要删骗子消息：把机器人设为群管理员并勾选「删除消息」（不删只警告则不需要）']]:[]),
-    [t.owners.length>0,'在规则里填老板的 Telegram 用户名（只有他们能审批和暂停）'],
-    [t.online,'机器人在线，群里发 /help 测试'],
-  ];
-  return `
-  <div class="grid g4">
-    <section class="card kpi"><span class="label">机器人</span><span class="v" style="font-size:18px">${t.bot?'@'+esc(t.bot.username):'未连接'}</span><span class="s">${t.bot?esc(t.bot.name||''):'还没启动过机器人'}</span></section>
-    <section class="card kpi"><span class="label">状态</span><span class="v ${t.online?'ok':'block'}" style="font-size:18px">${t.online?'在线':'离线'}</span><span class="s">最后心跳 ${ago(t.heartbeat)}</span></section>
-    <section class="card kpi"><span class="label">通知群</span><span class="v mono" style="font-size:16px">${esc(t.chat||'未设置')}</span><span class="s">${t.chat_source==='console'?'在控制台设置':t.chat_source==='env'?'部署时设置':'周报、预警发到这里'}</span></section>
-    <section class="card kpi"><span class="label">群消息权限</span><span class="v ${t.bot?(t.bot.reads_all_group_messages?'ok':'block'):'muted'}" style="font-size:18px">${t.bot?(t.bot.reads_all_group_messages?'能看全部消息':'只能看命令'):'—'}</span><span class="s">${t.bot&&!t.bot.reads_all_group_messages?'去 @BotFather /setprivacy 选 Disable':'隐私模式要关掉'}</span></section>
-  </div>
-  <div class="grid g2" style="align-items:start">
-  <div class="stack" style="gap:16px">
-  ${card('接入步骤',`<ol class="steps">${steps.map(([ok,txt])=>`<li class="${ok?'done':''}">${esc(txt)}</li>`).join('')}</ol>`)}
-  ${card('通知群和审批人',`<div class="stack">
-    <label class="f"><span>群 ID</span><div class="row"><input id="chatId" class="mono grow" style="width:auto" value="${esc(t.chat||'')}" placeholder="-1001234567890"><button class="btn" id="saveChat">保存</button></div></label>
-    <p class="muted" style="margin:0;font-size:12px">怎么拿群 ID：把 @RawDataBot 拉进群，它会回一串以 -100 开头的数字，拿到后把它踢掉。</p>
-    <div><span class="label">审批人（老板）</span><div class="row" style="margin-top:6px">${t.owners.map(o=>`<span class="chip">@${esc(o)}</span>`).join('')||'<span class="block">还没设置，任何人都不能审批</span>'}<a class="btn sm" href="#rules">修改</a></div></div></div>`)}
-  ${card('自动通知',`<div class="stack">
-    <div class="row"><label class="switch grow"><input type="checkbox" id="sWeekly" ${s.weekly_report?'checked':''}> 每周周报</label><select id="sWeekday" style="width:auto">${WEEK.map((w,i)=>`<option value="${i}" ${s.report_weekday===i?'selected':''}>${w}</option>`).join('')}</select><select id="sHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.report_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
-    <div class="row"><label class="switch grow"><input type="checkbox" id="sDigest" ${s.daily_digest?'checked':''}> 每日账本</label><select id="sDigestHour" style="width:auto">${[...Array(24).keys()].map(h=>`<option value="${h}" ${s.digest_hour===h?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('')}</select></div>
-    <div class="row"><label class="switch grow"><input type="checkbox" id="sRemind" ${s.pending_reminder_hours?'checked':''}> 有付款没签字时提醒老板，每隔</label><select id="sRemindH" style="width:auto">${[1,2,4,8,12,24].map(h=>`<option value="${h}" ${(s.pending_reminder_hours||4)===h?'selected':''}>${h} 小时</option>`).join('')}</select></div>
-    <label class="switch"><input type="checkbox" id="sAlerts" ${s.treasury_alerts?'checked':''}> 国库预警发到群里</label>
-    <label class="switch"><input type="checkbox" id="sQuiet" ${s.quiet_auto_pay?'checked':''}> 自动付款只回一行（群里消息多时更清爽）</label>
-    <div class="row"><button class="btn primary" id="saveNotify">保存通知设置</button><span class="muted" style="font-size:12px">时间按规则里的时区（${esc(S.rules.timezone)}）</span></div></div>`)}
-  ${card('现在发到群里',`<div class="stack">
-    <div class="row">${[['report','上周周报'],['today','今日账本'],['pending','待签字列表'],['rules','当前规则']].map(([k,l])=>`<button class="btn sm" data-send="${k}">${l}</button>`).join('')}</div>
-    <textarea id="customMsg" placeholder="自定义消息，例如：本周五前把发票发到群里"></textarea>
-    <div class="row"><button class="btn signal" id="sendCustom">发送</button><span class="muted" style="font-size:12px">消息先排队，机器人几秒内发出</span></div>
-    ${t.outbox.length?`<div class="scroll"><table><thead><tr><th>时间</th><th>内容</th><th>状态</th></tr></thead><tbody>${t.outbox.map(o=>`<tr><td class="mono" style="white-space:nowrap">${fmtTime(o.at)}</td><td>${esc(o.text.slice(0,60))}${o.text.length>60?'…':''}</td><td style="white-space:nowrap">${o.error?`<span class="block" title="${esc(o.error)}">失败</span>`:o.sent_at?'<span class="ok">已发</span>':'<span class="review">排队中</span>'}</td></tr>`).join('')}</tbody></table></div>`:''}</div>`)}
-  </div>
-  <div class="stack" style="gap:16px">
-  ${card('群聊',`<div class="stack"><p class="muted" style="margin:0">像在 Telegram 群里一样跟 AI 员工说话：看哪个员工接、怎么回。付款只试算；工单、翻译、暂停这类会改东西的命令不会真的执行。机器人在真实群里处理过的消息也在那里。</p><div><a class="btn primary" href="#chat">打开群聊</a></div></div>`)}
-  ${card('命令速查',`<table><tbody>${t.commands.map(c=>`<tr><td class="mono" style="white-space:nowrap">${esc(c.cmd)}</td><td>${esc(c.desc)}${c.owner_only?' <span class="chip review">仅老板</span>':''}${c.employee?`<span class="who-tag">${esc(c.employee)}</span>`:''}</td></tr>`).join('')}</tbody></table>`,{flush:true})}
-  ${card('群消息记录',t.messages.length?`<div class="row"><span class="grow muted">最近 ${t.messages.length} 条，在群聊里按 Telegram 的样子显示。</span><a class="btn sm" href="#chat">查看</a></div>`:'<div class="empty">机器人处理过的消息会出现在这里</div>')}
-  </div></div>`};
-BIND.telegram=()=>{
-  $('#saveChat').onclick=()=>act(()=>put('/api/telegram/chat',{chat:$('#chatId').value.trim()}),'通知群已保存');
-  $('#saveNotify').onclick=()=>act(()=>put('/api/telegram/settings',{weekly_report:$('#sWeekly').checked,report_weekday:+$('#sWeekday').value,report_hour:+$('#sHour').value,daily_digest:$('#sDigest').checked,digest_hour:+$('#sDigestHour').value,pending_reminder_hours:$('#sRemind').checked?+$('#sRemindH').value:0,treasury_alerts:$('#sAlerts').checked,quiet_auto_pay:$('#sQuiet').checked}),'通知设置已保存，机器人立即生效');
-  document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.send})));
-  $('#sendCustom').onclick=async()=>{const text=$('#customMsg').value.trim();if(!text)return toast('消息不能为空',true);if(await confirmBox('发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
-};
-// ---------- chat: talk to the team in a messenger laid out like Telegram ----------
-// Two simulated chats (the project group and a private chat with the bot) go through
-// /api/chat/simulate: payments are only test-run and commands that change things are not
-// executed. The third chat shows what the real bot handled in the group, read-only.
-const TG_ICON={
-  search:'<svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l4.6 4.6a1 1 0 0 1-1.4 1.4l-4.6-4.6A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>',
-  back:'<svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg>',
-  more:'<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
-  send:'<svg viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>',
-  kb:'<svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm-9 3h2v2h-2zm0 3h2v2h-2zM8 8h2v2H8zm0 3h2v2H8zm-1 2H5v-2h2zm0-3H5V8h2zm9 7H8v-2h8zm0-4h-2v-2h2zm0-3h-2V8h2zm3 3h-2v-2h2zm0-3h-2V8h2z"/></svg>',
-  menu:'<svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>',
-  group:'<svg viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6.5-.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM9 14c-3.3 0-7 1.6-7 4v2h14v-2c0-2.4-3.7-4-7-4Zm6.5-.5c-.5 0-1 0-1.5.1 1.2.9 2 2 2 3.4v3h6v-2.5c0-2.2-3.4-4-6.5-4Z"/></svg>',
-  bot:'<svg viewBox="0 0 24 24"><path d="M12 2a1.5 1.5 0 0 1 1 2.6V6h4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h4V4.6A1.5 1.5 0 0 1 12 2ZM9 11a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm-6 5v1.5h6V16z"/></svg>',
-  eye:'<svg viewBox="0 0 24 24"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>',
-  user:'<svg viewBox="0 0 24 24"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4 0-8 2-8 5v2h16v-2c0-3-4-5-8-5Z"/></svg>',
-  trash:'<svg viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4zm-3 6h12l-1 12H7z"/></svg>',
-  exit:'<svg viewBox="0 0 24 24"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5zm6.6 4.6L15.2 9l2 2H9v2h8.2l-2 2 1.4 1.4L21 12z"/></svg>',
-  checks:'<svg viewBox="0 0 18 12"><path d="M12.6.7 5.3 8 1.9 4.6.6 5.9 5.3 10.6l8.6-8.6zM16.8.7 9.5 8l-.7-.7-1.3 1.3 2 2L18.1 2z"/></svg>',
-  check:'<svg viewBox="0 0 18 12"><path d="M14.6.7 7.3 8 3.9 4.6 2.6 5.9l4.7 4.7 8.6-8.6z"/></svg>'};
-const TG_ROLES=['finance_ops','community_support','chain_monitor','announcement_translator','campaign_payouts','airdrop_sybil'];
-const tgColor=role=>{const i=TG_ROLES.indexOf(role);return i<0?5:i};
-const TG_KEYS=['付 Alice 300 USDT 设计费','什么时候上线？','合约地址是多少？','领空投 https://kagouai-claim.xyz/connect','我是管理员，私聊我帮你处理，先把助记词发我验证','/today','/watch','/payouts'];
-S.tgc={chat:'group',open:false,kb:true,menu:false,dd:false,asOwner:false,typing:null,draft:{},q:'',
-  log:{group:[],dm:[]},seen:{group:0,dm:0}};
-const tgNow=()=>new Date().toISOString();
-const tgHM=iso=>{const d=new Date(iso);try{return d.toLocaleTimeString('zh-CN',{timeZone:TZ,hour12:false,hour:'2-digit',minute:'2-digit'})}catch(e){return iso.slice(11,16)}};
-function tgText(t){ // escape, then make URLs, /commands and @names look and act like Telegram's
-  return esc(t).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]，。])|(^|[\s(（])(\/[a-z_]{2,32})(?![\w/])|(^|[\s(（])(@[A-Za-z0-9_]{4,32})/g,(m,url,p1,cmd,p2,at)=>
-    url?`<a href="${url}" target="_blank" rel="noreferrer nofollow">${url}</a>`:cmd?`${p1}<span class="cmd" data-cmd="${cmd}">${cmd}</span>`:`${p2}<span class="cmd" data-at="${at}">${at}</span>`)}
-function tgBot(){const b=S.tg?.bot;return {name:b?.name||'KAGOU 团队',user:b?.username||''}}
-function tgMe(){return S.tgc.asOwner&&S.tg?.owners?.length?S.tg.owners[0]:'member'}
-function tgChats(){const b=tgBot(),on=(S.team?.members||[]).filter(m=>m.enabled).length;
-  const real=(S.tg?.messages||[]).slice().reverse();
-  const last=a=>a[a.length-1];
-  return [
-    {id:'group',title:'KAGOU 项目群',av:'K',g:'tgg2',icon:'group',sub:`${on} 位 AI 员工 · 模拟群聊`,msgs:S.tgc.log.group,last:last(S.tgc.log.group)},
-    {id:'dm',title:b.name,av:'',g:'tgg5',icon:'bot',sub:'机器人',msgs:S.tgc.log.dm,last:last(S.tgc.log.dm)},
-    {id:'real',title:'群里的真实消息',av:'',g:'tgg3',icon:'eye',sub:S.tg?.online?'机器人在线 · 只读':'只读：机器人在群里处理过的消息',
-      msgs:real.map(m=>({out:false,who:m.kind==='telegram_in'?m.actor:(m.employee?roleName(m.employee):b.name),role:m.kind==='telegram_in'?'':m.employee||'',
-        text:m.text,at:m.at,user:m.kind==='telegram_in'})),last:null}]}
-function tgPreview(c){const m=c.msgs[c.msgs.length-1];if(!m)return c.id==='dm'?'发 /start 开始':c.id==='real'?'还没有消息':'点开就能跟 AI 员工说话';
-  if(m.svc)return esc(m.text);return (m.out?'<b>你：</b>':m.who&&c.id!=='dm'?`<b>${esc(m.who)}：</b>`:'')+esc(String(m.text).split('\n')[0])}
-function tgAv(name,g,icon,cls=''){return `<div class="tg-av ${cls} ${g}">${icon?TG_ICON[icon]:esc(Array.from(String(name||'?').replace(/^@/,''))[0]||'?')}</div>`}
-function tgMsgs(c){
-  if(!c.msgs.length){
-    if(c.id==='dm')return `<div class="tg-intro"><b>这个机器人能做什么？</b>${esc('我是 '+tgBot().name+'。项目群里的 AI 员工都通过我工作：付款、客服、链上监控、公告翻译、营销结算和空投反女巫。\n\n点下面的「开始」看看都有谁在岗。')}</div>`;
-    if(c.id==='real')return `<div class="tg-empty">机器人在群里处理过的消息会出现在这里。<br>先在「Telegram」页面把机器人接进群。</div>`;
-    return `<div class="tg-svc">今天</div><div class="tg-svc">你加入了群聊 · 这里是模拟，不记账、不发到真实群</div>`}
-  let out='',day='';
-  c.msgs.forEach((m,i)=>{
-    const d=(m.at||'').slice(0,10);if(d&&d!==day){day=d;out+=`<div class="tg-svc">${d===tgNow().slice(0,10)?'今天':esc(fmtTime(m.at).split(' ')[0])}</div>`}
-    if(m.svc){out+=`<div class="tg-svc">${esc(m.text)}</div>`;return}
-    const n=c.msgs[i+1],last=!n||n.svc||n.out!==m.out||n.who!==m.who;
-    const showName=!m.out&&c.id!=='dm'&&(i===0||c.msgs[i-1].svc||c.msgs[i-1].who!==m.who||c.msgs[i-1].out);
-    const col=m.user?6:tgColor(m.role);
-    const meta=`<span class="tg-meta">${tgHM(m.at)}${m.out?(m.pending?TG_ICON.check:TG_ICON.checks):''}</span>`;
-    const body=m.deleted?`<span class="tg-del">${esc(m.text)}</span>`:m.typing?'<span class="tg-dots"><i></i><i></i><i></i></span>':tgText(m.text);
-    out+=`<div class="tg-m ${m.out?'out':'in'} ${last?'last':''}">${m.out?'':tgAv(m.who,'tgg'+col,m.user?'':(!m.role?'bot':''),'xs')}
-      <div class="tg-b">${showName?`<span class="tg-who n${col}">${esc(m.who)}${m.tag?`<em>${esc(m.tag)}</em>`:''}</span>`:''}${body}${m.typing?'':meta}</div></div>`});
-  return out}
-function tgCmds(){return (S.tg?.commands||[]).filter(c=>c.cmd.startsWith('/'))}
-VIEWS.chat=async()=>{
-  if(!S.tg||Date.now()-(S.tgAt||0)>15000){S.tg=await api('/api/telegram');S.tgAt=Date.now()}
-  const cs=tgChats(),c=cs.find(x=>x.id===S.tgc.chat)||cs[0],q=S.tgc.q.trim().toLowerCase();
-  if(S.tgc.seen.real===undefined)S.tgc.seen.real=cs[2].msgs.length; // only messages that arrive while the console is open count as unread
-  const list=cs.filter(x=>!q||x.title.toLowerCase().includes(q)).map(x=>{const unread=x.msgs.length-(S.tgc.seen[x.id]||0);
-    return `<button class="tg-item" data-chat="${x.id}" aria-current="${x.id===c.id}">${tgAv(x.av,x.g,x.av?'':x.icon)}
-    <span class="tx"><span class="tg-row"><span class="tg-name">${esc(x.title)}</span><span class="tg-time">${x.msgs.length?tgHM(x.msgs[x.msgs.length-1].at):''}</span></span>
-    <span class="tg-row"><span class="tg-prev">${tgPreview(x)}</span>${unread>0&&x.id!==c.id?`<span class="tg-badge">${unread}</span>`:''}</span></span></button>`}).join('');
-  const sub=S.tgc.typing&&S.tgc.typing.chat===c.id?`<span class="tg-sub typing">${esc(S.tgc.typing.who)} 正在输入…</span>`:`<span class="tg-sub">${esc(c.sub)}</span>`;
-  const draft=S.tgc.draft[c.id]||'';
-  const ro=c.id==='real';
-  const showKb=!ro&&S.tgc.kb;
-  const cmds=tgCmds(),fq=draft.startsWith('/')&&!draft.includes(' ')?draft.slice(1).toLowerCase():null;
-  const pop=!ro&&(S.tgc.menu||fq!==null)?cmds.filter(x=>fq===null||x.cmd.slice(1).toLowerCase().startsWith(fq)):[];
-  const me=tgMe();
-  return `<div class="tg ${S.tgc.open?'open':''}" id="tg">
-  <aside class="tg-side">
-    <div class="tg-sh"><button class="ic" id="tgHome" title="返回控制台" aria-label="返回控制台">${TG_ICON.menu}</button>
-      <label class="tg-search">${TG_ICON.search}<input id="tgQ" placeholder="搜索" value="${esc(S.tgc.q)}" aria-label="搜索会话"></label></div>
-    <div class="tg-list" role="list">${list||'<div class="tg-empty">没有匹配的会话</div>'}</div>
-    <div class="tg-foot"><span style="flex:1">AI 员工在这里回复，跟真实群里一样。</span><a href="#team">返回控制台</a></div>
-  </aside>
-  <section class="tg-conv" aria-label="${esc(c.title)}">
-    <header class="tg-ch"><button class="ic back" id="tgBack" aria-label="返回会话列表">${TG_ICON.back}</button>
-      ${tgAv(c.av,c.g,c.av?'':c.icon,'sm')}<div class="tx"><span class="tg-name">${esc(c.title)}</span>${sub}</div>
-      ${ro?'':`<button class="ic" id="tgMore" aria-label="更多" aria-expanded="${S.tgc.dd}">${TG_ICON.more}</button>`}
-      ${S.tgc.dd?`<div class="tg-dd" role="menu">
-        <button data-dd="member" role="menuitemradio" aria-checked="${!S.tgc.asOwner}">${TG_ICON.user}以群成员 @member 发言${S.tgc.asOwner?'':'<span class="chk">✓</span>'}</button>
-        ${S.tg?.owners?.length?`<button data-dd="owner" role="menuitemradio" aria-checked="${S.tgc.asOwner}">${TG_ICON.user}以老板 @${esc(S.tg.owners[0])} 发言${S.tgc.asOwner?'<span class="chk">✓</span>':''}</button>`:''}
-        <button data-dd="clear" role="menuitem">${TG_ICON.trash}清空聊天记录</button>
-        <button data-dd="home" role="menuitem">${TG_ICON.exit}返回控制台</button></div>`:''}
-    </header>
-    <div class="tg-msgs" id="tgMsgs" aria-live="polite"><div class="tg-col">${tgMsgs(c)}</div></div>
-    <div class="tg-bottom">
-      ${pop.length?`<div class="tg-pop" role="listbox">${pop.map(x=>`<button data-pick="${esc(x.cmd)}" role="option"><span class="c">${esc(x.cmd)}</span><span class="d">${esc(x.desc)}${x.owner_only?' · 老板':''}</span></button>`).join('')}</div>`:''}
-      ${ro?`<div class="tg-ro">只读：这里是机器人在真实群里收发的消息</div>`:
-        c.id==='dm'&&!c.msgs.length?`<div class="tg-comp"><button class="tg-start" data-say="/start">开始</button></div>`:
-      `${showKb?`<div class="tg-kb">${TG_KEYS.map(k=>`<button data-say="${esc(k)}" title="${esc(k)}">${esc(k)}</button>`).join('')}</div>`:''}
-      <div class="tg-comp"><div class="tg-pill">
-        <button class="tg-menu-btn" id="tgMenu" aria-expanded="${S.tgc.menu}">${TG_ICON.menu}菜单</button>
-        <textarea class="tg-in" id="tgIn" rows="1" placeholder="${c.id==='group'?`以 @${esc(me)} 发消息`:'消息'}" aria-label="消息">${esc(draft)}</textarea>
-        <button class="ic ${showKb?'on':''}" id="tgKb" title="快捷消息" aria-label="快捷消息">${TG_ICON.kb}</button></div>
-        <button class="tg-send ${draft.trim()?'go':''}" id="tgSend" aria-label="发送" ${draft.trim()?'':'disabled'}>${TG_ICON.send}</button></div>`}
-    </div>
-  </section></div>`};
-function tgSeen(){const c=tgChats().find(x=>x.id===S.tgc.chat);if(c)S.tgc.seen[c.id]=c.msgs.length}
-async function tgSay(text){
-  const chat=S.tgc.chat;text=String(text||'').trim();if(!text||chat==='real'||S.tgc.typing)return;
-  const b=tgBot(),log=S.tgc.log[chat],me=tgMe();
-  // In the group the bot only hears commands and messages that @ it (or anything, for support's scans).
-  const mentioned=chat==='dm'||(!!b.user&&text.toLowerCase().includes('@'+b.user.toLowerCase()));
-  const mine={out:true,text,at:tgNow(),pending:true};log.push(mine);
-  S.tgc.draft[chat]='';S.tgc.menu=false;S.tgc.typing={chat,who:b.name};
-  const dots={out:false,who:b.name,role:'',typing:true,at:tgNow()};log.push(dots);
-  await render();
-  let r;try{r=await post('/api/chat/simulate',{text,username:me,mentioned});await new Promise(res=>setTimeout(res,450))}
-  catch(e){r={reply:e.message,employee:'',employee_name:''}}
-  log.splice(log.indexOf(dots),1);mine.pending=false;S.tgc.typing=null;
-  const who=r.employee_name||b.name;
-  if(r.delete){mine.deleted=true;mine.text='这条消息已被删除';log.push({svc:true,text:`${who} 删除了一条可疑消息`,at:tgNow()})}
-  if(r.reply)log.push({out:false,who,role:r.employee||'',tag:r.employee?'AI 员工':'机器人',text:r.reply,at:tgNow()});
-  else if(chat==='group'&&!log.some(m=>m.hint))log.push({svc:true,hint:true,text:`没有员工回复：普通闲聊不打扰群。用 / 命令，或 @${b.user||'机器人'} 试试`,at:tgNow()});
-  S.tgc.log[chat]=log.slice(-80);tgSeen();await render()}
-BIND.chat=()=>{
-  const tg=$('#tg');if(!tg)return;
-  const top=$('#demoBar');tg.style.setProperty('--tg-top',(top&&!top.hidden?top.offsetHeight:0)+'px');
-  const box=$('#tgMsgs');if(box)box.scrollTop=box.scrollHeight;tgSeen();
-  tg.querySelectorAll('[data-chat]').forEach(b=>b.onclick=()=>{S.tgc.chat=b.dataset.chat;S.tgc.open=true;S.tgc.dd=S.tgc.menu=false;tgSeen();render()});
-  const q=$('#tgQ');q.oninput=()=>{S.tgc.q=q.value;render().then(()=>{const i=$('#tgQ');i.focus();i.setSelectionRange(i.value.length,i.value.length)})};
-  $('#tgHome').onclick=()=>{location.hash='#team'};
-  const back=$('#tgBack');if(back)back.onclick=()=>{S.tgc.open=false;render()};
-  const more=$('#tgMore');if(more)more.onclick=e=>{e.stopPropagation();S.tgc.dd=!S.tgc.dd;render()};
-  tg.querySelectorAll('[data-dd]').forEach(b=>b.onclick=()=>{const k=b.dataset.dd;S.tgc.dd=false;
-    if(k==='member'||k==='owner')S.tgc.asOwner=k==='owner';
-    if(k==='clear'){S.tgc.log[S.tgc.chat]=[];S.tgc.seen[S.tgc.chat]=0}
-    if(k==='home'){location.hash='#team';return}
-    render()});
-  tg.onclick=e=>{if(S.tgc.dd&&!e.target.closest('.tg-dd,#tgMore')){S.tgc.dd=false;render()}};
-  tg.querySelectorAll('[data-say]').forEach(b=>b.onclick=()=>tgSay(b.dataset.say));
-  tg.querySelectorAll('.tg-b [data-cmd]').forEach(b=>b.onclick=()=>tgSay(b.dataset.cmd));
-  tg.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>tgSay(b.dataset.pick));
-  const kb=$('#tgKb');if(kb)kb.onclick=()=>{S.tgc.kb=!S.tgc.kb;render()};
-  const menu=$('#tgMenu');if(menu)menu.onclick=()=>{S.tgc.menu=!S.tgc.menu;render().then(()=>{const i=$('#tgIn');if(i)i.focus()})};
-  const inp=$('#tgIn'),send=$('#tgSend');
-  if(inp){
-    const fit=()=>{inp.style.height='auto';inp.style.height=Math.min(180,inp.scrollHeight)+'px'};fit();
-    inp.oninput=()=>{const was=S.tgc.draft[S.tgc.chat]||'';S.tgc.draft[S.tgc.chat]=inp.value;fit();
-      send.disabled=!inp.value.trim();send.classList.toggle('go',!!inp.value.trim());
-      // the command list follows a leading "/" the way Telegram's does
-      const slash=v=>v.startsWith('/')&&!v.includes(' ');
-      if(slash(inp.value)!==slash(was)||slash(inp.value)){const pos=inp.selectionStart;render().then(()=>{const i=$('#tgIn');if(i){i.focus();i.setSelectionRange(pos,pos)}})}};
-    inp.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();tgSay(inp.value)}
-      if(e.key==='Escape'&&S.tgc.menu){S.tgc.menu=false;render()}};
-    send.onclick=()=>tgSay(inp.value);
-    if(matchMedia('(min-width:721px)').matches||S.tgc.open)setTimeout(()=>{const i=$('#tgIn');if(i&&document.activeElement!==$('#tgQ'))i.focus()},0)}};
-
 // ---------- 09 reports ----------
 S.week=0;
 VIEWS.reports=async()=>{const [w,d]=await Promise.all([api('/api/report/weekly?weeks_ago='+S.week),api('/api/report/today')]);
   return `<div class="grid g2" style="align-items:start">
-  ${card('周报',`<div class="stack"><div class="row"><select id="week" style="width:auto">${[...Array(13).keys()].map(i=>`<option value="${i}" ${S.week===i?'selected':''}>${i===0?'上周':i+1+' 周前'}</option>`).join('')}</select><button class="btn sm" data-copy="${esc(w.text)}">复制</button><button class="btn sm" data-sendr="report">发到群里</button></div><pre class="report">${esc(w.text)}</pre></div>`)}
-  ${card('今日账本',`<div class="stack"><div class="row"><button class="btn sm" data-copy="${esc(d.text)}">复制</button><button class="btn sm" data-sendr="today">发到群里</button></div><pre class="report">${esc(d.text)}</pre></div>`)}
+  ${card('周报',`<div class="stack"><div class="row"><select id="week" style="width:auto">${[...Array(13).keys()].map(i=>`<option value="${i}" ${S.week===i?'selected':''}>${i===0?'上周':i+1+' 周前'}</option>`).join('')}</select><button class="btn sm" data-copy="${esc(w.text)}">复制</button></div><pre class="report">${esc(w.text)}</pre></div>`)}
+  ${card('今日账本',`<div class="stack"><div class="row"><button class="btn sm" data-copy="${esc(d.text)}">复制</button></div><pre class="report">${esc(d.text)}</pre></div>`)}
   </div>
   ${card('导出',`<div class="row"><span class="grow muted">完整账本（含所有字段）导出成 CSV，Excel 可以直接打开。</span><a class="btn" href="#ledger">去账本导出</a></div>`)}`};
-BIND.reports=()=>{$('#week').onchange=e=>{S.week=+e.target.value;render()};
-  document.querySelectorAll('[data-sendr]').forEach(b=>b.onclick=()=>act(()=>post('/api/telegram/send',{kind:b.dataset.sendr})))};
+BIND.reports=()=>{$('#week').onchange=e=>{S.week=+e.target.value;render()}};
 
 // ---------- 10 audit ----------
 VIEWS.audit=async()=>{const k=S.audit.kind;const items=await api('/api/events?limit=100'+(k?'&kind='+k:''));S.audit.items=items;
-  const tabs=[['','全部'],['audit','操作'],['alert','预警'],['support','客服'],['translate','翻译'],['telegram_in,telegram_out','Telegram'],['system','系统']];
+  const tabs=[['','全部'],['audit','操作'],['alert','预警'],['support','客服'],['translate','翻译'],['system','系统']];
   return `<section class="card"><div class="tabs" role="tablist">${tabs.map(([v,l])=>`<button role="tab" aria-selected="${k===v}" data-kind="${v}">${l}</button>`).join('')}</div>
   <div id="auditFeed">${feed(items,'没有记录')}</div>
   ${items.length>=100?'<div class="bd" style="border-top:1px solid var(--line)"><button class="btn" id="auditMore">加载更早的</button></div>':''}</section>
@@ -1407,7 +1201,7 @@ VIEWS.settings=async()=>`
   ${card('外观',`<div class="stack"><label class="f"><span>主题</span><select id="theme">${[['dark','深色'],['light','浅色'],['auto','跟随系统']].map(([v,l])=>`<option value="${v}" ${store.get('cs-theme','dark')===v?'selected':''}>${l}</option>`).join('')}</select></label>
     <label class="f"><span>自动刷新</span><select id="auto">${[['0','关'],['15','每 15 秒'],['60','每分钟']].map(([v,l])=>`<option value="${v}" ${store.get('cs-auto','60')===v?'selected':''}>${l}</option>`).join('')}</select></label></div>`)}
   ${card('登录',`<div class="stack"><p class="muted" style="margin:0">令牌只保存在这个标签页。换令牌要在服务器上改 <code>CHAINSTAFF_CONSOLE_TOKEN</code> 并重启控制台，旧令牌立即失效。</p><div><button class="btn" id="logout">退出登录</button></div></div>`)}
-  ${card('紧急操作',`<div class="stack"><p class="muted" style="margin:0">发现异常时先暂停：之后所有付款请求都会被拦截，直到恢复。Telegram 群里老板发 /pause 效果一样。</p><div><button class="btn danger" id="kill2">${S.status.paused?'恢复付款':'一键暂停所有付款'}</button></div></div>`)}
+  ${card('紧急操作',`<div class="stack"><p class="muted" style="margin:0">发现异常时先暂停：之后所有付款请求都会被拦截，直到恢复。</p><div><button class="btn danger" id="kill2">${S.status.paused?'恢复付款':'一键暂停所有付款'}</button></div></div>`)}
   ${card('快捷键',`<table><tbody><tr><td class="mono">R</td><td>刷新数据</td></tr><tr><td class="mono">Esc</td><td>关闭弹窗和详情</td></tr></tbody></table>`,{flush:true})}
   </div>`;
 BIND.settings=()=>{$('#theme').onchange=e=>{store.set('cs-theme',e.target.value);applyTheme()};
@@ -1454,7 +1248,7 @@ const kpi=(l,v,s='',cls='')=>`<section class="card kpi"><span class="label">${l}
 // ---------- team ----------
 VIEWS.team=async()=>{const t=await api('/api/team');S.team=t;renderNav();
   const on=t.members.filter(m=>m.enabled),todo=t.members.reduce((a,m)=>a+(m.enabled?(m.todo?.value||0):0),0);
-  const msgs=t.members.reduce((a,m)=>a+(m.activity_7d.telegram_in||0),0);
+  const alerts=t.members.reduce((a,m)=>a+(m.activity_7d.alert||0),0);
   const live=t.roles.filter(r=>r.status==='live'),soon=t.roles.filter(r=>r.status!=='live');
   const empCard=m=>`<section class="card emp"><div class="hd"><span class="av ${m.enabled?'on':''}">${esc(m.name[0])}</span><div class="grow" style="min-width:0"><h2>${esc(m.name)}</h2><span class="muted" style="font-size:12px">${esc(m.title)}${m.hired_at?' · '+fmtTime(m.hired_at).split(' ')[0]+' 入职':''}</span></div>
     <span class="pill ${m.enabled?'ok':'block'}"><span class="dot"></span>${m.enabled?'在岗':'停用'}</span><span class="pill ${m.touches_money?'review':'muted'}">${m.touches_money?'动钱':'不碰钱'}</span></div>
@@ -1471,9 +1265,9 @@ VIEWS.team=async()=>{const t=await api('/api/team');S.team=t;renderNav();
     ${r.status==='live'?(r.hired?`<div><a class="btn sm" href="#${ROLE_PAGE[r.id]}">去管理</a></div>`:`<div><button class="btn sm signal" data-hire="${r.id}">雇佣</button></div>`):'<p class="muted" style="margin:0;font-size:12px">开发中，上线后可以在这里一键雇佣。</p>'}</div></section>`;
   return `
   <div class="grid g4">
-    ${kpi('在岗员工',`${on.length}<span class="muted" style="font-size:14px"> / ${t.members.length}</span>`,'一个 Telegram 机器人托管全部员工')}
+    ${kpi('在岗员工',`${on.length}<span class="muted" style="font-size:14px"> / ${t.members.length}</span>`,'全部员工在这个控制台里管理')}
     ${kpi('等你处理',todo,'签字、工单、翻译草稿、高危预警',todo?'review':'')}
-    ${kpi('7 天群消息',msgs,'员工接手的群消息')}
+    ${kpi('7 天预警',alerts,'链上监控和金库预警')}
     ${kpi('岗位库',`${live.length}<span class="muted" style="font-size:14px"> + ${soon.length}</span>`,`${live.length} 个可雇佣，${soon.length} 个即将上线`)}
   </div>
   <div class="grid g2">${t.members.map(empCard).join('')}</div>
@@ -1507,7 +1301,7 @@ VIEWS.support=async()=>{if(!member('community_support'))return notHired('communi
   <div class="stack" style="gap:16px">
   ${card('基本设置',`<div class="stack">
     <label class="f"><span>项目名</span><input id="spName" value="${esc(s.project_name)}" placeholder="KAGOU"></label>
-    <label class="f"><span>真管理员（Telegram 用户名，逗号分开）</span><input id="spAdmins" class="mono" value="${esc(s.admins.map(a=>'@'+a).join(', '))}" placeholder="@cc_xbnb, @kagou_mod"></label>
+    <label class="f"><span>真管理员（社区用户名，逗号分开）</span><input id="spAdmins" class="mono" value="${esc(s.admins.map(a=>'@'+a).join(', '))}" placeholder="@cc_xbnb, @kagou_mod"></label>
     <label class="f"><span>官方域名（逗号分开，子域名自动算官方）</span><input id="spDomains" class="mono" value="${esc(s.official_domains.join(', '))}" placeholder="kagouai.com"></label>
     <div class="grid g2" style="gap:10px">
     <label class="f"><span>什么时候回答</span><select id="spMode"><option value="mention" ${s.answer_mode==='mention'?'selected':''}>只在 @机器人 或回复它时</option><option value="questions" ${s.answer_mode==='questions'?'selected':''}>群里有人提问且 FAQ 能答时</option></select></label>
@@ -1558,7 +1352,7 @@ VIEWS.monitor=async()=>{if(!member('chain_monitor'))return notHired('chain_monit
   <div class="stack" style="gap:16px">
   ${card('预警',`<div class="tabs" role="tablist" style="margin:-14px -16px 0">${[['','全部'],['high','高危'],...kinds.map(k=>[k,K[k]||k])].map(([v,l])=>`<button role="tab" aria-selected="${f===v}" data-monf="${v}">${esc(l)}</button>`).join('')}</div>
     ${alerts.length?`<div class="feed" style="margin:0 -16px -14px">${alerts.slice(0,60).map(a=>`<div class="it"><span class="sev ${a.data?.severity==='high'?'block':'review'}">${a.data?.severity==='high'?'高危':'注意'}</span><div>${esc(a.text)}${a.data?.url?`<div><a class="copy" href="${esc(a.data.url)}" target="_blank" rel="noreferrer">在浏览器查看交易</a></div>`:''}</div><span class="t">${fmtTime(a.at)}</span></div>`).join('')}</div>`:'<div class="empty">没有预警</div>'}`,{right:`<button class="btn sm" id="monCheck">立即检查</button>`})}
-  ${card('链上简报',`<div class="stack"><pre class="report" id="brief">读取中…</pre><div class="row"><button class="btn sm" id="briefSend">发到群里</button><span class="muted" style="font-size:12px">${s.daily_brief?`每天 ${String(s.brief_hour).padStart(2,'0')}:00 自动发`:'自动简报已关闭'}</span></div></div>`)}
+  ${card('链上简报',`<div class="stack"><pre class="report" id="brief">读取中…</pre><div class="row"><button class="btn sm" id="briefCopy">复制</button></div></div>`)}
   </div>
   <div class="stack" style="gap:16px">
   ${card('盯哪些地址',`<div class="stack"><p class="muted" style="margin:0;font-size:12px">${d.watch_source==='chain'?'现在用的是链配置里的国库地址。在这里填了就以这里为准。':'国库、多签、热钱包、做市地址都可以加，最多 50 个。'}</p>
@@ -1579,7 +1373,7 @@ BIND.monitor=()=>{if(!$('#monSave'))return;
   api('/api/monitor/brief').then(r=>{$('#brief').textContent=r.text}).catch(e=>{$('#brief').textContent=e.message});
   document.querySelectorAll('[data-monf]').forEach(b=>b.onclick=()=>{S.monF=b.dataset.monf;render()});
   $('#monCheck').onclick=async()=>{try{const r=await post('/api/monitor/check');toast(r.last_run?.ok===false?'检查失败：'+r.last_run.error:`检查完成，新预警 ${r.new.length} 条`,r.last_run?.ok===false);render()}catch(e){toast(e.message,true)}};
-  $('#briefSend').onclick=async()=>{const text=$('#brief').textContent;if(await confirmBox('把简报发到群里？',esc(text).replace(/\n/g,'<br>'),'发送'))act(()=>post('/api/telegram/send',{kind:'custom',text}))};
+  $('#briefCopy').onclick=()=>navigator.clipboard.writeText($('#brief').textContent).then(()=>toast('已复制'),()=>toast('复制失败',true));
   const amounts=id=>Object.fromEntries(collect(id).filter(x=>x.token||x.amount).map(x=>[x.token.toUpperCase(),x.amount]));
   $('#monSave').onclick=()=>act(()=>put('/api/monitor/settings',{watch:collect('monWatch').filter(x=>x.address),thresholds:amounts('monTh'),low_balance:amounts('monLow'),known_spenders:collect('monSp').filter(x=>x.address),
     alert_unknown_counterparty:$('#mUnk').checked,alert_poisoning:$('#mPoi').checked,alert_approvals:$('#mApp').checked,daily_brief:$('#mBrief').checked,brief_hour:+$('#mHour').value}),'监控设置已保存')};
@@ -1592,7 +1386,7 @@ VIEWS.translator=async()=>{if(!member('announcement_translator'))return notHired
     <div class="bd stack"><details ${x.status==='draft'?'open':''}><summary>中文原文</summary><pre class="report" style="margin-top:8px">${esc(x.source)}</pre></details>
     ${x.warnings.length?`<div class="note block">${x.warnings.map(w=>`<div>⚠️ ${esc(w)}</div>`).join('')}</div>`:'<div class="note ok">数字、地址、链接、@账号和术语都核对过，没发现问题。</div>'}
     ${Object.entries(x.outputs).map(([k,v])=>`<label class="f"><span>${esc(L[k]||k)}${s.chats[k]?' · 发到 '+esc(s.chats[k]):''}</span>${x.status==='draft'?`<textarea data-tr="${x.id}" data-lang="${esc(k)}" style="min-height:200px">${esc(v)}</textarea>`:`<pre class="report">${esc(v)}</pre>`}</label>`).join('')}
-    ${x.status==='draft'?`<div class="row"><button class="btn signal" data-trpost="${x.id}">确认并发到群里</button><button class="btn" data-trsave="${x.id}">保存修改</button><button class="btn ghost block" data-trdrop="${x.id}">作废</button></div>`:''}</div></section>`;
+    ${x.status==='draft'?`<div class="row"><button class="btn" data-trsave="${x.id}">保存修改</button><button class="btn ghost block" data-trdrop="${x.id}">作废</button></div>`:''}</div></section>`;
   return `${offNote('announcement_translator')}
   ${!d.configured?'<div class="note block"><b>翻译员还没接上模型。</b>部署时设置 <code>ANTHROPIC_API_KEY</code>，重启控制台和机器人后就能翻译。草稿和术语表现在就可以准备。</div>':''}
   <div class="grid g4">
@@ -1618,7 +1412,7 @@ VIEWS.translator=async()=>{if(!member('announcement_translator'))return notHired
     <span class="label">按语言分群发（留空 = 发到通知群 ${esc(d.chat||'（未设置）')}）</span>
     ${Object.entries(L).filter(([k])=>s.languages.includes(k)).map(([k,l])=>`<label class="f"><span>${esc(l)} 群 ID</span><input class="mono" data-trc="${k}" value="${esc(s.chats[k]||'')}" placeholder="-100…"></label>`).join('')}
     <div class="row"><button class="btn primary" id="trSave">保存翻译设置</button></div></div>`)}
-  ${card('流程',`<ol class="steps"><li>老板在这里或群里发 /translate 原文。</li><li>Claude 一次出所有目标语言的草稿。</li><li>规则逐条核对数字、地址、链接、@账号和术语，有出入就标红。</li><li>老板改好、确认，机器人才发到群里。没确认的草稿永远不会发出。</li></ol>`)}
+  ${card('流程',`<ol class="steps"><li>老板在这里贴原文。</li><li>Claude 一次出所有目标语言的草稿。</li><li>规则逐条核对数字、地址、链接、@账号和术语，有出入就标红。</li><li>老板改好、保存，再复制译文去发布。KAGOU 不会替你发到任何群。</li></ol>`)}
   </div></div>`};
 BIND.translator=()=>{if(!$('#trSave'))return;
   const langs=()=>[...document.querySelectorAll('[data-trl]')].filter(i=>i.checked).map(i=>i.dataset.trl);
@@ -1628,10 +1422,7 @@ BIND.translator=()=>{if(!$('#trSave'))return;
     try{await post('/api/translator/drafts',{text,languages:langs()});S.trSrc='';toast('草稿已生成，核对后确认发出');render()}catch(e){toast(e.message,true);b.disabled=false;$('#trBusy').textContent=''}};
   const outputs=id=>Object.fromEntries([...document.querySelectorAll(`[data-tr="${id}"]`)].map(t=>[t.dataset.lang,t.value]));
   document.querySelectorAll('[data-trsave]').forEach(b=>b.onclick=()=>act(()=>put('/api/translator/drafts/'+b.dataset.trsave,{outputs:outputs(b.dataset.trsave)}),'修改已保存，重新核对过了'));
-  document.querySelectorAll('[data-trpost]').forEach(b=>b.onclick=async()=>{const id=b.dataset.trpost,o=outputs(id);
-    if(!await confirmBox(`发出翻译 #${id}？`,Object.entries(o).map(([k,v])=>`<b>${esc(S.tr.languages[k]||k)}</b><br>${esc(v).replace(/\n/g,'<br>')}`).join('<hr style="border:0;border-top:1px solid var(--line)">'),'确认发出'))return;
-    try{await put('/api/translator/drafts/'+id,{outputs:o});await act(()=>post(`/api/translator/drafts/${id}/post`))}catch(e){toast(e.message,true)}});
-  document.querySelectorAll('[data-trdrop]').forEach(b=>b.onclick=async()=>{if(await confirmBox(`作废草稿 #${b.dataset.trdrop}？`,'作废后不能再发出，需要的话重新生成。','作废',true))act(()=>post(`/api/translator/drafts/${b.dataset.trdrop}/discard`),'已作废')});
+  document.querySelectorAll('[data-trdrop]').forEach(b=>b.onclick=async()=>{if(await confirmBox(`作废草稿 #${b.dataset.trdrop}？`,'作废后不能再编辑，需要的话重新生成。','作废',true))act(()=>post(`/api/translator/drafts/${b.dataset.trdrop}/discard`),'已作废')});
   $('#trSave').onclick=()=>act(()=>put('/api/translator/settings',{languages:langs(),tone:$('#trTone').value,project_name:$('#trName').value,notes:$('#trNotes').value,
     glossary:collect('trGloss').filter(x=>x.term),chats:Object.fromEntries([...document.querySelectorAll('[data-trc]')].map(i=>[i.dataset.trc,i.value.trim()]))}),'翻译设置已保存')};
 

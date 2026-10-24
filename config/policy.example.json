@@ -1,5 +1,5 @@
 {
-  "owners": ["your_telegram_username"],
+  "owners": ["owner_username"],
   "timezone": "Asia/Shanghai",
   "read_only": false,
   "single_limit": {"USDT": "500", "USDC": "500", "BNB": "0.5"},

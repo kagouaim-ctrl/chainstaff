@@ -23,7 +23,7 @@ jobs:
       - name: Static security scan
         run: |
           pip install semgrep
-          semgrep scan --config p/python --config p/secrets --error agent bot backend scripts
+          semgrep scan --config p/python --config p/secrets --error agent backend scripts
 
   bsc-testnet:
     # Read-only checks against the real BSC testnet (public RPC and WebSocket nodes): no keys, no transactions.

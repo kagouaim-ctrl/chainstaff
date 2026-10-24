@@ -1,6 +1,5 @@
 """Console v2: events, outbox, search, overview, payees, simulate, Telegram settings and scheduling."""
 
-import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -162,8 +161,8 @@ def test_quiet_auto_pay(emp):
 
 def test_owner_actions_are_audited(emp):
     emp.pause("lina")
-    emp.pause("your_telegram_username")
-    emp.approve("r3", "your_telegram_username")
+    emp.pause("owner_username")
+    emp.approve("r3", "owner_username")
     texts = [e["text"] for e in emp.store.events(("audit",))]
     assert texts == ["签字确认 r3", "暂停所有付款", "非老板尝试暂停付款，已拒绝"]
 
@@ -243,57 +242,24 @@ def test_employee_without_chain(emp):
     assert e["network"] is None and e["wallet_url"] is None and "USDT" in e["tokens"]
 
 
-def test_telegram_endpoints(c, emp):
-    t = c.get("/api/telegram", headers=H).json()
-    assert t["online"] is False and t["chat"] is None and t["settings"]["weekly_report"] is True
-    assert any(x["cmd"] == "/pause" and x["owner_only"] for x in t["commands"])
-    assert c.post("/api/telegram/send", headers=H, json={"kind": "report"}).status_code == 400  # no chat yet
-    assert c.put("/api/telegram/chat", headers=H, json={"chat": "abc"}).status_code == 400
-    assert c.put("/api/telegram/chat", headers=H, json={"chat": "-1001234"}).json()["chat"] == "-1001234"
-    for body in ({"kind": "report"}, {"kind": "pending"}, {"kind": "custom", "text": "你好"}):
-        assert c.post("/api/telegram/send", headers=H, json=body).json()["ok"]
-    assert c.post("/api/telegram/send", headers=H, json={"kind": "custom", "text": ""}).status_code == 400
-    assert c.post("/api/telegram/send", headers=H, json={"kind": "nope"}).status_code == 400
-    assert len(emp.store.outbox()) == 3
-    assert c.put("/api/telegram/settings", headers=H, json={"report_hour": 30}).status_code == 400
-    assert c.put("/api/telegram/settings", headers=H, json={"report_hour": 18}).json()["settings"]["report_hour"] == 18
-    emp.store.set_setting("telegram_bot", json.dumps({"username": "kagou_bot"}))
-    emp.store.set_setting("telegram_heartbeat", datetime.now(timezone.utc).isoformat())
-    t = c.get("/api/telegram", headers=H).json()
-    assert t["online"] and t["bot"]["username"] == "kagou_bot" and t["chat_source"] == "console" and len(t["outbox"]) == 3
+def test_telegram_is_gone_and_treasury_alerts_toggle(c, emp):
+    # KAGOU has no Telegram: no bot status, no group, no outgoing messages.
+    for method, path in (("get", "/api/telegram"), ("put", "/api/telegram/settings"), ("put", "/api/telegram/chat"),
+                         ("post", "/api/telegram/send")):
+        assert getattr(c, method)(path, headers=H, **({} if method == "get" else {"json": {}})).status_code in (404, 405)
+    assert c.get("/api/treasury", headers=H).json()["alerts_enabled"] is True
+    assert c.put("/api/treasury/alerts", headers=H, json={"enabled": False}).json()["alerts_enabled"] is False
+    assert TelegramSettings.load(emp.store).treasury_alerts is False and c.get("/api/treasury", headers=H).json()["alerts_enabled"] is False
+    assert emp.store.events(("audit",))[0]["text"] == "关闭金库提醒"
 
 
-# ---------- bot ----------
-
-class FakeBot:
-    def __init__(self, fail_on=None):
-        self.msgs, self.fail_on = [], fail_on
-
-    async def send_message(self, chat, text):
-        if self.fail_on and self.fail_on in text:
-            raise RuntimeError("chat not found")
-        self.msgs.append((chat, text))
-
-
-def test_tick_sends_scheduled_and_outbox(emp):
+def test_scheduled_texts_are_still_built(emp):
+    # The scheduler that posted these to a group is gone; the texts themselves stay available to the console.
     from agent.front_desk import FrontDesk
-    from bot.main import report_chat, tick
 
-    desk = FrontDesk(emp)
-    assert report_chat(emp, {}) is None
-    emp.store.enqueue("-100", "来自控制台")
-    emp.store.enqueue("-100", "坏消息")
-    bot = FakeBot(fail_on="坏")
     TelegramSettings.validate({"weekly_report": False, "pending_reminder_hours": 1}).save(emp.store)
-    assert asyncio.run(tick(bot, desk, NOW, {"CHAINSTAFF_REPORT_CHAT": "-200"})) == 2
-    assert bot.msgs[0][0] == -200 and "提醒" in bot.msgs[0][1] and bot.msgs[1] == (-100, "来自控制台")
-    assert emp.store.outbox() == []
-    assert emp.store.get_setting("telegram_heartbeat") == NOW.isoformat()
-    out = [e for e in emp.store.events(("telegram_out",))]
-    assert len(out) == 2
-    emp.store.set_setting("telegram_chat", "-300")
-    assert report_chat(emp, {"CHAINSTAFF_REPORT_CHAT": "-200"}) == -300
-    assert asyncio.run(tick(bot, desk, NOW, {})) == 0
+    out = FrontDesk(emp).scheduled(NOW)
+    assert out and "提醒" in out[0][1]
 
 
 def test_preview_commands(c):

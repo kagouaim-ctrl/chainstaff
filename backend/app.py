@@ -1,14 +1,14 @@
 """Owner console API for the whole AI team: the team roster, the finance ops employee
 (overview, approvals, ledger, payees, rules, treasury, reports), community support,
-the chain monitor, the announcement translator, Telegram and the audit log.
+the chain monitor, the announcement translator and the audit log. KAGOU has no Telegram: alerts and
+reports live in the console only.
 
 Run:
     export CHAINSTAFF_CONSOLE_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(24))")
     uvicorn backend.app:app --port 8000
 Then open http://localhost:8000 and paste the token.
 
-The console and the bot share the SQLite ledger: settings changed here (pause, Telegram
-notifications, outgoing messages) are picked up by the bot without a restart.
+The server also runs the background duties that used to live in the Telegram bot (agent/background.py).
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from __future__ import annotations
 import csv
 import hmac
 import io
-import json
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -92,9 +91,6 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
         if not (chain and chain.explorer_tx_url and value):
             return None
         return chain.explorer_tx_url.replace("/tx/", f"/{kind}/") + value
-
-    def chat() -> str | None:
-        return store.get_setting("telegram_chat") or env.get("CHAINSTAFF_REPORT_CHAT") or None
 
     @app.get("/")
     def index() -> FileResponse:
@@ -292,64 +288,14 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
             "alerts": store.events(("alert",), limit=100),
         }
 
-    # ---- Telegram ----
-
-    @app.get("/api/telegram", dependencies=[Depends(auth)])
-    def telegram() -> dict:
-        bot = store.get_setting("telegram_bot")
-        beat = store.get_setting("telegram_heartbeat")
-        online = bool(beat and datetime.now(timezone.utc) - datetime.fromisoformat(beat) < timedelta(minutes=3))
-        return {
-            "bot": json.loads(bot) if bot else None,
-            "heartbeat": beat,
-            "online": online,
-            "chat": chat(),
-            "chat_source": "console" if store.get_setting("telegram_chat") else ("env" if env.get("CHAINSTAFF_REPORT_CHAT") else None),
-            "owners": sorted(employee.owners),
-            "settings": TelegramSettings.load(store).__dict__,
-            "commands": team.commands(),
-            "outbox": store.outbox(unsent_only=False, limit=20),
-            "messages": store.events(("telegram_in", "telegram_out"), limit=60),
-        }
-
-    @app.put("/api/telegram/settings", dependencies=[Depends(auth)])
-    def put_telegram_settings(body: dict = Body(...)) -> dict:
-        try:
-            s = TelegramSettings.validate(body)
-        except ValueError as e:
-            raise HTTPException(400, str(e)) from e
+    @app.put("/api/treasury/alerts", dependencies=[Depends(auth)])
+    def put_treasury_alerts(body: dict = Body(...)) -> dict:
+        """The basic treasury alerts (used when no chain monitor is on the team). They are logged, never posted."""
+        s = TelegramSettings.load(store)  # legacy name: the settings row predates KAGOU and is kept for existing ledgers
+        s.treasury_alerts = bool(body.get("enabled"))
         s.save(store)
-        store.log_event("audit", "修改 Telegram 通知设置", OWNER_ID, {"settings": s.__dict__})
-        return {"ok": True, "settings": s.__dict__}
-
-    @app.put("/api/telegram/chat", dependencies=[Depends(auth)])
-    def put_telegram_chat(body: dict = Body(...)) -> dict:
-        value = str(body.get("chat", "")).strip()
-        if value and not value.lstrip("-").isdigit():
-            raise HTTPException(400, "群 ID 是一串数字，群组一般以 -100 开头")
-        store.set_setting("telegram_chat", value)
-        store.log_event("audit", f"通知群改为 {value or '（使用部署时的默认值）'}", OWNER_ID)
-        return {"ok": True, "chat": chat()}
-
-    @app.post("/api/telegram/send", dependencies=[Depends(auth)])
-    def telegram_send(body: dict = Body(...)) -> dict:
-        target = chat()
-        if not target:
-            raise HTTPException(400, "还没设置通知群，先在上面填群 ID")
-        kind = body.get("kind", "custom")
-        texts = {"report": employee.weekly_report_text, "today": employee.today_text,
-                 "pending": employee.pending_text, "rules": employee.rules_text}
-        if kind in texts:
-            text = texts[kind]()
-        elif kind == "custom":
-            text = str(body.get("text", "")).strip()
-            if not text:
-                raise HTTPException(400, "消息不能为空")
-        else:
-            raise HTTPException(400, f"不支持的类型：{kind}")
-        oid = store.enqueue(target, text)
-        store.log_event("audit", f"从控制台发送到群（{kind}）", OWNER_ID, {"outbox_id": oid})
-        return {"ok": True, "id": oid, "message": "已排队，机器人几秒内发出"}
+        store.log_event("audit", f"{'打开' if s.treasury_alerts else '关闭'}金库提醒", OWNER_ID)
+        return {"ok": True, "alerts_enabled": s.treasury_alerts}
 
     # ---- the team ----
 
@@ -361,7 +307,7 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
         if m.role == "finance_ops":
             view["headline"] = {"label": "7 天付款请求", "value": paid}
             view["todo"] = {"label": "待签字", "value": len(store.pending()), "href": "#approvals"}
-            view["setup"] = [] if employee.owners else ["规则里还没写老板的 Telegram 用户名"]
+            view["setup"] = [] if employee.owners else ["规则里还没写老板（签字人）"]
         elif m.role == "community_support":
             st = desk.support.stats()
             ss = desk.support.settings
@@ -537,7 +483,6 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
             "languages": LANGS,
             "tones": list(TONES),
             "drafts": store.translations(50),
-            "chat": chat(),
         }
 
     @app.put("/api/translator/settings", dependencies=[Depends(auth)])
@@ -571,11 +516,6 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
         if not isinstance(outputs, dict):
             raise HTTPException(400, "outputs 必须是 语言: 译文")
         return _translator_call(desk.translator.edit, tid, outputs, OWNER_ID)
-
-    @app.post("/api/translator/drafts/{tid}/post", dependencies=[Depends(auth)])
-    def post_draft(tid: int) -> dict:
-        ids = _translator_call(desk.translator.post, tid, OWNER_ID, chat())
-        return {"ok": True, "outbox": ids, "message": f"已排队 {len(ids)} 条，机器人几秒内发出"}
 
     @app.post("/api/translator/drafts/{tid}/discard", dependencies=[Depends(auth)])
     def discard_draft(tid: int) -> dict:
@@ -702,6 +642,17 @@ def _default_app() -> FastAPI:  # pragma: no cover - process entry point
     if chain and os.environ.get("KAGOU_CHAIN_LISTENER", "1") != "0":
         svc = ChainService(desk.finance.store, chain, wf)
         svc.start()
+    if os.environ.get("KAGOU_BACKGROUND", "1") != "0":
+        # The chain monitor's pass and the basic treasury alerts, which used to run in the Telegram bot.
+        from agent.background import BackgroundDuties
+        from agent.skills.finance_ops.alerts import EtherscanV2Source
+
+        api_key = os.environ.get("ETHERSCAN_API_KEY")
+        source = None
+        if chain and chain.explorer_api_url and api_key:
+            source = EtherscanV2Source(chain.explorer_api_url, api_key, {s: t.address for s, t in chain.tokens.items()})
+        BackgroundDuties(desk, source, chain.treasury_addresses if chain else (),
+                         chain.alert_outflow_threshold if chain else {}).start()
     return create_app(desk.finance, os.environ.get("CHAINSTAFF_CONSOLE_TOKEN", ""), chain, desk=desk, workforce=wf, chain_service=svc)
 
 
