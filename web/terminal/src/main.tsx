@@ -51,8 +51,8 @@ function Login() {
         <div className="row" style={{ gap: 10 }}>
           <BrandMark size={24} />
           <div className="col gap2">
-            <b className="brand-t">ChainStaff</b>
-            <span className="muted xs">AI Workforce Terminal for Web3</span>
+            <b className="brand-t">KAGOU</b>
+            <span className="muted xs">Real-Time On-Chain Multi-Agent Platform · BNB Chain</span>
           </div>
         </div>
         <label className="field">

@@ -9,7 +9,7 @@ export interface Agent {
   system_prompt: string;
   provider: "none" | "anthropic";
   model: string;
-  model_config: { max_tokens?: number; effort?: string };
+  model_config: { max_tokens?: number; effort?: string; max_tool_calls?: number; max_model_calls?: number; max_run_tokens?: number; call_timeout_s?: number };
   skills: string[];
   permissions: string[];
   is_manager: boolean;
