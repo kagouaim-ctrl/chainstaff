@@ -401,10 +401,10 @@ def test_reject_and_cancel_and_retry(wf, fake):
 
 def test_rule_planner_limits(wf):
     t = team(wf)
-    g = wf.submit_goal(t.ws["id"], "write a tweet about us", "owner")
-    wf.run_until_idle()
-    g = wf.db.task(g["id"])
-    assert g["status"] == D.FAILED and "规则规划器只能处理" in g["error"]
+    # Without a model the manager can only plan address-based work, so the mission is refused up front, not created to fail.
+    with pytest.raises(WorkforceError, match="只能拆分带 0x 地址"):
+        wf.submit_goal(t.ws["id"], "write a tweet about us", "owner")
+    assert not wf.db.tasks(kind="goal")[1]
     # max steps: plan (1) + wallet (1) = 2, the follow-ups don't fit
     g = wf.submit_goal(t.ws["id"], f"analyze {TOKEN}", "owner", max_steps=2)
     wf.run_until_idle()
@@ -430,15 +430,15 @@ def test_planner_without_needed_agents(wf):
     notes = [m["text"] for m in wf.db.messages(root_id=g["id"], limit=100) if m["event"] == "plan.note"]
     assert any("数据报告" in n for n in notes) and any("代币信息" in n for n in notes)
     assert wf.db.task(g["id"])["status"] == D.REVIEW
+    # This used to create a mission that then failed with "工作区里没有在岗的员工"; now it is refused with the reason.
     nobody = wf.create_workspace({"name": "empty", "manager_id": mgr["id"]}, "owner")
-    g = wf.submit_goal(nobody["id"], f"analyze {TOKEN}", "owner")
-    wf.run_until_idle()
-    assert "没有在岗的员工" in wf.db.task(g["id"])["error"]
+    with pytest.raises(WorkforceError, match="除了主管还没有成员"):
+        wf.submit_goal(nobody["id"], f"analyze {TOKEN}", "owner")
     idle = wf.create_agent({"name": "I"}, "owner")
     ws3 = wf.create_workspace({"name": "w3", "manager_id": mgr["id"], "members": [idle["id"]]}, "owner")
-    g = wf.submit_goal(ws3["id"], f"analyze {TOKEN}", "owner")
-    wf.run_until_idle()
-    assert "没有能做链上分析" in wf.db.task(g["id"])["error"]
+    with pytest.raises(WorkforceError, match="I 没有任何技能"):
+        wf.submit_goal(ws3["id"], f"analyze {TOKEN}", "owner")
+    assert wf.db.tasks(kind="goal", workspace_id=nobody["id"])[1] == 0 and wf.db.tasks(kind="goal", workspace_id=ws3["id"])[1] == 0
 
 
 def test_permission_and_skill_state_are_enforced_at_execution(wf):
@@ -555,7 +555,12 @@ def test_model_refusal_and_truncation(wf):
     wf.update_agent(t.contract["id"], {"skills": []}, "owner")
     wf.update_agent(t.onchain["id"], {"skills": []}, "owner")
     wf.update_agent(t.report["id"], {"skills": []}, "owner")
+    with pytest.raises(WorkforceError, match="没有能执行任务的员工.*没有任何技能"):
+        wf.submit_goal(t.ws["id"], f"Analyze {TOKEN}", "owner")
+    # if the team loses its skills after the mission was accepted, the planner still says why
+    wf.update_agent(t.report["id"], {"skills": ["data_report"], "permissions": ["report:write"]}, "owner")
     g = wf.submit_goal(t.ws["id"], f"Analyze {TOKEN}", "owner")
+    wf.update_agent(t.report["id"], {"skills": []}, "owner")
     wf.run_until_idle()
     err = wf.db.task(g["id"])["error"]
     assert "没有可用的技能" in err and "没有能做链上分析" in err
@@ -628,7 +633,8 @@ def test_paused_worker_times_out_and_goal_deadline(reader):
     for _ in range(4):
         wf.tick()
     w = [s for s in wf.db.subtasks(g["id"]) if s["skill"] == "wallet_analysis"][0]
-    assert w["status"] == D.FAILED and "超时没有接手" in w["error"]
+    # it timed out, and on the retry the manager saw the agent is off duty with nobody else able to do it
+    assert w["status"] == D.FAILED and "不在岗" in w["error"] and "没有其他能做钱包分析" in w["error"]
     assert any(m["event"] == "message.expired" for m in wf.db.messages(root_id=g["id"], limit=200))
     # a paused manager never picks the goal up: it expires
     wf.set_agent_status(t.onchain["id"], "active", "owner")
@@ -655,7 +661,9 @@ def test_delivered_but_unprocessed_messages_are_redelivered_and_recovered(wf):
     assert wf.db.message(mid)["status"] == D.PROCESSED  # re-queued then delivered and read
     # crash recovery: a subtask left running and a delivered message go back to the queue
     g = wf.submit_goal(t.ws["id"], f"analyze {EOA}", "owner")
-    wf.tick()
+    gm = wf.db.inbox(t.mgr["id"])[0]  # plan by hand so no worker thread races the "crash" below
+    wf.db.set_message_status(gm["id"], (D.QUEUED,), D.DELIVERED)
+    wf._plan(wf.db.agent(t.mgr["id"]), gm)
     w = [s for s in wf.db.subtasks(g["id"])][0]
     wf.db.transition(w["id"], (D.ASSIGNED,), D.RUNNING)
     m = [x for x in wf.db.messages(task_id=w["id"], limit=10) if x["event"] == "task.assign"][0]

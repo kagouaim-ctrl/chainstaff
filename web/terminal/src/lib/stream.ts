@@ -27,7 +27,8 @@ function setState(s: State) {
 function scheduleInvalidate(m: Message) {
   touched.add("overview");
   touched.add("activity");
-  if (m.kind === "task" || m.kind === "agent" || m.kind === "tool") ["tasks", "agents", "task", "workspaces", "missions"].forEach((k) => touched.add(k));
+  if (m.kind === "task" || m.kind === "agent" || m.kind === "tool") ["tasks", "agents", "task", "workspaces", "missions", "squads"].forEach((k) => touched.add(k));
+  if (m.event.startsWith("squad.") || m.event.startsWith("agent.")) ["squads", "agents", "workspaces", "preflight"].forEach((k) => touched.add(k));
   if (m.event.startsWith("approval")) ["approvals", "missions", "task", "ledger"].forEach((k) => touched.add(k));
   if (m.event === "task.completed" || m.event === "task.failed" || m.event === "goal.review") touched.add("ledger");
   if (m.kind === "chain") ["chain", "records", "ledger", "missions", "task"].forEach((k) => touched.add(k));

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Play, RefreshCw, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { ExecutionSteps } from "../components/Execution";
 import { OnChainLedger, PROOF_ORDER, proofCounts } from "../components/OnChainLedger";
 import { ChainPanel, VerifyButton } from "../components/TransactionStatus";
@@ -8,7 +8,7 @@ import { useWallet } from "../components/WalletStatus";
 import { Addr, Avatar, Cell, EmptyState, ErrorState, Json, Loading, PROOF, Sheet, Status, Tabs } from "../components/ui";
 import { api, post } from "../lib/api";
 import { useAction, useAgentName, useAgents, useChain, useLedger, useMission, useRecords, useTask } from "../lib/queries";
-import type { LedgerRow, ProofState } from "../lib/types";
+import type { LedgerRow, Proof, ProofState } from "../lib/types";
 import { fmtTime, go, num, plural, setParams, short, useIsMobile, weiToBnb, weiToGwei, type Route } from "../lib/util";
 
 type Tab = "ledger" | "tx" | "registry" | "events" | "wallet";
@@ -115,6 +115,10 @@ function Verification({ id, onClose }: { id: string; onClose: () => void }) {
       </div>
       <div className="insp-b">
         <div className="insp-sec">
+          <span className="label">Proof chain</span>
+          <ProofChain agents={agents.length} tasks={t.subtasks} hash={t.root.result_hash} proof={m.data?.proof} />
+        </div>
+        <div className="insp-sec">
           <span className="label">Who</span>
           {agents.map((a) => (
             <div key={a} className="list-row"><Avatar name={name(a)} /><span className="grow">{name(a)}</span><span className="muted xs">{plural(t.subtasks.filter((s) => s.assigned_agent === a).length, "execution")}</span></div>
@@ -134,6 +138,34 @@ function Verification({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Agent → Task → Result → Verification → Transaction, each link with its real state. Off-chain
+ * completion, a pending transaction and a confirmed one stay three different end points.
+ */
+function ProofChain({ agents, tasks, hash, proof }: { agents: number; tasks: { status: string }[]; hash: string | null; proof?: Proof }) {
+  const done = tasks.filter((x) => x.status === "completed").length;
+  const st = proof?.state;
+  const verify = st === "awaiting_review" ? ["wait", "awaiting review"] : st === "not_completed" ? ["bad", "not approved"] : hash && st !== "in_progress" ? ["ok", "approved"] : ["off", "—"];
+  const tx = proof?.chain_status === "confirmed" ? ["ok", `#${proof.block}`] : proof?.chain_status === "pending" ? ["wait", "pending"] : proof?.chain_status === "failed" ? ["bad", "failed"] : st === "offchain_completed" ? ["off", "off-chain only"] : ["off", "not anchored"];
+  const links: [string, string, string][] = [
+    ["Agent", agents ? "ok" : "off", `${agents}`],
+    ["Task", tasks.length && done === tasks.length ? "ok" : tasks.some((x) => x.status === "failed") ? "bad" : tasks.length ? "wait" : "off", `${done}/${tasks.length}`],
+    ["Result", hash ? "ok" : "off", hash ? short(hash, 4) : "—"],
+    ["Verification", verify[0], verify[1]],
+    ["Transaction", tx[0], tx[1]],
+  ];
+  return (
+    <div className="proof-chain">
+      {links.map(([k, s, v], i) => (
+        <Fragment key={k}>
+          {i > 0 && <ArrowRight size={11} className="muted" />}
+          <div className={`pc-step ${s}`}><span className="xs muted">{k}</span><span className="xs mono">{v}</span></div>
+        </Fragment>
+      ))}
+    </div>
   );
 }
 

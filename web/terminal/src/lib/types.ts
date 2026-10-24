@@ -21,7 +21,10 @@ export interface Agent {
   onchain: { agent_id?: string; address?: string; network?: string; tx?: string };
   created_at: string;
   updated_at: string;
-  live?: "busy" | "review" | "idle" | "error" | "paused" | "archived" | "active";
+  live?: "busy" | "waiting" | "review" | "idle" | "error" | "paused" | "archived" | "active";
+  max_concurrency?: number;
+  running?: number;
+  squads?: { id: string; name: string; workspace_id: string; role: "manager" | "member"; status: SquadStatus }[];
   current_task?: { id: string; title: string; status: TaskStatus } | null;
   tasks_completed?: number;
   tasks_failed?: number;
@@ -49,11 +52,59 @@ export interface Workspace {
   created_at: string;
   goals?: Task[];
   goal_count?: number;
+  squads?: { id: string; name: string; status: SquadStatus; manager_id: string | null }[];
+}
+
+export type SquadStatus = "active" | "paused" | "deleted";
+
+/** A team inside a workspace: one manager, members, a policy. Missions are given to a squad. */
+export interface Squad {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  name: string;
+  description: string;
+  manager_id: string | null;
+  members: string[];
+  permissions: string[];
+  status: SquadStatus;
+  max_parallel: number;
+  created_at: string;
+  updated_at: string;
+  missions: { active: number; review: number; completed: number; failed: number; cancelled: number };
+  success_rate: number | null;
+  cost_usd: number;
+  skills: string[];
+  executors: string[];
+  running: number;
+  ready: boolean;
+  issues: PreflightCheck[];
+}
+
+export type PreflightFix = "create_squad" | "configure_squad" | "resume_squad" | "assign_manager" | "add_agent" | "create_agent" | "configure_manager";
+
+export interface PreflightCheck {
+  key: string;
+  level: "ok" | "warn" | "error" | "info";
+  text: string;
+  fix: PreflightFix | null;
+}
+
+export interface Preflight {
+  ok: boolean;
+  ready: boolean;
+  workspace_id: string;
+  squad_id: string | null;
+  manager_id: string | null;
+  planner: "model" | "rules" | null;
+  executors: string[];
+  checks: PreflightCheck[];
 }
 
 export interface Task {
   id: string;
   workspace_id: string;
+  squad_id?: string | null;
   parent_id: string | null;
   root_id: string;
   kind: "goal" | "subtask";
@@ -186,6 +237,7 @@ export interface Schedule {
 export interface Meta {
   providers: string[];
   permissions: Record<string, string>;
+  squad_permissions: Record<string, string>;
   task_statuses: TaskStatus[];
   default_model: string;
   skills: { id: string; name: string; permissions: string[] }[];
@@ -206,7 +258,9 @@ export interface ChainStatus {
 }
 
 export interface Overview {
-  agents: { total: number; active: number; busy: number; idle: number; error: number; paused: number };
+  agents: { total: number; active: number; busy: number; idle: number; error: number; paused: number; waiting?: number };
+  squads?: number;
+  running_missions?: number;
   tasks: Record<TaskStatus, number>;
   running: number;
   pending_approvals: number;
@@ -265,6 +319,7 @@ export interface MissionTask {
 export interface Mission {
   id: string;
   workspace_id: string;
+  squad_id: string | null;
   name: string;
   brief: string;
   status: TaskStatus;

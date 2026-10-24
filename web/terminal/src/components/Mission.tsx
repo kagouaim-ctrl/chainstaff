@@ -18,7 +18,7 @@ export function MissionStage({ m }: { m: Pick<Mission, "stage"> }) {
 }
 
 /** Name, state and the numbers that decide whether to step in: progress, who, how long, how much. */
-export function MissionHeader({ m, d, compact }: { m: Mission; d?: TaskDetail; compact?: boolean }) {
+export function MissionHeader({ m, d, compact, squadName }: { m: Mission; d?: TaskDetail; compact?: boolean; squadName?: string }) {
   const name = useAgentName();
   const agent = useAgentLookup();
   const meta = useMeta();
@@ -38,6 +38,7 @@ export function MissionHeader({ m, d, compact }: { m: Mission; d?: TaskDetail; c
             <Priority p={m.priority} />
             <span className="mh-id">{m.id}</span>
             {m.planner && <span className="tag">{m.planner === "direct" ? "direct" : m.planner === "model" ? "model plan" : "rule plan"}</span>}
+            {squadName && <a className="tag acc" href={`#/squads/${m.squad_id}`} title="Assigned squad">{squadName}</a>}
           </div>
           <div className="mh-title ellipsis" title={m.name}>{m.name}</div>
           {!compact && <div className="muted xs">created {fmtTime(m.created_at)} by {m.created_by === "owner" ? "you" : m.created_by} · owner {name(m.owner)}{m.deadline_at && open ? ` · deadline ${fmtTime(m.deadline_at)}` : ""}</div>}
@@ -61,7 +62,7 @@ export function MissionHeader({ m, d, compact }: { m: Mission; d?: TaskDetail; c
           <span className="muted xs">{p.total ? `${p.completed} done · ${p.running} running · ${p.pending} queued${p.failed ? ` · ${p.failed} failed` : ""}` : m.stage === "planning" ? "manager is planning" : "no tasks"}</span>
         </div>
         <div>
-          <span className="label">Agents</span>
+          <span className="label">{squadName ? "Squad" : "Agents"}</span>
           <span className="avatars">{m.agents.slice(0, 6).map((id) => <Avatar key={id} name={name(id)} mgr={agent(id)?.is_manager} title={name(id)} />)}</span>
         </div>
         <div>

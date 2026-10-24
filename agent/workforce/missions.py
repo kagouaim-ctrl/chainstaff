@@ -67,7 +67,7 @@ def view(goal: dict, subs: list[dict], approvals: Iterable[dict], records: list[
     pending = [{"id": a["id"], "kind": a["kind"], "title": a["title"], "at": a["at"]} for a in approvals if a["status"] == "pending"]
     result = goal["result"] or {}
     return {
-        "id": goal["id"], "workspace_id": goal["workspace_id"], "name": goal["title"], "brief": goal["description"],
+        "id": goal["id"], "workspace_id": goal["workspace_id"], "squad_id": goal.get("squad_id"), "name": goal["title"], "brief": goal["description"],
         "status": goal["status"], "stage": STAGE[goal["status"]], "priority": goal["priority"], "owner": goal["assigned_agent"],
         "planner": goal["planner"], "created_by": goal["created_by"], "created_at": goal["created_at"], "started_at": goal["started_at"],
         "finished_at": goal["finished_at"], "deadline_at": goal["deadline_at"], "updated_at": goal["updated_at"],
@@ -100,9 +100,9 @@ def _approvals_by_task(db: D.WorkforceDB, status: str | None = "pending") -> dic
     return out
 
 
-def missions(db: D.WorkforceDB, *, workspace_id: str | None = None, status: list[str] | None = None, agent: str | None = None,
+def missions(db: D.WorkforceDB, *, workspace_id: str | None = None, squad_id: str | None = None, status: list[str] | None = None, agent: str | None = None,
              q: str | None = None, limit: int = 100) -> list[dict]:
-    goals, _ = db.tasks(kind="goal", workspace_id=workspace_id, status=status, q=q, limit=min(limit, 500))
+    goals, _ = db.tasks(kind="goal", workspace_id=workspace_id, squad_id=squad_id, status=status, q=q, limit=min(limit, 500))
     subs = db.tasks_by_root([g["id"] for g in goals])
     recs, aps = _records_by_task(db), _approvals_by_task(db)
     out = [view(g, subs[g["id"]], aps.get(g["id"], []), recs.get(g["id"], [])) for g in goals]
@@ -132,7 +132,7 @@ def ledger(db: D.WorkforceDB, *, limit: int = 200) -> list[dict]:
             continue
         p = proof(g, recs.get(g["id"], []))
         out.append({
-            "mission": g["id"], "workspace_id": g["workspace_id"], "name": g["title"], "status": g["status"], "owner": g["assigned_agent"],
+            "mission": g["id"], "workspace_id": g["workspace_id"], "squad_id": g.get("squad_id"), "name": g["title"], "status": g["status"], "owner": g["assigned_agent"],
             "finished_at": g["finished_at"] or g["updated_at"], "result_hash": g["result_hash"], "proof": p,
             "executions": [{"task": s["id"], "title": s["title"], "agent": s["assigned_agent"], "skill": s["skill"], "status": s["status"],
                             "result_hash": s["result_hash"], "error": s["error"], "finished_at": s["finished_at"]} for s in executed],

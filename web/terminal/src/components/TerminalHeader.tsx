@@ -11,6 +11,7 @@ import { WalletButton } from "./WalletStatus";
 export const NAV: [string, string][] = [
   ["terminal", "Terminal"],
   ["agents", "Agents"],
+  ["squads", "Squads"],
   ["workspace", "Workspace"],
   ["tasks", "Tasks"],
   ["onchain", "On-Chain"],

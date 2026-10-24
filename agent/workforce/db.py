@@ -62,6 +62,20 @@ CREATE TABLE IF NOT EXISTS wf_workspaces (
     archived    INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS wf_squads (
+    id           TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    manager_id   TEXT,
+    members      TEXT NOT NULL DEFAULT '[]',         -- agent ids, the manager not included
+    permissions  TEXT NOT NULL DEFAULT '[]',         -- squad policy, see SQUAD_PERMISSIONS in engine.py
+    status       TEXT NOT NULL DEFAULT 'active',     -- active | paused | deleted
+    max_parallel INTEGER NOT NULL DEFAULT 0,         -- running tasks across the squad's missions; 0 = no cap
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS wf_squads_ws ON wf_squads(workspace_id, created_at);
 CREATE TABLE IF NOT EXISTS wf_tasks (
     id            TEXT PRIMARY KEY,
     workspace_id  TEXT NOT NULL,
@@ -204,6 +218,16 @@ CREATE TABLE IF NOT EXISTS wf_chain_records (
 """
 
 
+# Columns added after the first release: (table, column, definition). Added on start if missing,
+# so a database created by an older version keeps working without a manual migration.
+MIGRATIONS = (
+    ("wf_tasks", "squad_id", "TEXT"),
+    ("wf_agents", "max_concurrency", "INTEGER NOT NULL DEFAULT 2"),
+)
+
+SQUAD_ACTIVE, SQUAD_PAUSED, SQUAD_DELETED = "active", "paused", "deleted"
+
+
 def new_id(prefix: str) -> str:
     return f"{prefix}_{secrets.token_hex(5)}"
 
@@ -227,6 +251,11 @@ class WorkforceDB:
         self._db = store._db
         self._lock = store._lock
         self._db.executescript(SCHEMA)
+        for table, col, ddl in MIGRATIONS:
+            cols = {r["name"] for r in self._db.execute(f"PRAGMA table_info({table})").fetchall()}
+            if col not in cols:
+                self._db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+        self._db.execute("CREATE INDEX IF NOT EXISTS wf_tasks_squad ON wf_tasks(squad_id, status)")
 
     # ---- agents ----
 
@@ -315,6 +344,70 @@ class WorkforceDB:
         d["archived"] = bool(d["archived"])
         return d
 
+    # ---- squads ----
+
+    def add_squad(self, **f: Any) -> dict:
+        sid = new_id("sqd")
+        now = _now()
+        row = {"id": sid, "created_at": now, "updated_at": now, **f}
+        for k in ("members", "permissions"):
+            row[k] = _j(row.get(k) or [])
+        self._db.execute(f"INSERT INTO wf_squads ({','.join(row)}) VALUES ({','.join('?' * len(row))})", tuple(row.values()))
+        return self.squad(sid)
+
+    def update_squad(self, sid: str, **f: Any) -> dict | None:
+        for k in ("members", "permissions"):
+            if k in f:
+                f[k] = _j(f[k])
+        f["updated_at"] = _now()
+        self._db.execute(f"UPDATE wf_squads SET {','.join(f'{k} = ?' for k in f)} WHERE id = ?", (*f.values(), sid))
+        return self.squad(sid)
+
+    def squad(self, sid: str) -> dict | None:
+        r = self._db.execute("SELECT * FROM wf_squads WHERE id = ?", (sid,)).fetchone()
+        return self._squad(r) if r else None
+
+    def squads(self, workspace_id: str | None = None, include_deleted: bool = False) -> list[dict]:
+        where, args = [], []
+        if workspace_id:
+            where.append("workspace_id = ?")
+            args.append(workspace_id)
+        if not include_deleted:
+            where.append("status != 'deleted'")
+        sql = "SELECT * FROM wf_squads" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY created_at, id"
+        return [self._squad(r) for r in self._db.execute(sql, tuple(args)).fetchall()]
+
+    def delete_squad(self, sid: str) -> bool:
+        return self._db.execute("DELETE FROM wf_squads WHERE id = ?", (sid,)).rowcount == 1
+
+    def squad_mission_stats(self) -> dict[str, dict]:
+        """Per squad: missions by status, and what they cost."""
+        out: dict[str, dict] = {}
+        rows = self._db.execute("SELECT squad_id AS s, status, COUNT(*) AS n, SUM(CAST(cost_usd AS REAL)) AS cost FROM wf_tasks"
+                                " WHERE kind = 'goal' AND squad_id IS NOT NULL GROUP BY squad_id, status").fetchall()
+        for r in rows:
+            s = out.setdefault(r["s"], {"by_status": {}, "cost": 0.0})
+            s["by_status"][r["status"]] = r["n"]
+            s["cost"] += r["cost"] or 0.0
+        return out
+
+    def running_subtasks(self, *, agent: str | None = None, squad_id: str | None = None) -> int:
+        """Subtasks handed out and not back yet, for one agent or across one squad's missions."""
+        if agent:
+            sql, args = "SELECT COUNT(*) AS n FROM wf_tasks WHERE kind = 'subtask' AND status IN (?, ?) AND assigned_agent = ?", (ASSIGNED, RUNNING, agent)
+        else:
+            sql = ("SELECT COUNT(*) AS n FROM wf_tasks s JOIN wf_tasks g ON g.id = s.root_id WHERE s.kind = 'subtask'"
+                   " AND s.status IN (?, ?) AND g.squad_id = ?")
+            args = (ASSIGNED, RUNNING, squad_id)
+        return int(self._db.execute(sql, args).fetchone()["n"])
+
+    @staticmethod
+    def _squad(r: sqlite3.Row) -> dict:
+        d = dict(r)
+        d["members"] = _load(d["members"], [])
+        d["permissions"] = _load(d["permissions"], [])
+        return d
+
     # ---- tasks ----
 
     def add_task(self, **f: Any) -> dict:
@@ -370,13 +463,16 @@ class WorkforceDB:
         rows = self._db.execute("SELECT * FROM wf_tasks WHERE root_id = ? AND id != ? ORDER BY created_at, id", (root_id, root_id)).fetchall()
         return [self._task(r) for r in rows]
 
-    def tasks(self, *, workspace_id: str | None = None, status: list[str] | None = None, agent: str | None = None,
+    def tasks(self, *, workspace_id: str | None = None, squad_id: str | None = None, status: list[str] | None = None, agent: str | None = None,
               kind: str | None = None, q: str | None = None, priority: int | None = None, since: datetime | None = None,
               until: datetime | None = None, sort: str = "created_at", desc: bool = True, limit: int = 50, offset: int = 0) -> tuple[list[dict], int]:
         where, args = [], []
         if workspace_id:
             where.append("workspace_id = ?")
             args.append(workspace_id)
+        if squad_id:
+            where.append("squad_id = ?")
+            args.append(squad_id)
         if status:
             where.append(f"status IN ({','.join('?' * len(status))})")
             args += status
@@ -533,6 +629,10 @@ class WorkforceDB:
         sql = (f"UPDATE wf_messages SET status = ?, updated_at = ?{', attempts = attempts + 1' if bump else ''}"
                f" WHERE id = ? AND status IN ({','.join('?' * len(allowed_from))})")
         return self._db.execute(sql, (to, _now(), mid, *allowed_from)).rowcount == 1
+
+    def reroute_handoffs(self, task_id: str, recipient: str) -> int:
+        return self._db.execute("UPDATE wf_messages SET recipient = ?, updated_at = ? WHERE task_id = ? AND event = 'handoff' AND status IN (?, ?)",
+                                (recipient, _now(), task_id, QUEUED, DELIVERED)).rowcount
 
     def stale_messages(self, older_than: datetime) -> list[dict]:
         rows = self._db.execute(
