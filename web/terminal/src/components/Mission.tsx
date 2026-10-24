@@ -8,12 +8,13 @@ import { duration, fmtTime, usd, useNow } from "../lib/util";
 import { Avatar, Pipe, Priority, Progress, PROOF, Status } from "./ui";
 
 const STAGE_LABEL: Record<Mission["stage"], [string, string]> = {
-  planning: ["Planning", "acc"], executing: ["Executing", "acc"], review: ["Awaiting review", "acc"],
+  planning: ["Planning", "info"], executing: ["Executing", "info"], review: ["Awaiting review", "acc"],
   completed: ["Completed", "ok"], failed: ["Failed", "bad"], cancelled: ["Cancelled", "mute"],
 };
 
-export function MissionStage({ m }: { m: Pick<Mission, "stage"> }) {
+export function MissionStage({ m, badge }: { m: Pick<Mission, "stage">; badge?: boolean }) {
   const [l, tone] = STAGE_LABEL[m.stage];
+  if (badge) return <span className={`badge ${tone === "mute" ? "" : tone}`}><span className="dot" />{l}</span>;
   return <span className={`st ${tone} ${m.stage === "planning" || m.stage === "executing" ? "live" : ""}`}><i /><span className="t">{l}</span></span>;
 }
 
@@ -32,20 +33,28 @@ export function MissionHeader({ m, d, compact, squadName }: { m: Mission; d?: Ta
   return (
     <div className="mh">
       <div className="mh-top">
-        <div className="col gap4 grow">
-          <div className="row gap6 wrap">
-            <MissionStage m={m} />
-            <Priority p={m.priority} />
-            <span className="mh-id">{m.id}</span>
+        <div className="col gap8 grow">
+          <div className="row gap8 wrap">
+            <MissionStage m={m} badge />
+            <span className="badge line"><Priority p={m.priority} /></span>
             {m.planner && <span className="tag">{m.planner === "direct" ? "direct" : m.planner === "model" ? "model plan" : "rule plan"}</span>}
-            {squadName && <a className="tag acc" href={`#/squads/${m.squad_id}`} title="Assigned squad">{squadName}</a>}
+            {squadName && <a className="tag" href={`#/squads/${m.squad_id}`} title="Assigned squad">{squadName}</a>}
           </div>
-          <div className="mh-title ellipsis" title={m.name}>{m.name}</div>
-          {!compact && <div className="muted xs">created {fmtTime(m.created_at)} by {m.created_by === "owner" ? "you" : m.created_by} · owner {name(m.owner)}{m.deadline_at && open ? ` · deadline ${fmtTime(m.deadline_at)}` : ""}</div>}
+          <h1 className="mh-title ellipsis" title={m.name}>{m.name}</h1>
+          {!compact && (
+            <div className="mh-meta">
+              <span className="mh-id">{m.id}</span>
+              <i className="dot" />
+              <span>Created <b className="tnum">{fmtTime(m.created_at)}</b> by <b>{m.created_by === "owner" ? "you" : m.created_by}</b></span>
+              <i className="dot" />
+              <span>Owner <b>{name(m.owner)}</b></span>
+              {m.deadline_at && open && <><i className="dot" /><span>Deadline <b className="tnum">{fmtTime(m.deadline_at)}</b></span></>}
+            </div>
+          )}
         </div>
         <div className="row gap6" style={{ flex: "none" }}>
           {m.status === "completed" && m.proof.state === "offchain_completed" && meta.data?.engine.anchor && (
-            <button className="btn sm outline-acc" disabled={anchor.isPending} onClick={() => anchor.mutate(undefined)}><Blocks size={12} /> Anchor</button>
+            <button className="btn sm" disabled={anchor.isPending} onClick={() => anchor.mutate(undefined)}><Blocks size={12} /> Anchor</button>
           )}
           {m.proof.tx_url && <a className="btn ghost sm" href={m.proof.tx_url} target="_blank" rel="noreferrer"><ExternalLink size={12} /> Tx</a>}
           {open && (
@@ -59,7 +68,7 @@ export function MissionHeader({ m, d, compact, squadName }: { m: Mission; d?: Ta
         <div className="wide">
           <span className="label">Progress</span>
           <Progress done={p.completed} failed={p.failed} total={p.total} />
-          <span className="muted xs">{p.total ? `${p.completed} done · ${p.running} running · ${p.pending} queued${p.failed ? ` · ${p.failed} failed` : ""}` : m.stage === "planning" ? "manager is planning" : "no tasks"}</span>
+          <span className="col gap6"><span className="muted xs ellipsis">{p.total ? <>{p.completed} done · {p.running} running · {p.pending} queued{p.failed ? <> · <span className="bad">{p.failed} failed</span></> : null}</> : m.stage === "planning" ? "manager is planning" : "no tasks"}</span>{d && !compact && <AssignmentStrip d={d} />}</span>
         </div>
         <div>
           <span className="label">{squadName ? "Squad" : "Agents"}</span>
@@ -78,7 +87,6 @@ export function MissionHeader({ m, d, compact, squadName }: { m: Mission; d?: Ta
           <span className={`st ${proofTone}`}><i /><span className="t ellipsis">{proofLabel}</span></span>
         </div>
       </div>
-      {d && !compact && <AssignmentStrip d={d} />}
     </div>
   );
 }
@@ -87,7 +95,7 @@ export function MissionHeader({ m, d, compact, squadName }: { m: Mission; d?: Ta
 function AssignmentStrip({ d }: { d: TaskDetail }) {
   if (!d.subtasks.length) return null;
   return (
-    <div className="row gap4" style={{ padding: "0 16px 8px", overflowX: "auto" }}>
+    <div className="mh-strip">
       {d.subtasks.map((s) => <span key={s.id} title={`${s.title} · ${s.status}`}><Pipe status={s.status} /></span>)}
     </div>
   );
@@ -101,7 +109,7 @@ export function AssignmentTable({ d, selected, onSelect }: { d: TaskDetail; sele
   if (!d.subtasks.length)
     return <div className="muted sm">{d.root.status === "pending" ? "等待主管接手…" : d.root.status === "running" ? "主管正在拆分任务…" : "没有任务"}</div>;
   return (
-    <div className="table-wrap" style={{ border: "1px solid var(--line)", borderRadius: "var(--r)" }}>
+    <div className="table-wrap boxed">
       <table className="dt inner">
         <thead><tr><th style={{ width: 28 }}>#</th><th>Task</th><th>Agent</th><th>Skill</th><th>After</th><th>State</th><th>Status</th><th className="r">Time</th></tr></thead>
         <tbody>
@@ -179,7 +187,7 @@ function TimelineRow({ m, name, titleOf, onTask, rootId }: { m: Message; name: (
       <span className="when">{fmtTime(m.at, false)}</span>
       <span className="node"><b className={m.event === "task.completed" || m.event === "chain.confirmed" || m.event === "approval.approved" ? "fill-ok" : nodeClass(v.tone)} /></span>
       <span className="body">
-        <span className={`xs ${v.tone === "bad" ? "bad" : v.tone === "ok" ? "ok" : v.tone === "acc" ? "acc" : v.tone === "info" ? "info" : "muted"}`} style={{ fontWeight: 600 }}>{v.verb}</span>
+        <span className={`verb ${v.tone === "bad" ? "bad" : v.tone === "ok" ? "ok" : v.tone === "acc" ? "acc" : v.tone === "info" ? "info" : "muted"}`}>{v.verb}</span>
         {actor && <span className="who">{actor}</span>}
         {target && <><ArrowRight size={11} className="arrow" /><span className="who">{target}</span></>}
         <span className="what ellipsis">{what}</span>

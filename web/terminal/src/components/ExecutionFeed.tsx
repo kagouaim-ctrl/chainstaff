@@ -115,7 +115,12 @@ function FeedRow({ m, task, tasks, root, onTask }: { m: Message; task?: T; tasks
         return <div className="feed-line ok" onClick={open}>{time}<CheckCircle2 size={13} />{who(m.sender || task.assigned_agent)}<span className="dim">completed</span>{ref(task)}{m.data?.secs !== undefined && <span className="muted xs mono">{m.data.secs}s · {short(m.data.result_hash, 6)}</span>}</div>;
       return <div className="feed-line ok strong">{time}<CheckCircle2 size={13} />Mission completed off-chain<span className="muted xs mono">{short(m.data?.result_hash, 8)}</span></div>;
     case "task.failed":
-      return <div className="feed-line bad" onClick={open}>{time}<CircleAlert size={13} />{task ? <>{ref(task)}<span>{m.text.replace(/^.*?失败：/, "失败：")}</span></> : <span>{m.text}</span>}</div>;
+      return (
+        <div className="feed-line bad" onClick={open}>
+          {time}<CircleAlert size={14} /><span className="verb bad">Failed</span>
+          {task ? <>{ref(task)}{task.assigned_agent && who(task.assigned_agent)}<span className="reason"><b>原因</b>{m.text.replace(/^.*?失败：/, "")}</span></> : <span>{m.text}</span>}
+        </div>
+      );
     case "task.reassigned":
       return <div className="feed-line acc" onClick={open}>{time}<Repeat size={13} />{who(m.sender)}<span className="dim">reassigned</span>{ref(task)}<ArrowRight size={11} className="muted" />{who(m.data?.to)}<span className="muted xs">{m.text.split("；")[0]}</span></div>;
     case "task.retry":

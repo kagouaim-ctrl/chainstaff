@@ -1,5 +1,5 @@
-import { Copy, ExternalLink, X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { Copy, ExternalLink, Inbox, X } from "lucide-react";
+import { forwardRef, useEffect, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { ProofState, TaskStatus } from "../lib/types";
 import { copy, initials, short, useToasts } from "../lib/util";
 
@@ -9,8 +9,8 @@ type Tone = "ok" | "bad" | "acc" | "info" | "mute" | "";
 const TASK: Record<TaskStatus, [string, Tone, boolean?]> = {
   pending: ["Pending", "mute"],
   assigned: ["Assigned", "info"],
-  running: ["Running", "acc", true],
-  waiting: ["Running", "acc", true], // a goal waiting on its tasks is running from the user's point of view
+  running: ["Running", "info", true],
+  waiting: ["Running", "info", true], // a goal waiting on its tasks is running from the user's point of view
   review: ["Review", "acc"],
   completed: ["Completed", "ok"],
   failed: ["Failed", "bad"],
@@ -22,7 +22,7 @@ export const PROOF: Record<ProofState, [string, Tone, boolean?]> = {
   in_progress: ["In progress", "mute"],
   awaiting_review: ["Awaiting review", "acc"],
   offchain_completed: ["Off-chain completed", "info"],
-  onchain_pending: ["On-chain pending", "acc", true],
+  onchain_pending: ["On-chain pending", "info", true],
   onchain_confirmed: ["On-chain confirmed", "ok"],
   not_completed: ["Not completed", "mute"],
 };
@@ -61,8 +61,8 @@ export function Progress({ done, failed = 0, total, compact }: { done: number; f
   return (
     <span className="progress" title={`${done} completed · ${failed} failed · ${total} tasks`}>
       <span className="bar">
-        <i style={{ width: w(done), background: "var(--ok)" }} />
-        <i style={{ width: w(failed), background: "var(--bad)" }} />
+        <i className="ok" style={{ width: w(done) }} />
+        <i className="bad" style={{ width: w(failed) }} />
       </span>
       {!compact && <span className="mono">{done + failed}/{total}</span>}
     </span>
@@ -76,7 +76,7 @@ export function Avatar({ name, mgr, lg, title }: { name?: string | null; mgr?: b
 export function Addr({ value, url, n = 6, copyable = true }: { value?: string | null; url?: string | null; n?: number; copyable?: boolean }) {
   if (!value) return <span className="muted">—</span>;
   return (
-    <span className="row gap2" style={{ display: "inline-flex" }}>
+    <span className="row gap2 addr">
       <span className="mono" title={value}>{short(value, n)}</span>
       {copyable && (
         <button className="btn ghost xs icon" title="复制" aria-label="复制" onClick={(e) => (e.stopPropagation(), copy(value))}>
@@ -92,9 +92,11 @@ export function Addr({ value, url, n = 6, copyable = true }: { value?: string | 
   );
 }
 
-export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
+/** Empty state: an optional icon, one line that names the situation, then what to do about it. */
+export function EmptyState({ title, children, icon = <Inbox size={18} />, small }: { title: string; children?: ReactNode; icon?: ReactNode; small?: boolean }) {
   return (
-    <div className="empty">
+    <div className={`empty ${small ? "sm" : ""}`}>
+      {icon && <div className="ic">{icon}</div>}
       <div className="t">{title}</div>
       {children}
     </div>
@@ -112,7 +114,7 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
 
 export function Loading({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="col" style={{ padding: 14, gap: 10 }} aria-busy="true">
+    <div className="col loading-rows" aria-busy="true">
       {Array.from({ length: rows }, (_, i) => <div key={i} className="skeleton" style={{ width: `${88 - (i % 4) * 14}%` }} />)}
     </div>
   );
@@ -131,9 +133,9 @@ export function Dialog({ title, onClose, children, footer, wide }: { title: Reac
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <div className="dialog" role="dialog" aria-modal="true" style={wide ? { width: "min(760px, calc(100vw - 32px))" } : undefined}>
+      <div className={`dialog ${wide ? "wide" : ""}`} role="dialog" aria-modal="true">
         <div className="hd">
-          <h2 className="grow" style={{ fontSize: 14 }}>{title}</h2>
+          <h2 className="grow">{title}</h2>
           <button className="btn ghost icon" onClick={onClose} aria-label="关闭"><X size={15} /></button>
         </div>
         <div className="bd">{children}</div>
@@ -198,6 +200,19 @@ export function Cell({ label, value, sub, tone, onClick, title }: { label: strin
   );
   return onClick ? <button className="cell" onClick={onClick} title={title}>{body}</button> : <div className="cell" title={title}>{body}</div>;
 }
+
+export type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost" | "danger" | "accent-soft";
+
+/**
+ * The button component. Same classes as `.btn` (so plain <button className="btn …"> stays valid);
+ * this adds the variant/size vocabulary and a loading state that keeps the width steady.
+ */
+export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant; size?: "xs" | "sm" | "md" | "lg"; icon?: boolean; loading?: boolean; block?: boolean;
+}>(function Button({ variant = "secondary", size = "md", icon, loading, block, className, disabled, children, ...rest }, ref) {
+  const cls = ["btn", variant, size !== "md" && size, icon && "icon", block && "block", loading && "loading", className].filter(Boolean).join(" ");
+  return <button ref={ref} className={cls} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>{children}</button>;
+});
 
 export function Json({ value }: { value: unknown }) {
   return <pre className="code">{JSON.stringify(value, null, 2)}</pre>;

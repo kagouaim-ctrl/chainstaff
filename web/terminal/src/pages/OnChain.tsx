@@ -48,7 +48,7 @@ function NetworkStrip() {
   const c = chain.data;
   return (
     <div className="strip">
-      <Cell label="Network" value={<span style={{ fontSize: 13 }}>{c?.network || "—"}</span>} sub={c?.configured ? `chain id ${c.chain_id}` : "未配置 CHAINSTAFF_CHAIN"} />
+      <Cell label="Network" value={<span className="v-sm">{c?.network || "—"}</span>} sub={c?.configured ? `chain id ${c.chain_id}` : "未配置 CHAINSTAFF_CHAIN"} />
       <Cell
         label="RPC health"
         value={rpc ? <span className={rpc.ok ? "ok" : "bad"}>{rpc.ok ? "Healthy" : "Down"}</span> : "—"}
@@ -57,8 +57,8 @@ function NetworkStrip() {
       />
       <Cell label="Latest block" value={rpc?.ok ? num(rpc.block) : "—"} sub={rpc?.block_time ? fmtTime(new Date(rpc.block_time * 1000).toISOString()) : undefined} />
       <Cell label="Gas price" value={rpc?.ok ? weiToGwei(rpc.gas_price_wei) : "—"} sub="gwei" />
-      <Cell label="Anchor wallet" value={<span style={{ fontSize: 12 }}>{c?.anchor ? short(c.anchor.address, 4) : "—"}</span>} sub={c?.anchor ? `${c.anchor.bnb ?? "?"} tBNB` : "未配置，不能上链"} />
-      <Cell label="Your wallet" value={<span style={{ fontSize: 12 }}>{wallet.account ? short(wallet.account, 4) : "—"}</span>} sub={wallet.account ? (wallet.chainId === "0x61" ? "BSC testnet" : `chain ${parseInt(wallet.chainId || "0", 16)}`) : wallet.available ? "未连接" : "没有浏览器钱包"} />
+      <Cell label="Anchor wallet" value={<span className="v-sm">{c?.anchor ? short(c.anchor.address, 4) : "—"}</span>} sub={c?.anchor ? `${c.anchor.bnb ?? "?"} tBNB` : "未配置，不能上链"} />
+      <Cell label="Your wallet" value={<span className="v-sm">{wallet.account ? short(wallet.account, 4) : "—"}</span>} sub={wallet.account ? (wallet.chainId === "0x61" ? "BSC testnet" : `chain ${parseInt(wallet.chainId || "0", 16)}`) : wallet.available ? "未连接" : "没有浏览器钱包"} />
       <div className="grow" />
       <div className="row" style={{ padding: "0 12px" }}>
         <button className="btn ghost sm icon" onClick={() => chain.refetch()} aria-label="刷新"><RefreshCw size={13} className={chain.isFetching ? "acc" : ""} /></button>
@@ -80,7 +80,7 @@ function Ledger({ route }: { route: Route }) {
         <button className="chip" aria-pressed={filter === "all"} onClick={() => setParams(route, { proof: null })}>All <span className="n">{counts.all}</span></button>
         {PROOF_ORDER.map((s) => (
           <button key={s} className="chip" aria-pressed={filter === s} onClick={() => setParams(route, { proof: s })}>
-            <span className={`ind ${PROOF[s][1] === "ok" ? "ok" : PROOF[s][1] === "acc" ? "warn" : PROOF[s][1] === "info" ? "" : ""}`} style={PROOF[s][1] === "info" ? { background: "var(--info)" } : undefined} />
+            <span className={`ind ${PROOF[s][1] === "ok" ? "ok" : PROOF[s][1] === "acc" ? "warn" : PROOF[s][1] === "info" ? "info" : ""}`} />
             {PROOF[s][0]} <span className="n">{counts[s]}</span>
           </button>
         ))}

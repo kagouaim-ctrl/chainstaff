@@ -4,7 +4,7 @@ import { describe } from "../lib/events";
 import type { Message } from "../lib/types";
 import { fmtTime, go } from "../lib/util";
 
-const KIND_TAG: Record<string, string> = { user: "USER", agent: "AGENT", system: "SYS", task: "TASK", tool: "TOOL", chain: "CHAIN" };
+const KIND_TAG: Record<string, string> = { user: "User", agent: "Agent", system: "System", task: "Task", tool: "Tool", chain: "Chain" };
 
 /** One event as a single dense row: time, kind, who → whom, what, task link. Used by Activity and inspectors. */
 export const ActivityRow = memo(function ActivityRow({ m, name, compact, onOpen }: {
@@ -31,11 +31,10 @@ export const ActivityRow = memo(function ActivityRow({ m, name, compact, onOpen 
     return (
       <div className="as-row compact" onDoubleClick={() => onOpen?.(m)}>
         <span className="when">{fmtTime(m.at, false)}</span>
-        <span className="col gap2" style={{ minWidth: 0 }}>
-          <span className="row gap6 sm" style={{ minWidth: 0 }}>
-            <span className={`${tone} xs nowrap`} style={{ fontWeight: 600 }}>{v.verb}</span>
-            <span className="dim ellipsis">{text}</span>
-          </span>
+        <span className="rail"><i className={tone} /></span>
+        <span className="txt">
+          <span className={`verb ${tone}`}>{v.verb}</span>
+          <span className="dim clamp2">{text}</span>
         </span>
       </div>
     );
@@ -45,7 +44,7 @@ export const ActivityRow = memo(function ActivityRow({ m, name, compact, onOpen 
       <span className="hide-m"><span className="tag">{KIND_TAG[m.kind]}</span></span>
       <span className="hide-m" style={{ minWidth: 0 }}>{actor}</span>
       <span className="row gap6" style={{ minWidth: 0 }}>
-        <span className={`${tone} xs nowrap`} style={{ fontWeight: 600 }}>{v.verb}</span>
+        <span className={`verb ${tone}`}>{v.verb}</span>
         <span className="dim ellipsis">{text}</span>
       </span>
       {m.task_id ? (

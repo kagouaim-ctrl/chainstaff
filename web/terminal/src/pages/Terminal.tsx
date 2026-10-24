@@ -5,7 +5,7 @@ import { ActivityStream } from "../components/ActivityStream";
 import { AgentForm } from "../components/AgentForm";
 import { AgentInspector } from "../components/AgentInspector";
 import { AgentRow, AgentTable } from "../components/AgentTable";
-import { QuickActionBar } from "../components/QuickActionBar";
+import { QuickActionBar, QuickActions } from "../components/QuickActionBar";
 import type { RunMode } from "../components/RunPanel";
 import { NewMissionDialog } from "../components/TaskComposer";
 import { EmptyState, ErrorState, Loading, Progress, Seg, Sheet } from "../components/ui";
@@ -109,20 +109,24 @@ export default function Terminal({ route }: { route: Route }) {
       </aside>
 
       <section className="pane center" aria-label="Agents">
-        <QuickActionBar onNewMission={() => setNewMission(true)} onNewAgent={() => setForm("new")} onView={setView} />
         <div className="toolbar">
           <h1>{cat || VIEWS.find(([v]) => v === view)?.[1] || "Needs attention"}</h1>
-          <span className="mono muted xs">{rows.length}</span>
-          <div className="search" style={{ width: 280, marginLeft: 8 }}>
-            <Search size={13} />
-            <input className="input" placeholder="名称、角色、技能、当前任务" value={q} onChange={(e) => setQ(e.target.value)} aria-label="筛选员工" />
+          <span className="count">{rows.length}</span>
+          <div className="grow" />
+          <QuickActions onNewMission={() => setNewMission(true)} onNewAgent={() => setForm("new")} />
+        </div>
+        <QuickActionBar onView={setView} />
+        <div className="filterbar">
+          <div className="search" style={{ width: 300 }}>
+            <Search size={14} />
+            <input className="input" placeholder="搜索名称、角色、技能或当前任务" value={q} onChange={(e) => setQ(e.target.value)} aria-label="筛选员工" />
           </div>
           <div className="grow" />
           <LiveTag />
           <Seg value={detailed ? "detailed" : "compact"} onChange={(v) => setDetailed(v === "detailed")} options={[["compact", "Compact"], ["detailed", "Detailed"]]} />
         </div>
         {!all.length ? (
-          <EmptyState title="Create your first agent">
+          <EmptyState title="Create your first agent" icon={<Bot size={18} />}>
             <span>先建一个 AI Manager，再建几个带技能的员工（钱包分析、合约分析、数据报告），然后把它们组成一个 Squad。</span>
             <button className="btn primary" onClick={() => setForm("new")}>Create agent</button>
           </EmptyState>
@@ -130,7 +134,7 @@ export default function Terminal({ route }: { route: Route }) {
           <>
             {allIdle && <div className="banner"><span className="ind ok" /> All agents idle · 没有执行中的任务<div className="grow" /><button className="btn sm primary" onClick={() => setNewMission(true)}>Create mission</button></div>}
             <AgentTable rows={rows} selected={selected} favorites={favs} onFavorite={toggleFav} onSelect={select} onAction={act} onConfigure={configure} detailed={detailed}
-              empty={<EmptyState title="No matching agents"><span>当前筛选没有结果。</span><button className="btn" onClick={clearFilters}>Clear filters</button></EmptyState>} />
+              empty={<EmptyState title="No matching agents" icon={<Search size={18} />}><span>当前筛选没有结果，换个关键词或清除筛选。</span><button className="btn sm" onClick={clearFilters}>Clear filters</button></EmptyState>} />
           </>
         )}
       </section>
@@ -203,8 +207,8 @@ function LivePanel() {
   const attention = (approvals.data?.length || 0) + recentFails.length + broken.length;
   return (
     <>
-      <div className="pane-h"><span className="label">Live operations</span><div className="grow" /><LiveTag /></div>
-      <div className="pane-h sub-h"><span className="label">Needs attention</span><span className={`mono xs ${attention ? "acc" : "muted"}`}>{attention}</span></div>
+      <div className="pane-h title"><span className="label">Live operations</span><div className="grow" /><LiveTag /></div>
+      <div className="pane-h sub-h"><span className="label">Needs attention</span>{attention > 0 && <span className="badge acc">{attention}</span>}</div>
       <div style={{ flex: "none", maxHeight: "38%", overflow: "auto" }}>
         {(approvals.data || []).map((a) => (
           <button key={a.id} className="m-row" onClick={() => a.task_id && go("workspace", a.workspace_id, { m: a.task_id })}>
@@ -229,7 +233,7 @@ function LivePanel() {
         ))}
         {!attention && <div className="all-clear"><span className="ind ok" /> 没有需要你处理的事项</div>}
       </div>
-      <div className="pane-h sub-h" style={{ borderTop: "1px solid var(--line)" }}><span className="label">Running missions</span><span className="mono muted xs">{missions.data?.length || 0}</span></div>
+      <div className="pane-h sub-h"><span className="label">Running missions</span><span className="mono muted xs">{missions.data?.length || 0}</span></div>
       <div style={{ flex: "none", maxHeight: "28%", overflow: "auto" }}>
         {(missions.data || []).map((m) => (
           <button key={m.id} className="m-row" onClick={() => go("workspace", m.workspace_id, { m: m.id })}>
@@ -237,13 +241,13 @@ function LivePanel() {
               <span className="ellipsis sm strong">{m.name}</span>
               <span className="row gap6 xs muted"><span>{m.stage}</span><span>·</span><span>{name(m.owner)}</span></span>
             </span>
-            <span style={{ width: 90 }}><Progress done={m.progress.completed} failed={m.progress.failed} total={m.progress.total} /></span>
+            <span style={{ width: 96 }}><Progress done={m.progress.completed} failed={m.progress.failed} total={m.progress.total} /></span>
           </button>
         ))}
-        {!missions.data?.length && <div className="all-clear muted">没有执行中的 Mission</div>}
+        {!missions.data?.length && <div className="all-clear"><span className="ind" /> 没有执行中的 Mission</div>}
       </div>
-      <div className="pane-h sub-h" style={{ borderTop: "1px solid var(--line)" }}><span className="label">Recent activity</span><div className="grow" /><a className="btn ghost xs" href="#/activity">All</a></div>
-      <div className="scroll" style={{ padding: "0 14px" }}>
+      <div className="pane-h sub-h"><span className="label">Recent activity</span><div className="grow" /><a className="btn ghost xs" href="#/activity">View all</a></div>
+      <div className="scroll" style={{ padding: "0 20px 16px" }}>
         <ActivityStream rows={rows} name={name} compact />
       </div>
     </>
@@ -269,17 +273,17 @@ function MobileTerminal(p: {
         <button className="cell" onClick={() => go("tasks", undefined, { f: "review", kind: "goal" })}><span className="label">Approvals</span><span className={`v ${approvals.data?.length ? "acc" : ""}`}>{approvals.data?.length || 0}</span></button>
         <button className="cell" onClick={() => go("tasks", undefined, { kind: "goal" })}><span className="label">Cost 24h</span><span className="v">{ov.data ? usd(ov.data.cost_usd) : "—"}</span></button>
       </div>
-      <div className="row gap6" style={{ padding: "8px 12px", overflowX: "auto", flex: "none" }}>
+      <div className="row gap6" style={{ padding: "8px 16px", overflowX: "auto", flex: "none" }}>
         {VIEWS.filter(([v]) => v !== "all").map(([v, label]) => (
           <button key={v} className="chip" aria-pressed={p.view === v && !p.cat} onClick={() => p.setView(v)}>{label}</button>
         ))}
         {CATEGORIES.map((c) => <button key={c} className="chip" aria-pressed={p.cat === c} onClick={() => p.setCat(p.cat === c ? null : c)}>{c}</button>)}
       </div>
-      <div style={{ padding: "0 12px 8px", flex: "none" }} className="row gap6">
+      <div style={{ padding: "4px 16px 12px", flex: "none" }} className="row gap8">
         <div className="search grow"><Search size={13} /><input className="input" placeholder="搜索员工" value={p.q} onChange={(e) => p.setQ(e.target.value)} /></div>
         <button className="btn primary" onClick={p.onNewMission}>Mission</button>
       </div>
-      <div className="m-list" style={{ borderTop: "1px solid var(--line)" }}>
+      <div className="m-list">
         {p.rows.map((a) => <AgentRow key={a.id} agent={a} onOpen={open} />)}
         {!p.all.length && <EmptyState title="Create your first agent"><button className="btn primary" onClick={p.onNewAgent}>Create agent</button></EmptyState>}
         {!!p.all.length && !p.rows.length && <EmptyState title="No matching agents"><button className="btn" onClick={() => (p.setQ(""), p.setView("all"), p.setCat(null))}>Clear filters</button></EmptyState>}
