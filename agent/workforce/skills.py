@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 from eth_utils import keccak
 
-from .chain import EIP1967_ADMIN, EIP1967_IMPL, SELECTORS, ChainReader, push4_selectors
+from .chain import EIP1967_ADMIN, EIP1967_IMPL, SELECTORS, Cancelled, ChainReader, push4_selectors
 
 ADDRESS = {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"}
 ADDRESS_RE = re.compile(r"0x[0-9a-fA-F]{40}")
@@ -41,6 +41,12 @@ class SkillContext:
     tokens: dict[str, tuple[str, int]] = field(default_factory=dict)  # symbol -> (address, decimals)
     upstream: list[dict] = field(default_factory=list)  # results handed over by other agents
     logs: list[str] = field(default_factory=list)
+    cancelled: Callable[[], bool] | None = None  # true once the task was cancelled or timed out
+
+    def check(self) -> None:
+        """Raise Cancelled if the task is gone; skills and the readers call it between steps."""
+        if self.cancelled and self.cancelled():
+            raise Cancelled("任务已取消")
 
     def log(self, line: str) -> None:
         self.logs.append(f"{datetime.now(timezone.utc).strftime('%H:%M:%S')} {line}")

@@ -202,15 +202,16 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
         except (TypeError, ValueError):
             raise HTTPException(400, f"{key} 必须是整数") from None
 
-    def _submit(wid: str, body: dict, squad_id: str | None = None) -> dict:
+    def _submit(wid: str, body: dict, squad_id: str | None = None, key: str | None = None) -> dict:
+        # A retried request (double click, network retry) carries the same key and gets the first mission back.
         return run(wf.submit_goal, wid, str(body.get("text", "")), owner, priority=_int(body, "priority", 2),
                    max_steps=_int(body, "max_steps", 20), budget_usd=body.get("budget_usd", "1"), timeout_s=_int(body, "timeout_s", 600),
                    squad_id=squad_id or body.get("squad_id") or None, manager_id=body.get("manager_id") or None,
-                   attachments=body.get("attachments") or None)
+                   attachments=body.get("attachments") or None, idempotency_key=key or body.get("idempotency_key") or None)
 
     @app.post("/api/wf/workspaces/{wid}/goals", dependencies=W)
-    def submit_goal(wid: str, body: dict = Body(...)) -> dict:
-        return _submit(wid, body)
+    def submit_goal(wid: str, body: dict = Body(...), idempotency_key: str | None = Header(None, alias="Idempotency-Key")) -> dict:
+        return _submit(wid, body, key=idempotency_key)
 
     # ---- squads: the team a mission is given to ----
 
@@ -261,9 +262,9 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
         return _squad_view(sid)
 
     @app.post("/api/wf/squads/{sid}/missions", dependencies=W)
-    def squad_mission(sid: str, body: dict = Body(...)) -> dict:
+    def squad_mission(sid: str, body: dict = Body(...), idempotency_key: str | None = Header(None, alias="Idempotency-Key")) -> dict:
         sq = run(wf.squad_or_404, sid)
-        return _submit(sq["workspace_id"], body, sid)
+        return _submit(sq["workspace_id"], body, sid, key=idempotency_key)
 
     @app.post("/api/wf/missions/preflight", dependencies=A)
     def preflight(body: dict = Body(...)) -> dict:

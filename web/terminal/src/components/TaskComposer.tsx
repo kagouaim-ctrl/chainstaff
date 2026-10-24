@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Paperclip, Send, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { post } from "../lib/api";
+import { newRequestKey, post, postOnce } from "../lib/api";
 import { useAction, useAgentName, useAgents, usePreflight, useSquads, useWorkspaces } from "../lib/queries";
 import type { PreflightCheck, PreflightFix, Squad, Task, Workspace } from "../lib/types";
 import { go, usePref } from "../lib/util";
@@ -56,14 +56,24 @@ export function TaskComposer({ ws, squadId, onSquad, onSubmitted, autoFocus, row
   const stale = body.text !== text || body.squad_id !== squad?.id || body.budget_usd !== o.budget_usd || body.manager_id !== (manager || undefined) || body.attachments !== files;
   const canLaunch = mode === "note" ? !!text.trim() : !!text.trim() && !!pf.data?.ok && !stale && !pf.isFetching;
 
+  // One key per mission draft: resending the same draft (double press, retry after a dropped response)
+  // reuses it and gets the same mission back; any change to the draft starts a new key.
+  const reqKey = useRef<{ sig: string; key: string }>({ sig: "", key: "" });
+  const missionKey = (payload: unknown) => {
+    const sig = JSON.stringify(payload);
+    if (reqKey.current.sig !== sig) reqKey.current = { sig, key: newRequestKey() };
+    return reqKey.current.key;
+  };
   const send = useAction(
-    () =>
-      mode === "mission"
-        ? post<Task>(`/api/wf/squads/${squad!.id}/missions`, {
-            text, manager_id: manager || undefined, priority: Number(o.priority), max_steps: Number(o.max_steps), budget_usd: o.budget_usd,
-            timeout_s: Number(o.timeout_s), attachments: files.length ? files : undefined,
-          })
-        : post(`/api/wf/workspaces/${ws.id}/notes`, { text }),
+    () => {
+      if (mode !== "mission") return post(`/api/wf/workspaces/${ws.id}/notes`, { text });
+      const payload = {
+        text, manager_id: manager || undefined, priority: Number(o.priority), max_steps: Number(o.max_steps), budget_usd: o.budget_usd,
+        timeout_s: Number(o.timeout_s), attachments: files.length ? files : undefined,
+      };
+      const path = `/api/wf/squads/${squad!.id}/missions`;
+      return postOnce<Task>(path, payload, missionKey([path, payload]));
+    },
     ["workspaces", "missions", "tasks", "squads"],
     mode === "mission" ? "Mission 已交给主管" : undefined,
   );
@@ -71,6 +81,7 @@ export function TaskComposer({ ws, squadId, onSquad, onSubmitted, autoFocus, row
     if (!canLaunch || send.isPending) return;
     send.mutate(undefined, {
       onSuccess: (t) => {
+        reqKey.current = { sig: "", key: "" };
         setText("");
         setFiles([]);
         qc.invalidateQueries({ queryKey: ["timeline", ws.id] });

@@ -54,6 +54,30 @@ export async function api<T = any>(path: string, opt: RequestInit & { json?: unk
 }
 
 export const post = <T = any>(p: string, json?: unknown) => api<T>(p, { method: "POST", json: json ?? {} });
+
+export function newRequestKey(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+
+/**
+ * POST that creates something exactly once: the Idempotency-Key header lets the server hand back
+ * what the first attempt created, so a dropped response is retried here without a second mission.
+ */
+export async function postOnce<T = any>(p: string, json: unknown, key: string, retries = 2): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await api<T>(p, { method: "POST", json, headers: { "Idempotency-Key": key } });
+    } catch (e) {
+      const retryable = !(e instanceof ApiError) || e.status >= 500; // network failure or server error
+      if (!retryable || i >= retries) throw e;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** i));
+    }
+  }
+}
 export const put = <T = any>(p: string, json: unknown) => api<T>(p, { method: "PUT", json });
 export const del = <T = any>(p: string) => api<T>(p, { method: "DELETE" });
 

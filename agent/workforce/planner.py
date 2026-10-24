@@ -10,6 +10,7 @@ Two planners, and the timeline always says which one ran:
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable
@@ -26,6 +27,28 @@ MAX_STEPS_PER_PLAN = 12
 
 class PlanError(Exception):
     pass
+
+
+class PlanCancelled(Exception):
+    """The goal was cancelled or timed out while it was being planned; the plan is thrown away.
+    usage is what a model call that finished after the cancel cost, so it can still be charged."""
+
+    def __init__(self, msg: str, usage: dict | None = None) -> None:
+        super().__init__(msg)
+        self.usage = usage
+
+
+def _retryable(e: Exception) -> bool:
+    """Timeouts, dropped connections, rate limits and server errors are worth another try; a bad request is not."""
+    if isinstance(e, (TimeoutError, ConnectionError)):
+        return True
+    try:
+        import anthropic
+    except ImportError:  # pragma: no cover - the SDK is a dependency
+        return False
+    if isinstance(e, (anthropic.APITimeoutError, anthropic.APIConnectionError, anthropic.RateLimitError)):
+        return True
+    return isinstance(e, anthropic.APIStatusError) and e.status_code >= 500
 
 
 @dataclass
@@ -51,10 +74,14 @@ class Plan:
 
 
 class Planner:
-    def __init__(self, llm: Callable[[], Any] | None, price_per_mtok: tuple[Decimal, Decimal] | None = None, model: str = MODEL) -> None:
+    def __init__(self, llm: Callable[[], Any] | None, price_per_mtok: tuple[Decimal, Decimal] | None = None, model: str = MODEL,
+                 timeout_s: float = 60.0, retries: int = 2, backoff_s: float = 1.0) -> None:
         self.llm = llm
         self.price = price_per_mtok
         self.model = model
+        self.timeout_s = timeout_s  # per model request; the SDK's own retries are off so this is the real ceiling
+        self.retries = retries
+        self.backoff_s = backoff_s
 
     def label(self) -> str:
         return "model+rules" if self.llm else "rules"
@@ -70,12 +97,13 @@ class Planner:
 
     # ---- planning ----
 
-    def plan(self, goal: str, manager: dict, members: list[dict], wf: "Workforce") -> Plan:
+    def plan(self, goal: str, manager: dict, members: list[dict], wf: "Workforce", *, use_model: bool = True,
+             cancelled: Callable[[], bool] | None = None) -> Plan:
         if not members:
             raise PlanError("工作区里没有在岗的员工")
-        if self.llm and manager["provider"] == "anthropic":
+        if use_model and self.llm and manager["provider"] == "anthropic":
             try:
-                return self._model_plan(goal, manager, members, wf)
+                return self._model_plan(goal, manager, members, wf, cancelled)
             except PlanError as e:
                 try:
                     plan = self._rule_plan(goal, members, wf)
@@ -112,7 +140,7 @@ class Planner:
             notes.append("团队里没有会数据报告的员工，结果不会汇总成报告")
         return Plan(steps, "rules", list(dict.fromkeys(notes)))
 
-    def _model_plan(self, goal: str, manager: dict, members: list[dict], wf: "Workforce") -> Plan:
+    def _model_plan(self, goal: str, manager: dict, members: list[dict], wf: "Workforce", cancelled: Callable[[], bool] | None = None) -> Plan:
         roster = [{"agent_id": a["id"], "name": a["name"], "role": a["role"],
                    "skills": [s for s in a["skills"] if wf.can_run(a, s) is None]} for a in members]
         skills = {sid: {"name": s.name, "description": s.description, "input_schema": s.input_schema}
@@ -134,7 +162,7 @@ class Planner:
                                                                 "agent_id": {"type": "string", "enum": ids},
                                                                 "input_json": {"type": "string"},
                                                                 "depends_on": {"type": "array", "items": {"type": "string"}}}}}}}
-        text, usage = self._call(manager, system, user, schema, max_tokens=4000)
+        text, usage = self._call(manager, system, user, schema, max_tokens=4000, cancelled=cancelled)
         try:
             raw = json.loads(text)["steps"]
         except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -176,7 +204,8 @@ class Planner:
         text, usage = self._call(agent, system, report_md[:30000], None, max_tokens=1500)
         return text.strip(), usage
 
-    def _call(self, agent: dict, system: str, user: str, schema: dict | None, max_tokens: int) -> tuple[str, dict]:
+    def _call(self, agent: dict, system: str, user: str, schema: dict | None, max_tokens: int,
+              cancelled: Callable[[], bool] | None = None) -> tuple[str, dict]:
         cfg = agent.get("model_config") or {}
         kwargs: dict[str, Any] = {
             "model": agent.get("model") or self.model,
@@ -187,7 +216,19 @@ class Planner:
             "fallbacks": "default",
             "output_config": {"effort": cfg.get("effort") or "medium", **({"format": {"type": "json_schema", "schema": schema}} if schema else {})},
         }
-        response = self.llm().beta.messages.create(**kwargs)
+        client = self.llm()
+        if hasattr(client, "with_options"):
+            client = client.with_options(timeout=self.timeout_s, max_retries=0)
+        for attempt in range(self.retries + 1):
+            if cancelled and cancelled():
+                raise PlanCancelled("任务已取消")
+            try:
+                response = client.beta.messages.create(**kwargs)
+                break
+            except Exception as e:
+                if not _retryable(e) or attempt == self.retries:
+                    raise PlanError(f"模型调用失败（{type(e).__name__}，第 {attempt + 1} 次）：{str(e)[:160]}") from e
+                time.sleep(self.backoff_s * 2 ** attempt)
         if response.stop_reason == "refusal":
             raise PlanError("模型拒绝了这个请求")
         if response.stop_reason == "max_tokens":
@@ -197,4 +238,7 @@ class Planner:
         cost = Decimal(0)
         if self.price:
             cost = (Decimal(tin) * self.price[0] + Decimal(tout) * self.price[1]) / Decimal(1_000_000)
-        return text, {"input_tokens": tin, "output_tokens": tout, "cost_usd": str(cost)}
+        usage = {"input_tokens": tin, "output_tokens": tout, "cost_usd": str(cost)}
+        if cancelled and cancelled():
+            raise PlanCancelled("任务已取消", usage)  # the answer came back after the goal ended; do not use it
+        return text, usage
