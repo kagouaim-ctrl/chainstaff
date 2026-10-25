@@ -17,8 +17,8 @@ What it does, in order, and records as pass/fail:
   3. runtime health and activity: the worker heartbeat shows on /api/at/runtime, and every step above is in the
      activity log with who triggered it.
   4. (--testnet) Token Watcher: the server follows BSC testnet (config/chain.example.json, public nodes, read only) and a
-     bsc_events watcher on testnet WBNB; confirmed transfers become events, wake the Token Watcher agent, and its tasks
-     finish with a facts-only report. This shows minutes of listening, not a long-running soak.
+     bsc_events watcher on testnet WBNB (every transfer counted as large, so each one wakes the agent); confirmed
+     transfers become events, wake the Token Watcher agent, and its tasks finish with a facts-only report. This shows minutes of listening, not a long-running soak.
 
 With the scripted endpoint, the model answers come from fixed rules (tests/support/autonomy_brain.py), so the results
 prove the runtime (queue, wake-up, delegation, sandbox, approvals, recovery), not model quality. Nothing here touches a
@@ -239,7 +239,11 @@ def main() -> int:
         if args.testnet:
             tws = j(c.post("/api/at/workspaces", json={"name": "BSC testnet WBNB"}))
             tw = j(c.post("/api/at/agents", json={"template": "token_watcher", "name": "Token Watcher", "workspace_ids": [tws["id"]], "activate": True}))["id"]
-            bw = j(c.post("/api/at/watchers", json={"workspace_id": tws["id"], "kind": "bsc_events", "config": {"address": WBNB_TESTNET, "symbol": "WBNB"}}))["watcher"]
+            bw = j(c.post("/api/at/watchers", json={"workspace_id": tws["id"], "kind": "bsc_events", "config": {"address": WBNB_TESTNET, "symbol": "WBNB",
+                                                                                                     # A plain transfer is recorded but wakes nobody (chain noise); a
+                                                                                                     # threshold of 1 raw unit makes every real transfer "large" so the
+                                                                                                     # wake-up path runs on real testnet data.
+                                                                                                     "large_transfer_raw": "1"}}))["watcher"]
             check("bsc_events watcher created on the live listener", bw["status"] == "active", bw.get("last_error") or bw["id"])
             hb = wait_for(lambda: next((x for x in j(c.get("/api/at/watchers", params={"workspace_id": tws["id"]})) if x["healthy"]), None), 60, 1)
             check("watcher follows new testnet blocks", bool(hb), (hb or {}).get("health"))
