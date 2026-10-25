@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Activity, Bell, ChevronDown, LogOut, Search, Settings, ShieldCheck, SquareArrowOutUpRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, setToken } from "../lib/api";
+import { DEMO } from "../lib/demo";
 import { useAgentName, useAgents, useApprovals, useChain, useMissions } from "../lib/queries";
 import { useStreamState } from "../lib/stream";
 import type { Message } from "../lib/types";
@@ -60,7 +61,13 @@ export function TerminalHeader({ route }: { route: Route }) {
 
 // Signed in with the read-only demo token: every page works, every change is refused by the server.
 function DemoPill() {
-  const s = useQuery({ queryKey: ["session"], queryFn: () => api<{ role: string }>("/api/session"), staleTime: Infinity });
+  const s = useQuery({ queryKey: ["session"], queryFn: () => api<{ role: string }>("/api/session"), staleTime: Infinity, enabled: !DEMO });
+  if (DEMO)
+    return (
+      <span className="pill demo" title="静态演示：示例数据（脚本化模型、模拟链），不连接服务器，不能修改">
+        演示 · 示例数据
+      </span>
+    );
   if (s.data?.role !== "viewer") return null;
   return (
     <span className="pill demo" title="演示账号：可以查看所有页面，不能修改任何内容">
@@ -94,9 +101,13 @@ function MoreMenu({ route }: { route: Route }) {
         <div className="menu" style={{ left: 0, right: "auto", top: "calc(100% + 2px)" }} onClick={() => setOpen(false)}>
           <a href="#/activity"><Activity size={13} /> Activity</a>
           <a href="#/settings"><Settings size={13} /> Settings</a>
-          <div className="pop-sep" />
-          <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
-          <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
+          {!DEMO && (
+            <>
+              <div className="pop-sep" />
+              <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
+              <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -114,8 +125,14 @@ function NetworkPill() {
       <span>{chain.data?.network || "No chain"}</span>
       {rpc?.ok && <span className="mono muted hide-xl">#{num(rpc.block)}</span>}
       <span className="sep" />
-      <span className={`ind ${live === "live" ? "ok" : "warn live"}`} title={live === "live" ? "实时连接正常" : "正在重新连接实时流"} />
-      <span>{live === "live" ? "Live" : "Syncing"}</span>
+      {DEMO ? (
+        <span className="muted" title="静态演示，没有实时连接">Snapshot</span>
+      ) : (
+        <>
+          <span className={`ind ${live === "live" ? "ok" : "warn live"}`} title={live === "live" ? "实时连接正常" : "正在重新连接实时流"} />
+          <span>{live === "live" ? "Live" : "Syncing"}</span>
+        </>
+      )}
     </button>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { queryClient, token } from "./api";
+import { DEMO, demoChainFeed } from "./demo";
 
 /**
  * The BSC listener's live feed (/api/chain/ws): new blocks, monitor events, confirmations, reorgs.
@@ -34,7 +35,19 @@ function emit() {
   subs.forEach((f) => f());
 }
 
+// Static demo: the recorded feed, shown once, newest first. No socket.
+function replay() {
+  void demoChainFeed().then((msgs) => {
+    const ms = msgs as ChainMsg[];
+    snapshot.hello = ms.find((m) => m.type === "hello") ?? null;
+    recent = ms.filter((m) => m.type !== "hello").slice(0, MAX);
+    state = "live";
+    emit();
+  });
+}
+
 function connect() {
+  if (DEMO) return replay();
   if (sock || !users) return;
   state = lastSeq === undefined ? "connecting" : "retrying";
   emit();

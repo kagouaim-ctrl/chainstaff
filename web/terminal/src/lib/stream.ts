@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { queryClient, token } from "./api";
+import { DEMO } from "./demo";
 import type { Message } from "./types";
 
 /**
@@ -81,7 +82,7 @@ async function run(startAfter: number) {
 }
 
 export function startStream(after: number) {
-  if (ctl) return;
+  if (ctl || DEMO) return; // the static demo has no server to stream from
   ctl = new AbortController();
   void run(after);
 }

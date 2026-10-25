@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { DEMO, DEMO_READ_ONLY, demoGet } from "./demo";
 
 // Same token the classic console keeps, so signing in once covers both.
 const KEY = "cs-token";
@@ -12,6 +13,7 @@ export function getToken(): string {
 }
 
 export function setToken(t: string) {
+  if (DEMO) return; // the static demo has no session to leave
   try {
     if (t) sessionStorage.setItem(KEY, t);
     else sessionStorage.removeItem(KEY);
@@ -22,7 +24,7 @@ export function setToken(t: string) {
   listeners.forEach((f) => f());
 }
 
-let memToken = getToken();
+let memToken = DEMO ? "demo" : getToken();
 const listeners = new Set<() => void>();
 export const onAuthChange = (f: () => void) => {
   listeners.add(f);
@@ -38,6 +40,12 @@ export class ApiError extends Error {
 
 export async function api<T = any>(path: string, opt: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = opt;
+  if (DEMO) {
+    if ((rest.method || "GET") !== "GET") throw new ApiError(403, DEMO_READ_ONLY);
+    const found = await demoGet(path);
+    if (found === undefined) throw new ApiError(404, "演示数据里没有这一项");
+    return found as T;
+  }
   const r = await fetch(path, {
     ...rest,
     body: json !== undefined ? JSON.stringify(json) : rest.body,
@@ -82,6 +90,7 @@ export const put = <T = any>(p: string, json: unknown) => api<T>(p, { method: "P
 export const del = <T = any>(p: string) => api<T>(p, { method: "DELETE" });
 
 export async function download(path: string, filename: string) {
+  if (DEMO) throw new ApiError(403, DEMO_READ_ONLY);
   const r = await fetch(path, { headers: { Authorization: "Bearer " + memToken } });
   if (!r.ok) throw new ApiError(r.status, "导出失败");
   const url = URL.createObjectURL(await r.blob());
