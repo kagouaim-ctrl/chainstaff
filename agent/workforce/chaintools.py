@@ -1,6 +1,6 @@
 """More read-only BSC tools, registered into the same REGISTRY as the built-in skills.
 
-block_info, tx_lookup, contract_read, event_search, wallet_activity and chain_events. Agents call them as
+block_info, tx_lookup, token_balance, contract_read, event_search, wallet_activity and chain_events. Agents call them as
 tools; missions can run them as subtasks. All of them read (eth_getBlock*, eth_getTransaction*,
 eth_call, eth_getLogs, or the local event store); none can sign or send.
 """
@@ -203,6 +203,22 @@ def wallet_activity(ctx: SkillContext, inp: dict) -> dict:
     return out
 
 
+def token_balance(ctx: SkillContext, inp: dict) -> dict:
+    r = ctx.need_chain()
+    holder, token = inp["address"], inp["token"]
+    ctx.log(f"eth_call symbol/decimals {token}, balanceOf({holder})")
+    info = r.erc20(token)
+    if not info["is_erc20"]:
+        raise SkillError(f"{token} 不是标准 BEP-20 代币（读不到 symbol/decimals/totalSupply）")
+    block = r.block_number()
+    bal = r.erc20_balance(token, holder, info["decimals"])
+    if bal is None:
+        raise SkillError(f"{token} 的 balanceOf 调用失败")
+    ctx.log(f"{bal} {info['symbol']} @ 区块 {block}")
+    return {"address": holder.lower(), "token": token.lower(), "symbol": info["symbol"], "decimals": info["decimals"],
+            "balance": str(bal), "block": block, "network": r.network}
+
+
 def chain_events(ctx: SkillContext, inp: dict) -> dict:
     if ctx.events is None:
         raise SkillError("实时链上监听没有运行（需要配置链和 BSC 节点），没有可查的监控事件")
@@ -219,6 +235,9 @@ TOOLS: tuple[Skill, ...] = (
           {"type": "object", "properties": {"block": {"type": "integer", "minimum": 0}}}, OBJ, ("chain:read",), "1.0.0", block_info, timeout_s=15),
     Skill("tx_lookup", "交易查询", "Analytics", "按哈希查询一笔交易：发送方、接收方、金额、调用方法、执行状态、手续费、确认数和解码后的事件。",
           {"type": "object", "required": ["hash"], "properties": {"hash": TX_HASH}}, OBJ, ("chain:read",), "1.0.0", tx_lookup, timeout_s=15),
+    Skill("token_balance", "代币余额", "Analytics", "读取一个地址在任意 BEP-20 代币上的余额（balanceOf），附带代币符号、精度和区块高度。",
+          {"type": "object", "required": ["address", "token"], "properties": {"address": ADDRESS, "token": ADDRESS}},
+          OBJ, ("chain:read",), "1.0.0", token_balance, timeout_s=15),
     Skill("contract_read", "合约只读调用", "Research",
           "用 eth_call 调用合约的只读函数（如 balanceOf(address)、owner()），按给定返回类型解码。不会发送交易，也不会改变链上状态。",
           {"type": "object", "required": ["address", "signature"], "properties": {
@@ -241,5 +260,5 @@ TOOLS: tuple[Skill, ...] = (
 for _t in TOOLS:
     if REGISTRY.get(_t.id) is None:
         REGISTRY.register(_t)
-SECTION.update({"block_info": "区块", "tx_lookup": "交易", "contract_read": "合约读取", "event_search": "事件检索",
+SECTION.update({"block_info": "区块", "tx_lookup": "交易", "token_balance": "代币余额", "contract_read": "合约读取", "event_search": "事件检索",
                 "wallet_activity": "钱包动态", "chain_events": "监控事件"})

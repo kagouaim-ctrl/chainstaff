@@ -30,7 +30,8 @@ KAGOU — AI-Native On-Chain Agent Platform。本文件描述当前分支上**�
  │                                                                                │
  │ SQLite（CHAINSTAFF_DB，生产在 /data 卷）：账本 + wf_* + chain_*                      │
  └────────────────────────────────────────────────────────────────────────────────┘
-          │ 模型调用只在后端（ANTHROPIC_API_KEY 不出服务器）
+          │ 模型调用只在后端，都经过 AI Model Gateway（gateway.py：预算、并发、熔断、记账）
+          │ 服务：Qwen 等 OpenAI 兼容接口（AI_*，openai_compat.py）或 Anthropic；key 不出服务器
           │ RPC：BSC 公共节点（测试网 97），只读
 ```
 
@@ -85,7 +86,13 @@ SSE 目前每 0.5 秒查一次 SQLite（单进程足够；多实例前需要换�
 
 `agent/workforce/missions.py::proof` 决定状态；没有锚定交易时永远不会显示为链上确认（`live_check` 实测：审批后为 `offchain_completed`）。
 
-## 6. 安全边界（现状）
+## 6. 模型调用
+
+每次模型调用（Agent 运行和主管规划）都先经过 `agent/workforce/gateway.py`：今日 / 本月花费到了上限就拒绝（明确报错），同一服务连续失败到阈值就熔断一段时间，同时进行的调用数有上限，单次运行的步数、输出 Token、超时有服务器上限。花费按 API 返回的 usage × 官方价格记在 `wf_ai_usage`（按 UTC 日、服务、模型），重启不丢；价格未知的调用单独计数，不算成 0 冒充。
+
+服务：`openai_compat.py` 覆盖 Qwen（首期）、Gemini、Groq、OpenRouter 和本地 Ollama / vLLM，由 `AI_PROVIDER / AI_BASE_URL / AI_API_KEY / AI_MODEL` 配置；`runtime.py` 的 `AnthropicProvider` 是 Claude（默认 Haiku 5.5）。一个 Agent 的 `provider` 决定它用哪个；所有 Agent 共用服务器上的 key。
+
+## 7. 安全边界（现状）
 
 - 只读：工具注册表拒绝非只读工具；Agent 没有签名或转账能力；私钥不进模型。
 - 模型 key 只在后端；前端没有任何密钥；令牌只在请求头或 WS 第一条消息。

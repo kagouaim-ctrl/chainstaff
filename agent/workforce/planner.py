@@ -15,8 +15,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable
 
-from agent.skills.translator.translator import MODEL
-
+from .chain import Cancelled
+from .models import DEFAULT_MODEL, anthropic_extras, cost_of
 from .skills import ADDRESS_RE, SKILL_BY_ID, SkillError, validate
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -27,6 +27,10 @@ MAX_STEPS_PER_PLAN = 12
 
 class PlanError(Exception):
     pass
+
+
+class PlanCallError(PlanError):
+    """The model API could not be reached or kept failing (counts towards the gateway's circuit breaker)."""
 
 
 class PlanCancelled(Exception):
@@ -74,17 +78,25 @@ class Plan:
 
 
 class Planner:
-    def __init__(self, llm: Callable[[], Any] | None, price_per_mtok: tuple[Decimal, Decimal] | None = None, model: str = MODEL,
-                 timeout_s: float = 60.0, retries: int = 2, backoff_s: float = 1.0) -> None:
+    def __init__(self, llm: Callable[[], Any] | None, price_per_mtok: tuple[Decimal, Decimal] | None = None, model: str = DEFAULT_MODEL,
+                 timeout_s: float = 60.0, retries: int = 2, backoff_s: float = 1.0, compat=None) -> None:
         self.llm = llm
+        self.compat = compat  # OpenAICompatProvider: managers with provider=openai_compat plan with it
         self.price = price_per_mtok
         self.model = model
         self.timeout_s = timeout_s  # per model request; the SDK's own retries are off so this is the real ceiling
         self.retries = retries
         self.backoff_s = backoff_s
+        self.gateway = None  # set by the Workforce: budgets, concurrency and the circuit breaker
 
     def label(self) -> str:
-        return "model+rules" if self.llm else "rules"
+        return "model+rules" if self.llm or self.compat else "rules"
+
+    def ready(self, agent: dict | None) -> bool:
+        """This agent's model can be called from this server."""
+        if not agent:
+            return False
+        return bool(agent["provider"] == "anthropic" and self.llm) or bool(agent["provider"] == "openai_compat" and self.compat)
 
     # ---- choosing who does what ----
 
@@ -101,7 +113,7 @@ class Planner:
              cancelled: Callable[[], bool] | None = None) -> Plan:
         if not members:
             raise PlanError("工作区里没有在岗的员工")
-        if use_model and self.llm and manager["provider"] == "anthropic":
+        if use_model and self.ready(manager):
             try:
                 return self._model_plan(goal, manager, members, wf, cancelled)
             except PlanError as e:
@@ -116,7 +128,7 @@ class Planner:
     def _rule_plan(self, goal: str, members: list[dict], wf: "Workforce") -> Plan:
         addrs = list(dict.fromkeys(a.lower() for a in ADDRESS_RE.findall(goal)))[:3]
         if not addrs:
-            raise PlanError("规则规划器只能处理带 0x 地址的链上分析任务；给主管配置模型（Anthropic）后才能理解其他目标")
+            raise PlanError("规则规划器只能处理带 0x 地址的链上分析任务；给主管配置模型（Anthropic 或 OpenAI 兼容）后才能理解其他目标")
         steps: list[Step] = []
         notes: list[str] = []
         for i, addr in enumerate(addrs):
@@ -207,16 +219,67 @@ class Planner:
         text, usage = self._call(agent, system, report_md[:30000], None, max_tokens=1500)
         return text.strip(), usage
 
+    def _compat_call(self, agent: dict, system: str, user: str, schema: dict | None, max_tokens: int,
+                     cancelled: Callable[[], bool] | None) -> tuple[str, dict]:
+        from .openai_compat import CompatError
+
+        try:
+            text, u, model = self.compat.json_call(model=agent.get("model") or None, system=system, user=user, schema=schema,
+                                                   max_tokens=max_tokens, timeout_s=self.timeout_s, cancelled=cancelled)
+        except CompatError as e:
+            raise PlanCallError(f"模型调用失败：{e}") from e
+        cost = cost_of(model, u["input_tokens"], u["output_tokens"], self.compat.price_for(model, u["input_tokens"]))
+        usage = {"input_tokens": u["input_tokens"], "output_tokens": u["output_tokens"], "cost_usd": str(cost or Decimal(0)), "priced": cost is not None,
+                 "model": model}
+        if cancelled and cancelled():
+            raise PlanCancelled("任务已取消", usage)
+        return text, usage
+
     def _call(self, agent: dict, system: str, user: str, schema: dict | None, max_tokens: int,
               cancelled: Callable[[], bool] | None = None) -> tuple[str, dict]:
+        """One planning call through the gateway: refused when over budget or the provider's breaker is open."""
+        gw = self.gateway
+        if gw is None:
+            return self._raw_call(agent, system, user, schema, max_tokens, cancelled)
+        provider = "openai_compat" if agent.get("provider") == "openai_compat" else "anthropic"
+        model = agent.get("model") or (self.compat.model if provider == "openai_compat" and self.compat else self.model)
+        blocked = gw.blocked(provider)
+        if blocked:
+            raise PlanError(blocked)
+        if gw.max_output_tokens:
+            max_tokens = min(max_tokens, gw.max_output_tokens)
+
+        def record(usage: dict | None) -> None:
+            if usage:
+                gw.record(provider, usage.get("model") or model, usage["input_tokens"], usage["output_tokens"],
+                          Decimal(usage["cost_usd"]) if usage.get("priced", True) else None)
+
+        try:
+            with gw.slot(cancelled or (lambda: False)):
+                text, usage = self._raw_call(agent, system, user, schema, max_tokens, cancelled)
+        except Cancelled:
+            raise PlanCancelled("任务已取消") from None
+        except PlanCancelled as e:
+            record(e.usage)
+            raise
+        except PlanCallError as e:
+            gw.failed(provider, model, e)
+            raise
+        gw.succeeded(provider)
+        record(usage)
+        return text, usage
+
+    def _raw_call(self, agent: dict, system: str, user: str, schema: dict | None, max_tokens: int,
+                  cancelled: Callable[[], bool] | None = None) -> tuple[str, dict]:
         cfg = agent.get("model_config") or {}
+        if agent.get("provider") == "openai_compat":
+            return self._compat_call(agent, system, user, schema, int(cfg.get("max_tokens") or max_tokens), cancelled)
         kwargs: dict[str, Any] = {
             "model": agent.get("model") or self.model,
             "max_tokens": int(cfg.get("max_tokens") or max_tokens),
             "system": system,
             "messages": [{"role": "user", "content": user}],
-            "betas": ["server-side-fallback-2026-07-01"],
-            "fallbacks": "default",
+            **anthropic_extras(agent.get("model") or self.model),
             "output_config": {"effort": cfg.get("effort") or "medium", **({"format": {"type": "json_schema", "schema": schema}} if schema else {})},
         }
         client = self.llm()
@@ -230,7 +293,7 @@ class Planner:
                 break
             except Exception as e:
                 if not _retryable(e) or attempt == self.retries:
-                    raise PlanError(f"模型调用失败（{type(e).__name__}，第 {attempt + 1} 次）：{str(e)[:160]}") from e
+                    raise PlanCallError(f"模型调用失败（{type(e).__name__}，第 {attempt + 1} 次）：{str(e)[:160]}") from e
                 time.sleep(self.backoff_s * 2 ** attempt)
         if response.stop_reason == "refusal":
             raise PlanError("模型拒绝了这个请求")
@@ -238,10 +301,10 @@ class Planner:
             raise PlanError("模型输出被截断")
         text = next((b.text for b in response.content if b.type == "text"), "")
         tin, tout = int(response.usage.input_tokens), int(response.usage.output_tokens)
-        cost = Decimal(0)
-        if self.price:
-            cost = (Decimal(tin) * self.price[0] + Decimal(tout) * self.price[1]) / Decimal(1_000_000)
-        usage = {"input_tokens": tin, "output_tokens": tout, "cost_usd": str(cost)}
+        # Priced like agent runs (the published price unless CHAINSTAFF_MODEL_PRICE overrides it); was 0 without an override.
+        cost = cost_of(getattr(response, "model", "") or kwargs["model"], tin, tout, self.price)
+        usage = {"input_tokens": tin, "output_tokens": tout, "cost_usd": str(cost or Decimal(0)), "priced": cost is not None,
+                 "model": getattr(response, "model", "") or kwargs["model"]}
         if cancelled and cancelled():
             raise PlanCancelled("任务已取消", usage)  # the answer came back after the goal ended; do not use it
         return text, usage

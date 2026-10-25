@@ -124,3 +124,160 @@
 
 - 真实模型、真实域名、Railway 上的持久化：都等你提供 key / 账号后验证。
 - SSE 仍是 0.5 秒轮询 SQLite；单实例够用。
+
+---
+
+## AI Runtime 接入：Qwen、AI Model Gateway、成本控制（2026-10-25）
+
+对应需求“KAGOUAI ChainStaff — AI Runtime Integration”，并入第 2 阶段，在同一分支上继续，没有重写。
+
+### 1. 先检查现有项目（结论）
+
+| 问题 | 结论（检查依据） |
+|---|---|
+| Agent 是否已有真实推理 | **有**。`agent/workforce/runtime.py` 的 `AgentRuntime` 是真实的模型 ↔ 工具循环（PR #15 起），以前只接了 Anthropic，并且需要 key |
+| Mission 能否实际执行 | **能**。`engine.py` 调度、`planner.py` 规划；无模型时用规则规划（只认 0x 地址）；`live_check.py` 在真实进程上跑通（见第 1 阶段） |
+| BSC 模块是否连真实 RPC | **是**。`agent/bsc/rpc.py` 的 `RpcPool`（多节点、重试、限流）；CI 在 BSC 测试网上验证（chain id 97） |
+| Mock / Fake / Hardcoded | Live 模式没有。示例数据只在 `/demo/` 静态构建（`VITE_DEMO=1`）里；测试里的脚本化模型和模拟链只在 `tests/` |
+| 发现的问题 | ① 只有一个模型服务；② 没有全站的每日 / 每月预算、并发上限、熔断；③ 主管规划在没设 `CHAINSTAFF_MODEL_PRICE` 时成本记成 0（已修）；④ 没有“任意代币余额”工具；⑤ Agent 的结论没有要求区分链上事实和推断 |
+
+### 2. 实际架构（新增部分）
+
+```
+Agent Runtime / Mission Planner
+        │  每次模型调用
+        ▼
+AI Model Gateway (agent/workforce/gateway.py)
+  ├ 预算：今日 / 本月花费 ≥ 上限 → 拒绝，明确报错（不静默继续）
+  ├ 熔断：同一服务连续失败 N 次 → 暂停 M 秒，期间直接拒绝
+  ├ 并发：AI_MAX_CONCURRENT_TASKS 个调用槽，其余排队（取消的任务不再等）
+  ├ 上限：AI_MAX_AGENT_STEPS / AI_MAX_OUTPUT_TOKENS / AI_REQUEST_TIMEOUT（Agent 自己只能设得更低）
+  └ 记账：wf_ai_usage 表，按 UTC 日、服务、模型累计调用、失败、Token、成本（重启不丢）
+        │
+        ├─ OpenAICompatProvider（openai_compat.py）：Qwen（首期）/ Gemini / Groq / OpenRouter / 本地 Ollama、vLLM
+        └─ AnthropicProvider（runtime.py）：Claude，默认最便宜的 Haiku 5.5
+        │
+        ▼
+Tool Registry（只读 BSC 工具，后端逐次鉴权）→ RpcPool → BSC
+```
+
+链上监听（`agent/bsc/listener.py`）不经过模型：新区块、事件过滤、重组、补块、断线重连都是后端规则；只有 Agent 任务才调用模型。
+
+### 3. AI 接入
+
+| 项目 | 内容 |
+|---|---|
+| 首期模型 | Qwen，阿里云 Model Studio（百炼）OpenAI 兼容接口 `POST {AI_BASE_URL}/chat/completions` |
+| 地址（按官方文档核实） | 新加坡：`https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`；旧域名 `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` 仍可用。北京、美国、东京各有自己的地址，key 按地域绑定，跨地域用会 401 |
+| 模型 | 建议 `qwen-plus`：文档写明支持 function calling，且在新用户免费额度的举例里。更便宜的 `qwen3.7-flash`（≤32K 输入 $0.03 / $0.13 每百万 Token）也在 function calling 支持列表里，但它的模型页对新加坡区写着不支持 function calling，**两份文档矛盾，需要用真实 key 验证后再推荐** |
+| 免费额度 | 只在新加坡区（International）：每个模型通常 100 万 Token，90 天，开通 Model Studio 后自动发放 |
+| 价格 | 新加坡区内置官方美元标价（分档，按单次请求输入量）：qwen-plus $0.4 / $1.2（≤256K，思考模式输出 $4）、qwen3.7-plus $0.4 / $1.6、qwen-flash $0.05 / $0.4、qwen3.7-flash $0.03 / $0.13（≤32K）等。用标价计成本，所以免费额度期间记录的成本会高于实际账单，不会更低。北京区按人民币另有价格，需要 `AI_PRICE` |
+| 思考模式 | 默认关（`enable_thinking: false`，与官方 function calling 示例一致，也更便宜）；`AI_ENABLE_THINKING=1` 打开 |
+| 统一接口 | `ModelProvider.complete(model, system, messages, tools, limits, on_text, should_stop, timeout_s) -> ModelTurn`（同步，跑在 Agent 线程池里，和现有引擎一致，没有改成 async）。多轮、System Prompt、function calling、超时、重试（429 / 5xx，指数退避）、Token usage、调用日志（时间线 `model.start` / `model.done`）、成本 |
+| 工具调用格式 | 不假设一致：Claude 格式的对话在出入口转换成 chat completions（`tool_calls` / `role: tool`）；参数不是合法 JSON 时作为错误结果交还模型，不猜 |
+| 流式 | Claude 是流式；OpenAI 兼容接口目前**不流式**（阿里云 OpenAI 兼容文档写明 tools 不能和 `stream=True` 一起用），回答在调用结束时整段出现在时间线 |
+| 本地模型 | `AI_PROVIDER=local` + `AI_BASE_URL=http://localhost:11434/v1`（Ollama）或 vLLM 的地址，无需 key，成本记 0。没有部署本地模型 |
+| 密钥 | 只在服务器环境变量；不进浏览器、不进 `/api/system`、不进模型请求体；测试断言了这三点 |
+
+配置示例：
+
+```env
+AI_PROVIDER=qwen
+AI_BASE_URL=https://<WorkspaceId>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+AI_API_KEY=<阿里云 Model Studio 的 API Key>
+AI_MODEL=qwen-plus
+AI_MAX_OUTPUT_TOKENS=2048
+AI_REQUEST_TIMEOUT=60
+AI_DAILY_BUDGET_USD=1
+AI_MONTHLY_BUDGET_USD=10
+AI_MAX_AGENT_STEPS=8
+AI_MAX_CONCURRENT_TASKS=5
+```
+
+配置不完整（例如只填了 `AI_PROVIDER`）或地址不是 https 时，服务器拒绝启动并说明缺什么，而不是带着“好像有模型”的状态运行。旧变量 `KAGOU_OPENAI_COMPAT_*` 仍然有效。
+
+### 4. Agent Runtime
+
+在 PR #15 的循环上没有改流程，只加了网关和输出要求：
+
+接收任务 → 系统提示（角色 + 运行规则）→ 网关检查（预算、熔断）→ 等调用槽 → 模型 → 若要调用工具：后端逐次检查（是否提供给这个 Agent、权限是否还在、技能是否启用、参数 schema）→ 执行只读工具 → 结果作为**数据**交回模型（运行规则写明工具结果里的指令一律忽略）→ 继续推理 → 结论。
+
+- 最大步数（模型调用次数）、工具调用次数、Token、单次超时、任务截止时间、取消、Agent 预算、Mission 预算：都有，到了就停并写明原因。
+- 结论要求分三部分：链上事实（带工具、数值、区块）、统计（怎么算的）、推断（明确标注）。
+- 每次调用记录：模型、Token、成本、是否有价格、用了哪个服务、耗时、调用了哪些工具。
+
+### 5. BSC 工具
+
+| 需求里的名字 | 实际工具 | 数据来源 |
+|---|---|---|
+| get_wallet_balance | `wallet_analysis` | `eth_getBalance` 等，带区块高度 |
+| get_token_balance | **`token_balance`（本次新增）** | 任意 BEP-20 的 `balanceOf`，带符号、精度、区块 |
+| get_transaction | `tx_lookup` | `eth_getTransactionByHash` + 回执 |
+| get_token_metadata | `token_info` | `name` / `symbol` / `decimals` / `totalSupply` |
+| get_wallet_transactions | `wallet_activity`（链上日志，最近 5000 个区块内的代币转账，不需要 key）；`tx_history`（完整交易历史，**需要 `ETHERSCAN_API_KEY`**） | 普通 RPC 拿不到一个地址的完整交易历史，也拿不到原生 BNB 转账列表；没有 key 时工具直接说明，不编数据 |
+| monitor_wallet | 链上监控（`/api/chain/monitors`，后端 `ChainListener`）+ `chain_events` 工具 | 监听不调用模型；Agent 只在需要解释时查询记录下来的事件 |
+| analyze_wallet | `agent_task`（Agent 用以上工具推理） | 结论按事实 / 统计 / 推断分开 |
+
+工具都在注册表里标为只读，只有 `chain:read` 权限；没有任何签名、转账、授权、兑换工具。
+
+### 6. Mission 状态
+
+沿用现有状态（改名会破坏现有界面和数据）：
+
+| 需求 | 现有 |
+|---|---|
+| PENDING / QUEUED | `pending`（已创建）、`assigned` / `waiting`（排队、等依赖） |
+| RUNNING | `running` |
+| COMPLETED | `review`（等人审核）→ `completed` |
+| FAILED / CANCELLED | `failed` / `cancelled` |
+| TIMED_OUT | `failed`，原因写“到了截止时间”或“工具超时”（没有单独的状态值） |
+
+重试只重跑失败的只读子任务；链上写操作（锚定）不会被自动重试。监控在重启后从数据库恢复并补块（第 1 阶段已在测试网验证）。
+
+### 7. 多 Agent 协作
+
+不需要新代码：主管（Mission Coordinator）用模型把目标拆成带依赖的步骤，独立步骤并行，下游 Agent 只看到依赖步骤交来的结果（作为数据）。所有 Agent 共用服务器上的同一个模型 key。`scripts/ai_check.py` 会建这 4 个 Agent：Mission Coordinator、BSC Analyst、On-chain Monitor、Research Agent。防止无限互相调用：Agent 不能自己派任务给别的 Agent，只有主管规划，步骤数上限 12。
+
+### 8. 测试结果
+
+**Mock 测试（脚本化模型 / 模拟链节点，不是真实 API）**
+
+| 项目 | 结果 |
+|---|---|
+| `pytest --cov=agent --cov-fail-under=99` | **496 通过**，3 跳过（测试网），覆盖率 99.08%。其中一次运行里 `test_bsc_perf` 的 P95 计时在高负载下失败 1 次，单独运行 3/3 通过，再跑全量全部通过（已知偶发，见第 1 阶段） |
+| 新增 `tests/test_openai_compat.py`（12 项） | 多轮工具调用、工具结果回传、未授权工具被拒、错误参数、截断、重试 429 / 5xx / 网络错误、坏 key 不重试、取消、免费 / 付费 / 无价格的计价、主管规划、预检 |
+| 新增 `tests/test_ai_gateway.py`（14 项） | 每日预算耗尽后拒绝新调用（API 收不到请求）、月预算跨重启累计、预算耗尽时规划退回规则规划、熔断打开和恢复、规划失败计入熔断、并发上限（3 个任务同时只有 1 个调用）、排队时取消、服务器上限压过 Agent 设置、环境变量校验、Qwen 配置和分档价格、端到端 Qwen 成本、`build_workforce` 读取 `AI_*` |
+| `tests/test_live_mode.py` 新增 1 项 | `/api/system` 报告 Qwen 服务、模型、地址和花费，且不含 key |
+| `tests/test_bsc_edges.py` 新增 1 项 | `token_balance` |
+| `npm run build`、`npm run build:demo` | 通过 |
+
+**脚本检查（真实服务器进程 + 真实 HTTP，模型是脚本化接口，链是模拟节点）** — `scripts/ai_check.py --sim-chain` 对 `tests/support/scripted_chat_server.py`：**8/8 通过**。这只证明检查脚本本身和服务器端流程能跑通，**不是**真实模型测试。CI 每次都会跑这一步。
+
+**真实模型测试：未执行。** 没有 Qwen 或 Anthropic 的 key。需求里的测试一（AI 连接）、测试二（Agent 执行）、测试四（模型选择并调用工具）、测试六（多 Agent）的真实版本都等 key 到位后用 `scripts/ai_check.py --chain` 完成；测试三（真实地址余额）已在第 1 阶段的 BSC 测试网 CI 中通过（不经模型）；测试五（Mission 状态流转）、测试七（超时 / RPC 失败 / 取消 / 预算耗尽）、测试八（未授权工具被拒）有 Mock 测试和真实进程检查。
+
+### 9. 修改文件
+
+新增：`agent/workforce/gateway.py`、`agent/workforce/models.py`、`agent/workforce/openai_compat.py`、`scripts/ai_check.py`、`tests/support/scripted_chat_server.py`、`tests/test_ai_gateway.py`、`tests/test_openai_compat.py`、`.github/workflows/ai-check.yml`
+
+修改：`agent/workforce/{__init__,chaintools,engine,planner,runtime}.py`、`agent/skills/translator/translator.py`、`backend/{app,workforce_api}.py`、`deploy/app.kagouai.com/kagou.env.example`、`.github/workflows/ci.yml`、`tests/{test_agent_runtime,test_bsc_edges,test_live_mode,test_team}.py`、`web/terminal/src/{components/AgentForm.tsx,components/SquadForm.tsx,components/TerminalHeader.tsx,lib/types.ts,lib/util.ts,pages/Settings.tsx}`、`docs/*`
+
+前端只改了已有页面里的文字和状态：创建 Agent 时的模型选项显示实际服务（如“共享模型 · Qwen · qwen-plus”），Settings 显示共享模型、今日 / 本月 AI 花费和预算、并发和熔断状态。没有新页面，没有改 Landing Page，没有 Telegram。
+
+### 10. 部署
+
+见 [部署指南](KAGOU_DEPLOYMENT_GUIDE.md) 的变量表。没有部署任何东西。
+
+### 11. 尚未完成
+
+- 真实 Qwen / Claude 调用：等 key。
+- `qwen3.7-flash` 在新加坡区是否支持 tool calling：文档矛盾，要实测。
+- OpenAI 兼容接口不流式。
+- 每日 / 每月预算对“无价格”的调用不完整（控制台会提示有多少次）。
+- 单进程内的并发和熔断；多实例部署前要换成共享存储。
+- 多用户、角色权限、API 限流仍没有（安全阶段）。
+
+### 12. 下一步建议
+
+1. 拿到 Qwen key 后跑 `scripts/ai_check.py --chain`，把真实结果写回本报告，再决定默认用 `qwen-plus` 还是更便宜的 flash 模型。
+2. 用真实结果调整 Agent 的系统提示和工具描述。
+3. 第 4 阶段的链上检索（持有人分布、流动性）需要先选数据源。

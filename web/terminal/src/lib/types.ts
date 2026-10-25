@@ -7,7 +7,7 @@ export interface Agent {
   role: string;
   description: string;
   system_prompt: string;
-  provider: "none" | "anthropic";
+  provider: "none" | "anthropic" | "openai_compat";
   model: string;
   model_config: { max_tokens?: number; effort?: string; max_tool_calls?: number; max_model_calls?: number; max_run_tokens?: number; call_timeout_s?: number };
   skills: string[];
@@ -241,7 +241,7 @@ export interface Meta {
   task_statuses: TaskStatus[];
   default_model: string;
   skills: { id: string; name: string; permissions: string[] }[];
-  engine: { llm: boolean; chain: boolean; etherscan: boolean; anchor: boolean; planner: string };
+  engine: { llm: boolean; compat: string | null; compat_service?: string | null; chain: boolean; etherscan: boolean; anchor: boolean; planner: string };
   network: string | null;
   chain_id: number | null;
   explorer: string | null;
@@ -254,12 +254,31 @@ export interface SystemInfo {
   version: string | null;
   started_at: string | null;
   database: { engine: string; persistent: boolean; file: string | null };
-  model: { configured: boolean; providers: string[]; default_model: string | null; reason: string | null };
+  model: {
+    configured: boolean; providers: string[]; default_model: string | null; reason: string | null;
+    compat?: { service: string; model: string; host: string } | null;
+  };
+  ai_usage?: AiUsage;
   chain: { configured: boolean; network: string | null; chain_id: number | null; listener: boolean };
   explorer_api: boolean;
   anchor: boolean;
   writes: { payments: boolean; agent_signing: boolean };
   auth: { viewer_token: boolean; cors_origins: string[] };
+}
+
+/** Model spend and the limits in force (/api/wf/ai-usage; without `days` inside /api/system). */
+export interface AiUsage {
+  today_usd: string;
+  month_usd: string;
+  unpriced_calls_this_month: number;
+  daily_budget_usd: string | null;
+  monthly_budget_usd: string | null;
+  max_concurrent: number;
+  in_flight: number;
+  max_agent_steps: number | null;
+  max_output_tokens: number | null;
+  request_timeout_s: number | null;
+  breaker: { failures: number; cooldown_s: number; open: Record<string, { failures: number; open_for_s: number }> };
 }
 
 export interface ChainStatus {

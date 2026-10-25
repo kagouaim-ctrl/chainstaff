@@ -402,7 +402,7 @@ SKILLS: tuple[Skill, ...] = (
           "把任务交给员工自己的模型：它理解任务，从自己被授权的工具里选择要调用的，读取真实结果后决定下一步，最后给出结论。",
           {"type": "object", "required": ["instruction"], "properties": {"instruction": {"type": "string"}}},
           {"type": "object", "properties": {"answer": {"type": "string"}, "tool_calls": {"type": "array"}}},
-          ("model:invoke",), "1.0.0", _agent_task, compatibility="需要 Anthropic 模型", agent_tool=False, timeout_s=900),
+          ("model:invoke",), "1.0.0", _agent_task, compatibility="需要模型（Qwen 等 OpenAI 兼容服务，或 Anthropic）", agent_tool=False, timeout_s=900),
 )
 REGISTRY = ToolRegistry()
 for _s in SKILLS:

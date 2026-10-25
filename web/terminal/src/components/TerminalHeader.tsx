@@ -79,9 +79,9 @@ function DemoPill() {
 // Live mode without a model key: agents cannot reason, and the console says so rather than letting it pass unnoticed.
 function ModelPill() {
   const meta = useMeta();
-  if (!meta.data || meta.data.engine.llm) return null;
+  if (!meta.data || meta.data.engine.llm || meta.data.engine.compat) return null;
   return (
-    <button className="pill warn-pill d-only" onClick={() => go("settings")} title="服务器没有设置 ANTHROPIC_API_KEY：Agent 不调用模型，主管只用规则拆分">
+    <button className="pill warn-pill d-only" onClick={() => go("settings")} title="服务器没有配置模型（ANTHROPIC_API_KEY 或 KAGOU_OPENAI_COMPAT_*）：Agent 不调用模型，主管只用规则拆分">
       Model off
     </button>
   );

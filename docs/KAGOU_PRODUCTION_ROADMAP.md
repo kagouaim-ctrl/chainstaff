@@ -7,7 +7,7 @@
 | 阶段 | 内容 | 状态 | 说明 |
 |---|---|---|---|
 | 1 | 真实后端部署准备、Demo / Live 双模式 | ✅ | 见 [实施报告](KAGOU_IMPLEMENTATION_REPORT.md) 第 1 阶段 |
-| 2 | 真实 LLM Tool Calling Runtime | 🟡 ⛔ | Runtime、Tool Registry、预算和成本记账已在 PR #15；真实模型调用需要 `ANTHROPIC_API_KEY`（付费） |
+| 2 | 真实 LLM Tool Calling Runtime | 🟡 ⛔ | Runtime、Tool Registry 已在 PR #15；本分支加了 Qwen 等 OpenAI 兼容服务、AI Model Gateway（每日 / 每月预算、并发、熔断、按天记账），默认 Claude 改为最便宜的 Haiku 5.5。真实模型测试需要 Qwen（`AI_API_KEY`）或 Anthropic key |
 | 3 | 多 Agent 协作、审计报告的调度问题 | 🟡 | 6 项 P0 问题 PR #15 已修并有测试；本分支会再逐项核对回归测试 |
 | 4 | GMGN 式链上检索 | 🟡 | 已有 13 个只读工具；持有人分布、流动性、历史统计需要索引或第三方数据源 |
 | 5 | 统一 On-Chain 页面 | 🟡 | 链下完成 / 待审核 / 链上确认已区分；页面分区还要整理 |
@@ -20,7 +20,7 @@
 
 | 事项 | 用在哪 | 现状 |
 |---|---|---|
-| `ANTHROPIC_API_KEY`（付费） | 第 2、6 阶段的真实模型测试 | 没有。拿到前所有 Agent 测试都是脚本化模型（Mock），报告里单独列 |
+| Qwen key（阿里云 Model Studio 新加坡区，新用户有免费额度）或 `ANTHROPIC_API_KEY` | 第 2、6 阶段的真实模型测试 | 没有。拿到前所有 Agent 测试都是脚本化模型（Mock），报告里单独列；有 key 后跑 `scripts/ai_check.py` |
 | Railway 账号和项目 | 部署 Live 后端 | 配置已准备（`railway.toml`、部署指南）；没有部署 |
 | `app.kagouai.com` DNS | 正式域名 | 不动，等你操作 |
 | `ETHERSCAN_API_KEY`（免费额度） | 历史交易、合约源码 / ABI | 没有；相关工具会明确报告缺 key |

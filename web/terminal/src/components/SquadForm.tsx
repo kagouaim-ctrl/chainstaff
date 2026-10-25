@@ -126,7 +126,7 @@ export function SquadForm({ squad, workspaceId, onClose, onSaved }: { squad?: Sq
             {(() => {
               const m = roster.find((a) => a.id === manager);
               if (!m) return <span className="warn">没有主管，不能接 Mission</span>;
-              return m.provider === "anthropic" && meta.data?.engine.llm ? "模型规划，能理解任意目标" : "规则规划：只处理带 0x 地址的链上分析";
+              return (m.provider === "anthropic" && meta.data?.engine.llm) || (m.provider === "openai_compat" && meta.data?.engine.compat) ? "模型规划，能理解任意目标" : "规则规划：只处理带 0x 地址的链上分析";
             })()}
             {off.length > 0 && <div className="warn">{off.map((a) => a.name).join("、")} 不在岗</div>}
           </div>

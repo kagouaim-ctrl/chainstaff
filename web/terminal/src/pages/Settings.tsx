@@ -4,9 +4,9 @@ import { Dialog, EmptyState, ErrorState, Loading, Seg, Status, Tabs } from "../c
 import { del, post, put, setToken } from "../lib/api";
 import { useAction, useAgents, useMemory, useMeta, useSchedules, useSystem, useWorkspaces } from "../lib/queries";
 import { API_BASE } from "../lib/api";
-import type { Memory } from "../lib/types";
+import type { AiUsage, Memory } from "../lib/types";
 import { DEMO } from "../lib/demo";
-import { fmtTime, go, usePref } from "../lib/util";
+import { SERVICE, fmtTime, go, usePref } from "../lib/util";
 
 type Tab = "schedules" | "memory" | "system";
 
@@ -202,9 +202,31 @@ function ServerInfo() {
             <dt>Database</dt>
             <dd><span className={`badge ${s.database.persistent ? "ok" : "warn"}`}><span className="dot" />{s.database.persistent ? `SQLite · ${s.database.file}` : "内存数据库：重启后数据丢失"}</span></dd>
             <dt>Chain writes</dt><dd>{s.writes.payments ? "实盘付款已开启" : "关闭：只读链上数据"} · Agent 不能签名或转账</dd>
+            {s.ai_usage && <AiSpend u={s.ai_usage} />}
           </>
         )}
       </dl>
+    </>
+  );
+}
+
+function AiSpend({ u }: { u: AiUsage }) {
+  const open = Object.entries(u.breaker.open);
+  const over = (spent: string, cap: string | null) => !!cap && Number(spent) >= Number(cap);
+  const blocked = over(u.today_usd, u.daily_budget_usd) || over(u.month_usd, u.monthly_budget_usd);
+  return (
+    <>
+      <dt>AI spend</dt>
+      <dd>
+        <span className={`badge ${blocked ? "bad" : "ok"}`}><span className="dot" />
+          今日 ${Number(u.today_usd).toFixed(4)}{u.daily_budget_usd ? ` / $${u.daily_budget_usd}` : ""} · 本月 ${Number(u.month_usd).toFixed(4)}{u.monthly_budget_usd ? ` / $${u.monthly_budget_usd}` : ""}
+        </span>
+        {blocked && <small className="warn"> 预算已用完，新的模型调用会被拒绝</small>}
+        {u.unpriced_calls_this_month > 0 && <small className="warn"> 本月 {u.unpriced_calls_this_month} 次调用没有已知价格，未计入花费（设置 AI_PRICE）</small>}
+      </dd>
+      <dt>AI limits</dt>
+      <dd>同时 {u.max_concurrent} 个模型调用（进行中 {u.in_flight}）{u.max_agent_steps ? ` · 每次运行最多 ${u.max_agent_steps} 步` : ""}{u.request_timeout_s ? ` · 单次 ${u.request_timeout_s}s 超时` : ""}</dd>
+      {open.length > 0 && (<><dt>Circuit breaker</dt><dd>{open.map(([p, b]) => <span key={p} className="badge bad"><span className="dot" />{p} 连续失败 {b.failures} 次，{b.open_for_s}s 后重试</span>)}</dd></>)}
     </>
   );
 }
@@ -222,7 +244,8 @@ function System() {
     <div className="section col" style={{ maxWidth: 720 }}>
       <div className="label">Engine</div>
       <dl className="kv">
-        {row("Model", e.llm, `Anthropic · planner ${e.planner}`, "没有 ANTHROPIC_API_KEY：主管用规则拆分，员工不调用模型")}
+        {row("Model", e.llm, `Anthropic · 默认 ${meta.data!.default_model} · planner ${e.planner}`, "没有 ANTHROPIC_API_KEY：Anthropic 员工不调用模型")}
+        {row("Shared model", !!e.compat, `${SERVICE[e.compat_service || ""] || "OpenAI 兼容"} · ${e.compat}`, "没有 AI_PROVIDER / AI_API_KEY：Qwen 等共享模型不可用")}
         {row("Chain", e.chain, `${meta.data!.network} (${meta.data!.chain_id})`, "没有 CHAINSTAFF_CHAIN：链上技能不可用")}
         {row("Etherscan", e.etherscan, "configured", "没有 ETHERSCAN_API_KEY：交易历史技能不可用")}
         {row("Anchor wallet", e.anchor, "BSC testnet signer ready", "没有 CHAINSTAFF_ANCHOR_WALLET：结果哈希不能上链")}

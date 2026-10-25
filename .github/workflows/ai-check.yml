@@ -1,0 +1,41 @@
+name: ai-check
+# Real model + real BSC testnet, run by hand: it spends model API credit, so it never runs on push.
+# Needs repository secrets AI_API_KEY (and AI_BASE_URL, AI_MODEL, AI_PROVIDER as variables or secrets),
+# or ANTHROPIC_API_KEY. Settings → Secrets and variables → Actions.
+on:
+  workflow_dispatch:
+    inputs:
+      daily_budget_usd:
+        description: "AI_DAILY_BUDGET_USD for this run"
+        default: "0.5"
+
+permissions:
+  contents: read
+
+jobs:
+  real-ai:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: Real model, real BSC testnet
+        env:
+          AI_PROVIDER: ${{ vars.AI_PROVIDER || secrets.AI_PROVIDER }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL || secrets.AI_BASE_URL }}
+          AI_MODEL: ${{ vars.AI_MODEL || secrets.AI_MODEL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_DAILY_BUDGET_USD: ${{ inputs.daily_budget_usd }}
+          AI_MAX_AGENT_STEPS: "8"
+        run: python scripts/ai_check.py --chain --out ai-check.json
+      - name: Results
+        if: always()
+        run: |
+          if [ -f ai-check.json ]; then
+            { echo "### ai-check.json"; echo '```json'; cat ai-check.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            cat ai-check.json
+          fi

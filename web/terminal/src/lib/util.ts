@@ -195,3 +195,8 @@ export function useToasts() {
 export const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** The service behind the server's shared OpenAI-compatible model (AI_PROVIDER), as the console names it. */
+export const SERVICE: Record<string, string> = {
+  qwen: "Qwen", gemini: "Gemini", groq: "Groq", openrouter: "OpenRouter", local: "本地模型", openai_compatible: "OpenAI 兼容",
+};

@@ -6,6 +6,8 @@ contract check that every API path the KAGOU Console calls exists on the server.
 
 from __future__ import annotations
 
+import json
+
 import re
 from pathlib import Path
 
@@ -23,7 +25,7 @@ H = {"Authorization": "Bearer " + TOKEN_AUTH}
 CONSOLE = "https://console.example.com"
 
 
-def build(tmp_path, env=None, chain_on=True, llm=None, db="l.db"):
+def build(tmp_path, env=None, chain_on=True, llm=None, db="l.db", compat=None, ai_env=None):
     from agent.runtime import build_employee
     from backend.app import create_app
 
@@ -31,7 +33,7 @@ def build(tmp_path, env=None, chain_on=True, llm=None, db="l.db"):
     p.write_text((ROOT / "config" / "policy.example.json").read_text())
     emp, _ = build_employee({"CHAINSTAFF_POLICY": str(p), "CHAINSTAFF_DB": str(tmp_path / db) if db else ":memory:"})
     chain = load_chain(ROOT / "config" / "chain.example.json") if chain_on else None
-    wf = Workforce(emp.store, llm=llm)
+    wf = Workforce(emp.store, llm=llm, compat=compat, ai_env=ai_env)
     svc = ChainService(emp.store, chain, wf, rpc=pool(FakeBSC())) if chain_on else None
     return create_app(emp, TOKEN_AUTH, chain, env=env or {}, workforce=wf, chain_service=svc), emp, wf
 
@@ -148,3 +150,23 @@ def test_every_console_api_path_exists_on_the_server(live):
     missing = sorted(p for p in paths if not any(re.fullmatch(re.escape(r).replace(re.escape("{x}"), "[^/]+"), p.replace("{x}", "X"))
                                                  for r in routes))
     assert missing == []
+
+
+def test_system_with_qwen_reports_service_and_spend(tmp_path):
+    from agent.workforce.openai_compat import from_env
+
+    qwen = from_env({"AI_PROVIDER": "qwen", "AI_BASE_URL": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+                     "AI_API_KEY": "sk-secret", "AI_MODEL": "qwen-plus"})
+    app, _, wf = build(tmp_path, chain_on=False, db=None, compat=qwen, ai_env={"AI_DAILY_BUDGET_USD": "1", "AI_MONTHLY_BUDGET_USD": "10"})
+    c = TestClient(app)
+    wf.gateway.record("openai_compat", "qwen-plus", 1000, 200, None)
+    s = c.get("/api/system", headers=H).json()
+    assert s["model"]["configured"] is True and s["model"]["providers"] == ["openai_compat"] and s["model"]["default_model"] is None
+    assert s["model"]["compat"] == {"service": "qwen", "model": "qwen-plus", "host": "dashscope-intl.aliyuncs.com"}
+    assert s["ai_usage"]["daily_budget_usd"] == "1" and s["ai_usage"]["monthly_budget_usd"] == "10"
+    assert s["ai_usage"]["unpriced_calls_this_month"] == 1 and "days" not in s["ai_usage"]
+    assert "sk-secret" not in json.dumps(s)
+    u = c.get("/api/wf/ai-usage", headers=H).json()
+    assert u["days"][0]["model"] == "qwen-plus" and u["days"][0]["calls"] == 1 and u["days"][0]["input_tokens"] == 1000
+    wf.stop()
+

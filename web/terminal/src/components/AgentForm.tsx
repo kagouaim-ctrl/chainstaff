@@ -2,6 +2,7 @@ import { useState } from "react";
 import { post, put } from "../lib/api";
 import { useAction, useMeta } from "../lib/queries";
 import type { Agent } from "../lib/types";
+import { SERVICE } from "../lib/util";
 import { Dialog } from "./ui";
 
 export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose: () => void; onSaved?: (a: Agent) => void }) {
@@ -31,7 +32,7 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
     () => {
       const body = {
         name: f.name, role: f.role, description: f.description, system_prompt: f.system_prompt, provider: f.provider,
-        model: f.provider === "anthropic" ? f.model : "", is_manager: f.is_manager, budget_usd: f.budget_usd || "0",
+        model: f.provider !== "none" ? f.model : "", is_manager: f.is_manager, budget_usd: f.budget_usd || "0",
         model_config: {
           ...(f.effort ? { effort: f.effort } : {}),
           ...Object.fromEntries((["max_tokens", "max_tool_calls", "max_model_calls", "call_timeout_s"] as const).filter((k) => f[k]).map((k) => [k, Number(f[k])])),
@@ -83,21 +84,25 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
           <span>Model provider</span>
           <select className="input" value={f.provider} onChange={(e) => set("provider", e.target.value)}>
             <option value="none">None（只执行技能，不调用模型）</option>
-            <option value="anthropic">Anthropic</option>
+            <option value="anthropic">Anthropic（默认最便宜的 Claude Haiku 5.5）</option>
+            <option value="openai_compat">{meta.data?.engine.compat ? `共享模型 · ${SERVICE[meta.data.engine.compat_service || ""] || "OpenAI 兼容"} · ${meta.data.engine.compat}` : "共享模型（Qwen / Gemini / Groq / OpenRouter / 本地，OpenAI 兼容接口）"}</option>
           </select>
           {f.provider === "anthropic" && !meta.data?.engine.llm && <small className="warn">服务器没有 ANTHROPIC_API_KEY，模型调用不会发生</small>}
+          {f.provider === "openai_compat" && !meta.data?.engine.compat && <small className="warn">服务器没有设置 AI_PROVIDER / AI_BASE_URL / AI_API_KEY / AI_MODEL，模型调用不会发生</small>}
         </label>
-        {f.provider === "anthropic" && (
+        {f.provider !== "none" && (
           <label className="field">
             <span>Model</span>
-            <input className="input mono" value={f.model} placeholder={meta.data?.default_model} onChange={(e) => set("model", e.target.value)} />
+            <input className="input mono" value={f.model}
+              placeholder={(f.provider === "openai_compat" ? meta.data?.engine.compat : meta.data?.default_model) || ""}
+              onChange={(e) => set("model", e.target.value)} />
           </label>
         )}
       </div>
-      {f.provider === "anthropic" && (
+      {f.provider !== "none" && (
         <>
           <div className="grid2">
-            <label className="field">
+            {f.provider === "anthropic" && <label className="field">
               <span>Effort</span>
               <select className="input" value={f.effort} onChange={(e) => set("effort", e.target.value)}>
                 <option value="">default (medium)</option>
@@ -107,7 +112,7 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
                 <option value="xhigh">xhigh</option>
                 <option value="max">max</option>
               </select>
-            </label>
+            </label>}
             <label className="field">
               <span>Max tokens</span>
               <input className="input mono" inputMode="numeric" value={f.max_tokens} onChange={(e) => set("max_tokens", e.target.value.replace(/\D/g, ""))} />

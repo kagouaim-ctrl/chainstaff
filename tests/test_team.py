@@ -492,7 +492,8 @@ def test_translator_draft_edit_post(store):
     TranslatorSettings.validate({"glossary": [{"term": "链工", "translation": "ChainStaff"}], "chats": {"ja": "-100777"}}).save(store)
     d = t.draft(SOURCE, "boss")
     req = claude.requests[0]
-    assert req["model"] == "claude-opus-5-5" and req["fallbacks"] == "default" and req["betas"] == ["server-side-fallback-2026-07-01"]
+    # The cheapest model by default; Claude Haiku 5.5 takes no server-side refusal fallback, so none is sent.
+    assert req["model"] == "claude-haiku-5-5" and "fallbacks" not in req and "betas" not in req
     assert req["output_config"]["format"]["schema"]["required"] == ["en", "ja"]
     assert d["status"] == "draft" and d["warnings"] == ["日本語：术语「链工」应译为「ChainStaff」"]
     assert "/post 1" in t.preview_text(d) and "请核对" in t.preview_text(d)
@@ -721,7 +722,7 @@ def test_api_monitor(c, desk):
 
 def test_api_translator(c, desk):
     t = c.get("/api/translator", headers=H).json()
-    assert t["configured"] and t["model"] == "claude-opus-5-5" and t["languages"]["ja"] == "日本語" and "chat" not in t
+    assert t["configured"] and t["model"] == "claude-haiku-5-5" and t["languages"]["ja"] == "日本語" and "chat" not in t
     assert c.put("/api/translator/settings", json={"languages": ["en"], "tone": "concise"}, headers=H).json()["settings"]["tone"] == "concise"
     assert c.put("/api/translator/settings", json={"tone": "x"}, headers=H).status_code == 400
     d = c.post("/api/translator/drafts", json={"text": "你好"}, headers=H).json()
