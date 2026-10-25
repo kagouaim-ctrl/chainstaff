@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { api, post } from "./api";
 import type {
-  Agent, AgentDetail, Approval, ChainRecord, ChainStatus, LedgerRow, Memory, Meta, Mission, Overview, Preflight, Schedule, Skill, Squad, TaskDetail, TaskPage, Workspace,
+  Agent, AgentDetail, Approval, ChainRecord, ChainStatus, LedgerRow, Memory, Meta, Mission, Overview, Preflight, Schedule, Skill, Squad, SystemInfo, TaskDetail, TaskPage, Workspace,
 } from "./types";
 import { errText, toast } from "./util";
 
@@ -10,6 +10,7 @@ const qs = (params: Record<string, string | number | undefined | null>) =>
   new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "") as [string, string][]).toString();
 
 export const useMeta = () => useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/api/wf/meta"), staleTime: 60_000 });
+export const useSystem = () => useQuery({ queryKey: ["system"], queryFn: () => api<SystemInfo>("/api/system"), staleTime: 60_000 });
 export const useAgents = () => useQuery({ queryKey: ["agents"], queryFn: () => api<Agent[]>("/api/wf/agents") });
 export const useAgent = (id?: string | null) =>
   useQuery({ queryKey: ["agents", id], queryFn: () => api<AgentDetail>(`/api/wf/agents/${id}`), enabled: !!id });

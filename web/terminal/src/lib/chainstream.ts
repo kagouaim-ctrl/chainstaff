@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { queryClient, token } from "./api";
+import { API_BASE, queryClient, token } from "./api";
 import { DEMO, demoChainFeed } from "./demo";
 
 /**
@@ -51,8 +51,9 @@ function connect() {
   if (sock || !users) return;
   state = lastSeq === undefined ? "connecting" : "retrying";
   emit();
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/api/chain/ws`);
+  const origin = API_BASE ? new URL(API_BASE) : location;
+  const proto = origin.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${origin.host}/api/chain/ws`);
   sock = ws;
   ws.onopen = () => ws.send(JSON.stringify({ type: "auth", token: token(), since: lastSeq }));
   ws.onmessage = (e) => {

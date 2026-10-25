@@ -22,6 +22,6 @@ app.kagouai.com {
 
 	reverse_proxy kagou:8000 {
 		flush_interval -1
-		health_uri /healthz
+		health_uri /readyz
 	}
 }

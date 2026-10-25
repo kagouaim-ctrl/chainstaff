@@ -248,6 +248,20 @@ export interface Meta {
   last_message_id: number;
 }
 
+/** GET /api/system: what the server can really do now. The static demo answers with mode "demo". */
+export interface SystemInfo {
+  mode: "live" | "demo";
+  version: string | null;
+  started_at: string | null;
+  database: { engine: string; persistent: boolean; file: string | null };
+  model: { configured: boolean; providers: string[]; default_model: string | null; reason: string | null };
+  chain: { configured: boolean; network: string | null; chain_id: number | null; listener: boolean };
+  explorer_api: boolean;
+  anchor: boolean;
+  writes: { payments: boolean; agent_signing: boolean };
+  auth: { viewer_token: boolean; cors_origins: string[] };
+}
+
 export interface ChainStatus {
   configured: boolean;
   network: string | null;

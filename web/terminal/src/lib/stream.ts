@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { queryClient, token } from "./api";
+import { apiUrl, queryClient, token } from "./api";
 import { DEMO } from "./demo";
+import { markDown, markOk } from "./health";
 import type { Message } from "./types";
 
 /**
@@ -48,9 +49,10 @@ async function run(startAfter: number) {
   while (ctl && !ctl.signal.aborted) {
     setState(lastId ? "retrying" : "connecting");
     try {
-      const r = await fetch(`/api/wf/stream?after=${lastId}`, { headers: { Authorization: "Bearer " + token() }, signal: ctl.signal });
-      if (!r.ok || !r.body) throw new Error(String(r.status));
+      const r = await fetch(apiUrl(`/api/wf/stream?after=${lastId}`), { headers: { Authorization: "Bearer " + token() }, signal: ctl.signal });
+      if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
       setState("live");
+      markOk();
       delay = 1000;
       const reader = r.body.getReader();
       const dec = new TextDecoder();
@@ -73,6 +75,7 @@ async function run(startAfter: number) {
       }
     } catch (e) {
       if (ctl?.signal.aborted) break;
+      markDown(`实时事件流断开（${(e as Error)?.message || "网络错误"}）`);
     }
     setState("retrying");
     await new Promise((res) => setTimeout(res, delay));

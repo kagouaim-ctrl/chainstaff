@@ -2,7 +2,8 @@ import { LogOut, Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, EmptyState, ErrorState, Loading, Seg, Status, Tabs } from "../components/ui";
 import { del, post, put, setToken } from "../lib/api";
-import { useAction, useAgents, useMemory, useMeta, useSchedules, useWorkspaces } from "../lib/queries";
+import { useAction, useAgents, useMemory, useMeta, useSchedules, useSystem, useWorkspaces } from "../lib/queries";
+import { API_BASE } from "../lib/api";
 import type { Memory } from "../lib/types";
 import { DEMO } from "../lib/demo";
 import { fmtTime, go, usePref } from "../lib/util";
@@ -183,6 +184,31 @@ function MemoryForm({ m, onClose }: { m: Memory | null; onClose: () => void }) {
   );
 }
 
+function ServerInfo() {
+  const q = useSystem();
+  if (q.isLoading) return <Loading rows={2} />;
+  if (q.error) return <ErrorState error={q.error} />;
+  const s = q.data!;
+  const live = s.mode === "live";
+  return (
+    <>
+      <div className="label">Server</div>
+      <dl className="kv">
+        <dt>Mode</dt>
+        <dd><span className={`badge ${live ? "ok" : "warn"}`}><span className="dot" />{live ? "Live · 真实后端" : "Demo · 示例快照，不连接服务器"}</span></dd>
+        {live && (
+          <>
+            <dt>Server</dt><dd className="mono">{API_BASE || location.origin}{s.version ? ` · ${s.version}` : ""}</dd>
+            <dt>Database</dt>
+            <dd><span className={`badge ${s.database.persistent ? "ok" : "warn"}`}><span className="dot" />{s.database.persistent ? `SQLite · ${s.database.file}` : "内存数据库：重启后数据丢失"}</span></dd>
+            <dt>Chain writes</dt><dd>{s.writes.payments ? "实盘付款已开启" : "关闭：只读链上数据"} · Agent 不能签名或转账</dd>
+          </>
+        )}
+      </dl>
+    </>
+  );
+}
+
 function System() {
   const meta = useMeta();
   const [density, setDensity] = usePref("density", "compact");
@@ -201,6 +227,7 @@ function System() {
         {row("Etherscan", e.etherscan, "configured", "没有 ETHERSCAN_API_KEY：交易历史技能不可用")}
         {row("Anchor wallet", e.anchor, "BSC testnet signer ready", "没有 CHAINSTAFF_ANCHOR_WALLET：结果哈希不能上链")}
       </dl>
+      <ServerInfo />
       <div className="label">Display</div>
       <div className="row"><span className="dim">Table density</span><Seg value={density} onChange={setDensity} options={[["compact", "Compact"], ["detailed", "Detailed"]]} /></div>
       <div className="label">Session</div>

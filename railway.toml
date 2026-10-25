@@ -1,0 +1,13 @@
+# Railway: prepared, not deployed. Builds the same Dockerfile as deploy/app.kagouai.com/ and needs a volume at /data.
+# Variables to set in Railway: see docs/KAGOU_DEPLOYMENT_GUIDE.md ("Railway"). PORT is set by Railway.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/readyz"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+# One replica: the engine, the listener and the background duties share one SQLite file.
+numReplicas = 1

@@ -32,8 +32,9 @@ const load = () =>
 
 /** The recorded answer for this path; with other filters or pages, the closest recorded variant of the same path. */
 export async function demoGet(path: string): Promise<unknown | undefined> {
-  const { get } = await load();
   const bare = path.split("?")[0];
+  if (bare === "/api/system") return DEMO_SYSTEM;
+  const { get } = await load();
   const key = path in get ? path : bare in get ? bare : Object.keys(get).find((k) => k.split("?")[0] === bare);
   return key === undefined ? undefined : structuredClone(get[key]);
 }
@@ -43,3 +44,17 @@ export async function demoChainFeed(): Promise<Record<string, unknown>[]> {
 }
 
 export const DEMO_READ_ONLY = "演示版只能查看，不能修改。完整版需要连接 KAGOU 服务器。";
+
+// Said by the demo itself, not recorded: nothing here is a running server.
+const DEMO_SYSTEM = {
+  mode: "demo",
+  version: null,
+  started_at: null,
+  database: { engine: "snapshot", persistent: false, file: null },
+  model: { configured: false, providers: [], default_model: null, reason: "演示版没有模型：执行记录来自脚本化模型的示例" },
+  chain: { configured: false, network: null, chain_id: null, listener: false },
+  explorer_api: false,
+  anchor: false,
+  writes: { payments: false, agent_signing: false },
+  auth: { viewer_token: false, cors_origins: [] },
+};

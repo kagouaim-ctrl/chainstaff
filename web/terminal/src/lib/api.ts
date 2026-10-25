@@ -1,5 +1,14 @@
 import { QueryClient } from "@tanstack/react-query";
 import { DEMO, DEMO_READ_ONLY, demoGet } from "./demo";
+import { markDown, markOk, unreachable } from "./health";
+
+/**
+ * Where the KAGOU server is. Empty (the default) means this page's own origin, which is how the server serves the console
+ * at /terminal/. VITE_API_BASE=https://api.example.com builds a console hosted elsewhere; that server must list this
+ * console's origin in KAGOU_CORS_ORIGINS.
+ */
+export const API_BASE = ((import.meta.env.VITE_API_BASE as string | undefined) || "").replace(/\/+$/, "");
+export const apiUrl = (path: string) => API_BASE + path;
 
 // Same token the classic console keeps, so signing in once covers both.
 const KEY = "cs-token";
@@ -46,11 +55,23 @@ export async function api<T = any>(path: string, opt: RequestInit & { json?: unk
     if (found === undefined) throw new ApiError(404, "演示数据里没有这一项");
     return found as T;
   }
-  const r = await fetch(path, {
-    ...rest,
-    body: json !== undefined ? JSON.stringify(json) : rest.body,
-    headers: { Authorization: "Bearer " + memToken, "Content-Type": "application/json", ...(rest.headers || {}) },
-  });
+  let r: Response;
+  try {
+    r = await fetch(apiUrl(path), {
+      ...rest,
+      body: json !== undefined ? JSON.stringify(json) : rest.body,
+      headers: { Authorization: "Bearer " + memToken, "Content-Type": "application/json", ...(rest.headers || {}) },
+    });
+  } catch (e) {
+    if ((e as Error)?.name === "AbortError") throw e;
+    markDown("无法连接 KAGOU 服务器（网络错误）");
+    throw new ApiError(0, "无法连接 KAGOU 服务器");
+  }
+  if (unreachable(r.status)) {
+    markDown(`KAGOU 服务器暂时不可用（HTTP ${r.status}）`);
+    throw new ApiError(r.status, `KAGOU 服务器暂时不可用（HTTP ${r.status}）`);
+  }
+  markOk();
   if (r.status === 401) {
     setToken("");
     throw new ApiError(401, "令牌不对或已失效");
@@ -80,7 +101,7 @@ export async function postOnce<T = any>(p: string, json: unknown, key: string, r
     try {
       return await api<T>(p, { method: "POST", json, headers: { "Idempotency-Key": key } });
     } catch (e) {
-      const retryable = !(e instanceof ApiError) || e.status >= 500; // network failure or server error
+      const retryable = !(e instanceof ApiError) || e.status === 0 || e.status >= 500; // network failure or server error
       if (!retryable || i >= retries) throw e;
       await new Promise((r) => setTimeout(r, 400 * 2 ** i));
     }
@@ -91,7 +112,7 @@ export const del = <T = any>(p: string) => api<T>(p, { method: "DELETE" });
 
 export async function download(path: string, filename: string) {
   if (DEMO) throw new ApiError(403, DEMO_READ_ONLY);
-  const r = await fetch(path, { headers: { Authorization: "Bearer " + memToken } });
+  const r = await fetch(apiUrl(path), { headers: { Authorization: "Bearer " + memToken } });
   if (!r.ok) throw new ApiError(r.status, "导出失败");
   const url = URL.createObjectURL(await r.blob());
   const a = Object.assign(document.createElement("a"), { href: url, download: filename });
@@ -101,6 +122,6 @@ export async function download(path: string, filename: string) {
 
 export const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 5_000, refetchOnWindowFocus: false, retry: (n, e) => !(e instanceof ApiError && e.status < 500) && n < 2 },
+    queries: { staleTime: 5_000, refetchOnWindowFocus: false, retry: (n, e) => !(e instanceof ApiError && e.status > 0 && e.status < 500) && n < 2 },
   },
 });
