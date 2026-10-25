@@ -17,7 +17,8 @@ import time
 
 def commands(env: dict) -> dict[str, list[str]]:
     port = env.get("PORT", "8000")
-    cmds = {"api": [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", port, "--proxy-headers", "--forwarded-allow-ips", "*"]}
+    cmds = {"api": [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", port, "--workers", "1",
+                    "--timeout-graceful-shutdown", "10", "--proxy-headers", "--forwarded-allow-ips", "*"]}
     if env.get("KAGOU_WORKER", "1") != "0":
         cmds["worker"] = [sys.executable, "-m", "agent.autonomy.worker"]
     return cmds

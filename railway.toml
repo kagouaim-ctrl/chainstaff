@@ -9,5 +9,5 @@ healthcheckPath = "/readyz"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
-# One replica: the engine, the listener and the background duties share one SQLite file.
+# One replica: the API, the agent worker, the listener and the background duties share one SQLite file.
 numReplicas = 1

@@ -24,6 +24,8 @@ jobs:
         run: |
           python tests/support/scripted_chat_server.py 18999 &
           AI_PROVIDER=local AI_BASE_URL=http://127.0.0.1:18999/v1 AI_MODEL=scripted python scripts/ai_check.py --sim-chain --wait 60 --out ai-check-mock.json
+      - name: Autonomous agents end to end (API + separate worker process + scripted model endpoint, a mock; worker killed mid-run)
+        run: python scripts/autonomy_check.py --out autonomy-check-mock.json
       - name: Dependency vulnerability scan
         run: pip-audit --skip-editable
       - name: Static security scan

@@ -69,6 +69,40 @@ python scripts/ai_check.py --url https://<railway 域名> --token <控制台令�
 
 它建 4 个 Agent（Mission Coordinator、BSC Analyst、On-chain Monitor、Research Agent），让 BSC Analyst 用工具查一个真实地址的余额，再让团队完成一个多 Agent Mission，输出每一步的模型调用、Token、成本和工具调用。也可以在 GitHub Actions 里手动运行 `ai-check` 工作流（需要先在仓库 Settings → Secrets and variables → Actions 加 `AI_API_KEY`，以及 `AI_PROVIDER`、`AI_BASE_URL`、`AI_MODEL` 变量）。
 
+## 自主 Agent（ChainStaff 的 Worker）
+
+镜像的启动命令是 `python -m agent.autonomy.supervise`：同一个容器里跑两个进程，API（uvicorn）和 Agent Worker（`python -m agent.autonomy.worker`），哪个退出就重启哪个（1 秒起步、指数退避到 60 秒）。两个进程共用 `/data` 上的同一个 SQLite 文件；Worker 每隔几秒写一次心跳，Overview 的 Runtime Health 和 Settings → Runtime 显示的就是这个心跳。没有在线 Worker 时页面会直接说"没有在线的 Worker：Agent 不会被唤醒"，不会显示假在线。
+
+Agent 被唤醒后要调用模型，所以必须配好上面的 `AI_PROVIDER` / `AI_API_KEY`（或 `ANTHROPIC_API_KEY`），否则任务会失败并写明原因。
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `KAGOU_WORKER` | `1` | `0`：只跑 API，不跑 Worker（例如 Worker 单独部署时） |
+| `KAGOU_DATA_DIR` | 数据库所在目录（镜像里是 `/data`） | 每个任务的隔离副本放在 `<目录>/sandboxes`，任务结束后清理 |
+| `KAGOU_LOCAL_REPO_ROOTS` | 空（不允许本地仓库） | 允许作为 Workspace 仓库的本地目录，多个用 `:` 分隔。补丁获批后只会应用到这些目录下的仓库 |
+| `KAGOU_GITHUB_TOKEN` | 空 | GitHub 仓库：克隆私有仓库、推送修复分支、开 **Draft** PR。只需要目标仓库的 Contents 读写和 Pull requests 读写；Agent 不会合并 PR，也拿不到这个令牌（只在 git 命令的环境变量里，不进模型上下文） |
+| `KAGOU_ALLOW_PRIVATE_HTTP` | `0` | `1`：允许 API 健康检查访问内网地址（默认拒绝，防 SSRF） |
+| `KAGOU_TASK_BUDGET_USD` | `0.5` | 单个任务默认的模型预算；Agent 和 Mission 还可以各自设上限，全局还有上面的 `AI_DAILY_BUDGET_USD` |
+| `KAGOU_MAX_DELEGATION_DEPTH` | `4` | 委派链最长几层（1–10） |
+| `KAGOU_MAX_DELEGATIONS_PER_HOUR` | `30` | 每个 Agent 每小时最多委派几次 |
+| `KAGOU_MAX_EVENT_RUNS_PER_HOUR` | `20` | 每个 Agent 每小时最多被事件唤醒几次 |
+| `KAGOU_MAX_FIXES_PER_ISSUE` | `2` | 同一个问题（指纹）最多尝试修复几次 |
+| `KAGOU_TASK_MAX_ATTEMPTS` | `2` | 任务被中断（Worker 崩溃、租约过期）后最多重跑几次 |
+| `KAGOU_TASK_TIMEOUT_S` | `1800` | 任务的默认截止时间 |
+| `KAGOU_RUN_MAX_MODEL_CALLS` / `KAGOU_RUN_MAX_TOOL_CALLS` | `16` / `30` | 一次运行最多几次模型调用 / 工具调用 |
+| `KAGOU_WORKER_CONCURRENCY` / `KAGOU_AGENT_CONCURRENCY` | `4` / `1` | Worker 同时跑几个任务；每个 Agent 默认同时跑几个 |
+| `KAGOU_LEASE_S` / `KAGOU_HEARTBEAT_S` / `KAGOU_WORKER_STALE_S` | `60` / `5` / `30` | 任务租约、心跳间隔、多久没心跳算离线。Worker 崩溃后，租约过期的任务由下一个 Worker 接手 |
+
+隔离副本里跑测试时：环境变量清空（不带任何密钥），能用 `unshare` 时断网，有 CPU、内存、文件大小和进程数限制。容器平台不允许非特权用户命名空间时不会断网，Settings → Runtime 会显示 `network_isolated: false`。
+
+部署后的端到端检查（不需要模型密钥，用的是脚本化的模拟模型，结果里会写明）：
+
+```bash
+python scripts/autonomy_check.py --out autonomy-check.json
+```
+
+它在本机起 API、独立的 Worker 进程和模拟模型服务，跑完整的 Bug 流程（日志 → 监控 Agent → 调查 Agent → 修复 Agent → 隔离环境测试 → 待审核补丁 → 通过 API 批准 → 验证任务），重复日志去重，再在任务运行中用 SIGKILL 杀掉 Worker，验证新 Worker 接手并完成任务。配好模型后加 `--real-model` 用真实模型跑同样的流程。
+
 ## 方案 B：自己的服务器（Docker Compose + Caddy）
 
 见 [deploy-kagou.md](deploy-kagou.md)。新增的环境变量（`KAGOU_DEMO_TOKEN`、`KAGOU_CORS_ORIGINS`、`KAGOU_VERSION`）已写进 `deploy/app.kagouai.com/kagou.env.example`。镜像的 `HEALTHCHECK` 和 Caddy 的 `health_uri` 已改为 `/readyz`（检查数据库可读）。
