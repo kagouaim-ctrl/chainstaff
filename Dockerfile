@@ -28,8 +28,10 @@ ENV CHAINSTAFF_DB=/data/kagou.db \
 VOLUME ["/data"]
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status == 200 else 1)"
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:%s/readyz' % __import__('os').environ.get('PORT', '8000'), timeout=4).status == 200 else 1)"
 # The console edits the policy file in place (atomic replace in its folder), so it lives on the data volume. First start
 # seeds it from the example (placeholder owner, no live wallet: test mode). Edit it before anyone relies on approvals.
 # One worker: the engine, the listener and the background duties are in-process singletons sharing one SQLite file.
-CMD ["sh", "-c", "[ -f \"$CHAINSTAFF_POLICY\" ] || cp config/policy.example.json \"$CHAINSTAFF_POLICY\"; exec uvicorn backend.app:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips '*'"]
+# PORT: platforms such as Railway assign one; 8000 otherwise. A data folder that is not writable stops the start with a
+# clear message instead of running on a database that cannot persist.
+CMD ["sh", "-c", "d=$(dirname \"$CHAINSTAFF_DB\"); touch \"$d/.write-test\" 2>/dev/null && rm -f \"$d/.write-test\" || { echo \"KAGOU: $d is not writable by uid $(id -u); the database would not persist\" >&2; exit 1; }; [ -f \"$CHAINSTAFF_POLICY\" ] || cp config/policy.example.json \"$CHAINSTAFF_POLICY\"; exec uvicorn backend.app:app --host 0.0.0.0 --port \"${PORT:-8000}\" --workers 1 --timeout-graceful-shutdown 10 --proxy-headers --forwarded-allow-ips '*'"]

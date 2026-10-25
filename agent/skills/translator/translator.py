@@ -13,9 +13,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable
 
 from agent.store import Store
+from agent.workforce.models import DEFAULT_MODEL as MODEL, anthropic_extras  # the cheapest Claude model unless configured
 
 ROLE = "announcement_translator"
-MODEL = "claude-opus-5-5"
 LANGS = {
     "en": "English",
     "ja": "日本語",
@@ -184,8 +184,7 @@ class Translator:
         response = self.client_factory().beta.messages.create(
             model=self.model,
             max_tokens=16000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
+            **anthropic_extras(self.model),
             output_config={"effort": "medium", "format": {"type": "json_schema", "schema": schema}},
             system=system,
             messages=[{"role": "user", "content": user}],

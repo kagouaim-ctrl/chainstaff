@@ -92,6 +92,11 @@ def mount_workforce(app: FastAPI, wf: Workforce, auth: Callable, owner: str, cha
 
     # ---- meta ----
 
+    @app.get("/api/wf/ai-usage", dependencies=A)
+    def ai_usage(days: int = 31) -> dict:
+        """Model spend per UTC day, provider and model, with the budgets and limits in force."""
+        return wf.gateway.usage(days=max(1, min(days, 366)))
+
     @app.get("/api/wf/meta", dependencies=A)
     def meta() -> dict:
         return {"providers": list(PROVIDERS), "permissions": ALL_PERMISSIONS, "squad_permissions": SQUAD_PERMISSIONS, "task_statuses": list(D.TASK_STATUSES),

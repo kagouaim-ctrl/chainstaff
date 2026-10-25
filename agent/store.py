@@ -213,6 +213,7 @@ class _SerializedConnection:
 class Store:
     def __init__(self, path: str | Path = ":memory:") -> None:
         self._lock = threading.RLock()
+        self.path = str(path)
         conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
         conn.row_factory = sqlite3.Row
         self._db = _SerializedConnection(conn, self._lock)
@@ -222,6 +223,10 @@ class Store:
         if "employee" not in {r["name"] for r in self._db.execute("PRAGMA table_info(events)").fetchall()}:
             self._db.execute("ALTER TABLE events ADD COLUMN employee TEXT NOT NULL DEFAULT ''")
             self._db.execute("CREATE INDEX IF NOT EXISTS events_employee ON events(employee, id)")
+
+    def ping(self) -> None:
+        """Raises if the database cannot be read (readiness probe)."""
+        self._db.execute("SELECT 1")
 
     # ---- writes ----
 

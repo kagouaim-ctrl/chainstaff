@@ -296,3 +296,25 @@ def test_polling_survives_a_node_error():
     finally:
         lst.stop()
     assert threading.active_count() >= 1
+
+
+def test_token_balance_reads_any_bep20_balance():
+    def sel(sig):
+        return "0x" + keccak(text=sig)[:4].hex()
+
+    answers = {sel("name()"): encode(["string"], ["Tether USD"]), sel("symbol()"): encode(["string"], ["USDT"]),
+               sel("decimals()"): encode(["uint8"], [18]), sel("totalSupply()"): encode(["uint256"], [10**24]),
+               sel("balanceOf(address)"): encode(["uint256"], [25 * 10**17])}
+
+    def call(c, tag):
+        return "0x" + answers.get(c["data"][:10], b"").hex() if c["to"].lower() == TOKEN.lower() else "0x"
+
+    ctx = ctx_of(eth_call=call, eth_blockNumber="0x64")
+    out = run_tool("token_balance", ctx, {"address": WALLET, "token": TOKEN})
+    assert out == {"address": WALLET.lower(), "token": TOKEN.lower(), "symbol": "USDT", "decimals": 18, "balance": "2.5",
+                   "block": 100, "network": "bsc-testnet"}
+    with pytest.raises(SkillError, match="不是标准 BEP-20"):
+        run_tool("token_balance", ctx, {"address": WALLET, "token": WALLET})
+    del answers[sel("balanceOf(address)")]
+    with pytest.raises(SkillError, match="balanceOf 调用失败"):
+        run_tool("token_balance", ctx, {"address": WALLET, "token": TOKEN})

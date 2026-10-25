@@ -21,7 +21,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
+from urllib.parse import urlsplit
 
 from agent.config import ChainConfig
 from agent.front_desk import FrontDesk
@@ -55,6 +57,24 @@ def _when(v: str | None) -> datetime | None:
     return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
 
 
+def cors_origins(value: str | None) -> list[str]:
+    """KAGOU_CORS_ORIGINS: comma-separated exact origins allowed to call the API from another site, e.g. a console
+    hosted apart from this server. Empty means same-origin only, which is all the bundled console needs. No wildcard:
+    every origin that may hold a console token is named."""
+    out = []
+    for o in (value or "").split(","):
+        o = o.strip().rstrip("/")
+        if not o:
+            continue
+        u = urlsplit(o)
+        if o == "*" or u.scheme not in ("https", "http") or not u.netloc or u.path or u.query or u.fragment:
+            raise RuntimeError(f"KAGOU_CORS_ORIGINS: {o!r} is not an origin like https://app.kagouai.com")
+        if u.scheme == "http" and u.hostname not in ("localhost", "127.0.0.1"):
+            raise RuntimeError(f"KAGOU_CORS_ORIGINS: {o!r} must use https (http only for localhost)")
+        out.append(o)
+    return out
+
+
 def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | None = None, env: dict | None = None,
                desk: FrontDesk | None = None, sybil_background: bool = True, workforce: Workforce | None = None,
                chain_service: ChainService | None = None, viewer_token: str | None = None) -> FastAPI:
@@ -63,11 +83,22 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     if viewer_token and (len(viewer_token) < 16 or viewer_token == token):
         raise RuntimeError("KAGOU_DEMO_TOKEN must be at least 16 characters and differ from the console token")
     env = dict(os.environ if env is None else env)
+    origins = cors_origins(env.get("KAGOU_CORS_ORIGINS"))
     store = employee.store
     desk = desk or FrontDesk(employee)
     team: Team = desk.team
     started = datetime.now(timezone.utc)
     app = FastAPI(title="ChainStaff console", docs_url=None, redoc_url=None)
+    if origins:
+        # Bearer tokens, no cookies: credentials stay off, so a listed origin can only use a token its user pasted.
+        app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+                           allow_headers=["Authorization", "Content-Type", "Idempotency-Key"], max_age=600)
+
+    def origin_ok(origin: str | None, host: str | None) -> bool:
+        """For the WebSocket, which CORS does not cover: no Origin (not a browser), this server's own host, or a listed one."""
+        if not origin:
+            return True
+        return urlsplit(origin).netloc == (host or "") or origin.rstrip("/") in origins
 
     def is_viewer(given: str) -> bool:
         return bool(viewer_token) and hmac.compare_digest(given.strip().encode(), viewer_token.encode())
@@ -118,12 +149,45 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
         """Liveness for the container and the reverse proxy. No auth and nothing private: just that the app answers."""
         return {"ok": True}
 
+    @app.get("/readyz")
+    def readyz() -> Response:
+        """Readiness: the database answers. Unauthenticated, so it says nothing beyond ready or not."""
+        try:
+            store.ping()
+        except Exception:
+            return JSONResponse({"ok": False}, status_code=503)
+        return JSONResponse({"ok": True})
+
+    @app.get("/api/system", dependencies=[Depends(auth)])
+    def system() -> dict:
+        """What this server can really do right now, so the console never implies a capability it lacks.
+        Live mode only: the static demo answers this from its snapshot with mode=demo."""
+        wf = app.state.workforce
+        persistent = store.path not in ("", ":memory:")
+        return {
+            "mode": "live",
+            "version": env.get("KAGOU_VERSION") or None,
+            "started_at": started.isoformat(),
+            "database": {"engine": "sqlite", "persistent": persistent, "file": Path(store.path).name if persistent else None},
+            "model": {"configured": bool(wf.runtime.providers), "providers": sorted(wf.runtime.providers),
+                      "default_model": wf.planner.model if wf.llm else None,
+                      "compat": {"service": wf.compat.label, "model": wf.compat.model, "host": wf.compat.host} if wf.compat else None,
+                      "reason": None if wf.runtime.providers else "服务器没有设置 AI_PROVIDER / AI_API_KEY（或 ANTHROPIC_API_KEY），Agent 不能调用模型"},
+            "ai_usage": {k: v for k, v in wf.gateway.usage(days=0).items() if k != "days"},
+            "chain": {"configured": chain is not None, "network": chain.network if chain else None,
+                      "chain_id": chain.chain_id if chain else None, "listener": chain_service is not None},
+            "explorer_api": wf.etherscan is not None,
+            "anchor": wf.anchor is not None,
+            "writes": {"payments": bool(employee.executor.live), "agent_signing": False},
+            "auth": {"viewer_token": bool(viewer_token), "cors_origins": origins},
+        }
+
     # The AI workforce terminal: agents, workspaces, tasks, approvals, on-chain records.
     app.state.workforce = workforce or Workforce(store)
     mount_workforce(app, app.state.workforce, auth, OWNER_ID, chain)
     # BSC realtime data layer: status, monitors, events, and the live WebSocket.
     app.state.chain = chain_service
-    mount_chain(app, chain_service, auth, token_ok)
+    mount_chain(app, chain_service, auth, token_ok, origin_ok=origin_ok)
 
     # ---- status and overview ----
 

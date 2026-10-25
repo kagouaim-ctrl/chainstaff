@@ -1,6 +1,6 @@
 # KAGOU — Real-Time On-Chain Multi-Agent Platform
 
-BNB Chain 上的实时多 Agent 平台，由 ChainStaff（链工）整合升级而来。核心是 AI 员工平台（Agent Runtime、Mission 调度、Tool Registry）和 BSC 实时数据层（多节点 RPC 池、WebSocket 新区块监听、重组处理、链上事件监控），控制台是 `web/terminal/`（KAGOU Console）。整合说明见 [docs/KAGOU_INTEGRATION_REPORT.md](docs/KAGOU_INTEGRATION_REPORT.md)。
+BNB Chain 上的实时多 Agent 平台，由 ChainStaff（链工）整合升级而来。核心是 AI 员工平台（Agent Runtime、Mission 调度、Tool Registry）和 BSC 实时数据层（多节点 RPC 池、WebSocket 新区块监听、重组处理、链上事件监控），控制台是 `web/terminal/`（KAGOU Console）。整合说明见 [docs/KAGOU_INTEGRATION_REPORT.md](docs/KAGOU_INTEGRATION_REPORT.md)；生产化进度见 [路线图](docs/KAGOU_PRODUCTION_ROADMAP.md)、[架构](docs/KAGOU_ARCHITECTURE.md)、[实施报告](docs/KAGOU_IMPLEMENTATION_REPORT.md)、[部署指南](docs/KAGOU_DEPLOYMENT_GUIDE.md)。
 
 默认只读链上数据。Agent 不能自己转移资产、不能自己签交易；私钥和助记词不会交给模型；模型调用只在后端。KAGOU 没有 Telegram：没有机器人、群聊、通知或 webhook，预警和报告只在控制台里。
 

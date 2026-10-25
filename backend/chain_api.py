@@ -21,7 +21,8 @@ AUTH_TIMEOUT_S = 5.0
 WS_TOPICS = {"block", "event", "event.confirmed", "event.reorged", "reorg", "gap", "status", "trigger", "trigger.error", "resync"}
 
 
-def mount_chain(app: FastAPI, svc: ChainService | None, auth: Callable, token_ok: Callable[[str], bool], write: Callable | None = None) -> None:
+def mount_chain(app: FastAPI, svc: ChainService | None, auth: Callable, token_ok: Callable[[str], bool], write: Callable | None = None,
+                origin_ok: Callable[[str | None, str | None], bool] | None = None) -> None:
     A = [Depends(auth)]
     W = [Depends(auth)] + ([Depends(write)] if write else [])
 
@@ -85,6 +86,9 @@ def mount_chain(app: FastAPI, svc: ChainService | None, auth: Callable, token_ok
 
     @app.websocket("/api/chain/ws")
     async def ws(sock: WebSocket) -> None:
+        if origin_ok and not origin_ok(sock.headers.get("origin"), sock.headers.get("host")):
+            await sock.close(code=4403)  # a page on another site; CORS does not apply to WebSockets
+            return
         await sock.accept()
         try:
             first = json.loads(await asyncio.wait_for(sock.receive_text(), AUTH_TIMEOUT_S))

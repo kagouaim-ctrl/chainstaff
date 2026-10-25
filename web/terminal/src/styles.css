@@ -803,6 +803,7 @@ pre.code {
   :root { --row-h: 44px; }
   body { overflow: hidden; }
   .app { grid-template-rows: 52px minmax(0, 1fr) auto; height: 100dvh; }
+  .conn-down { top: 52px; padding: var(--space-2) var(--space-4); font-size: var(--text-xs); }
   .head { padding: 0 var(--space-2) 0 var(--space-4); }
   .brand { margin-right: 0; }
   .nav, .d-only, .head .search { display: none !important; }
@@ -894,6 +895,10 @@ button.pick-row { cursor: pointer; }
 .squad-item .sq-act { opacity: 0; transition: opacity var(--dur-hover); }
 .squad-item:hover .sq-act, .squad-item:focus-within .sq-act { opacity: 1; }
 .all-clear { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-5) var(--space-3); font-size: var(--text-xs); color: var(--text-secondary); }
+/* Over the page, under the header: the grid rows stay as they are while the server is unreachable. */
+.conn-down { position: fixed; top: var(--head-h); left: 0; right: 0; z-index: 60; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-5); font-size: var(--text-sm); color: var(--text-primary); background: color-mix(in srgb, var(--status-danger) 16%, var(--bg-primary)); box-shadow: inset 0 -1px 0 var(--status-danger-border); }
+.conn-down > svg { color: var(--status-danger); flex: none; }
+.pill.warn-pill { color: var(--status-warning, #f0b90b); border-color: currentColor; cursor: pointer; }
 .banner { display: flex; align-items: center; gap: var(--space-2); margin: 0 var(--space-5) var(--space-2); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--text-regular); background: var(--bg-secondary); flex: none; }
 
 /* ================= composer preflight ================= */

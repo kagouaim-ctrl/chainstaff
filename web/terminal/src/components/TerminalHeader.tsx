@@ -3,7 +3,7 @@ import { Activity, Bell, ChevronDown, LogOut, Search, Settings, ShieldCheck, Squ
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, setToken } from "../lib/api";
 import { DEMO } from "../lib/demo";
-import { useAgentName, useAgents, useApprovals, useChain, useMissions } from "../lib/queries";
+import { useAgentName, useAgents, useApprovals, useChain, useMeta, useMissions } from "../lib/queries";
 import { useStreamState } from "../lib/stream";
 import type { Message } from "../lib/types";
 import { ago, go, num, short, usePref, type Route } from "../lib/util";
@@ -68,11 +68,22 @@ function DemoPill() {
         演示 · 示例数据
       </span>
     );
-  if (s.data?.role !== "viewer") return null;
+  if (s.data?.role !== "viewer") return <ModelPill />;
   return (
     <span className="pill demo" title="演示账号：可以查看所有页面，不能修改任何内容">
       演示 · 只读
     </span>
+  );
+}
+
+// Live mode without a model key: agents cannot reason, and the console says so rather than letting it pass unnoticed.
+function ModelPill() {
+  const meta = useMeta();
+  if (!meta.data || meta.data.engine.llm || meta.data.engine.compat) return null;
+  return (
+    <button className="pill warn-pill d-only" onClick={() => go("settings")} title="服务器没有配置模型（ANTHROPIC_API_KEY 或 KAGOU_OPENAI_COMPAT_*）：Agent 不调用模型，主管只用规则拆分">
+      Model off
+    </button>
   );
 }
 

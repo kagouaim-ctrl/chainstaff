@@ -35,6 +35,8 @@ from agent.store import Store, _iso
 from . import db as D
 from .cron import Cron
 from .db import WorkforceDB
+from .gateway import Gateway
+from .models import DEFAULT_MODEL
 from . import chaintools  # noqa: F401 - registers the extra read-only chain tools
 from .chain import Cancelled
 from .planner import Planner, PlanCancelled, PlanError
@@ -43,7 +45,7 @@ from .skills import ADDRESS_RE, AGENT_TASK, PERMISSIONS, REGISTRY, SKILL_BY_ID, 
 
 EXTRA_PERMISSIONS = {"message:peers": "可以直接给同工作区的其他员工发消息"}
 ALL_PERMISSIONS = {**PERMISSIONS, **EXTRA_PERMISSIONS}
-PROVIDERS = ("none", "anthropic")
+PROVIDERS = ("none", "anthropic", "openai_compat")
 AUDIT = "workforce"
 
 # Squad policy. Each one changes what the engine does for the squad's missions.
@@ -88,16 +90,23 @@ class Workforce:
                  tokens: dict[str, tuple[str, int]] | None = None, llm: Callable[[], Any] | None = None,
                  anchor=None, max_workers: int = 4, msg_timeout_s: int = 300,
                  price_per_mtok: tuple[Decimal, Decimal] | None = None, plan_timeout_s: float = 60.0, plan_retries: int = 2,
-                 plan_workers: int = 2) -> None:
+                 plan_workers: int = 2, compat=None, ai_env: dict | None = None, default_model: str | None = None) -> None:
         self.store = store
         self.db = WorkforceDB(store)
         self.reader = reader
         self.etherscan = etherscan
         self.tokens = tokens or {}
-        self.planner = Planner(llm, price_per_mtok, timeout_s=plan_timeout_s, retries=plan_retries)
+        self.planner = Planner(llm, price_per_mtok, model=default_model or DEFAULT_MODEL, timeout_s=plan_timeout_s, retries=plan_retries, compat=compat)
         self.llm = llm
-        # Agents that reason with a model run here; one provider per configured model API (only Anthropic today).
-        self.runtime = AgentRuntime(self, {"anthropic": AnthropicProvider(llm)} if llm else {}, price_per_mtok)
+        self.compat = compat
+        # Agents that reason with a model run here; one provider per configured model API.
+        providers: dict = {"anthropic": AnthropicProvider(llm)} if llm else {}
+        if compat:
+            providers["openai_compat"] = compat
+        self.runtime = AgentRuntime(self, providers, price_per_mtok)
+        # Every model call (agent runs and planning) goes through the gateway: budgets, concurrency, circuit breaker.
+        self.gateway = Gateway.from_env(self.db, ai_env or {})
+        self.planner.gateway = self.gateway
         self.anchor = anchor
         self.events = None  # set by the BSC listener (agent.bsc) when it runs; chain tools query it
         self.msg_timeout = timedelta(seconds=msg_timeout_s)
@@ -172,6 +181,8 @@ class Workforce:
         f = self._clean_agent(body)
         if f.get("provider") == "anthropic" and not f.get("model"):
             f["model"] = self.planner.model
+        if f.get("provider") == "openai_compat" and not f.get("model") and self.compat:
+            f["model"] = self.compat.model
         a = self.db.add_agent(**f)
         self._audit(f"创建员工 {a['name']}（{a['id']}）", by, {"agent": a["id"]})
         return a
@@ -608,13 +619,15 @@ class Workforce:
                 add("capacity", "warn", "所有能执行的员工都在满负荷，新任务会排队等他们空出来")
 
         # How the manager will plan, and whether that plan can work for this goal.
-        uses_model = bool(manager and manager["provider"] == "anthropic" and self.llm)
+        uses_model = self.planner.ready(manager)
         out["planner"] = "model" if uses_model else "rules"
         if manager and manager["provider"] == "anthropic" and not self.llm:
             add("planner_model", "warn", "主管配置了 Anthropic，但服务器没有 ANTHROPIC_API_KEY，会改用规则规划")
+        if manager and manager["provider"] == "openai_compat" and not self.compat:
+            add("planner_model", "warn", "主管配置了 OpenAI 兼容模型，但服务器没有设置 KAGOU_OPENAI_COMPAT_*，会改用规则规划")
         rule_able = [a for a in able if any(self.can_run(a, s) is None for s in RULE_SKILLS)]
         if uses_model:
-            add("planner", "ok", f"主管用模型（{manager['model'] or self.planner.model}）拆分任务")
+            add("planner", "ok", f"主管用模型（{manager['model'] or (self.compat.model if manager['provider'] == 'openai_compat' else self.planner.model)}）拆分任务")
         elif text.strip() and not ADDRESS_RE.search(text):
             add("planner", "error", "没有模型时，主管只能拆分带 0x 地址的链上分析任务；在目标里写上地址，"
                                     "或给主管配置 Anthropic 模型（并在服务器设置 ANTHROPIC_API_KEY）", "configure_manager")
@@ -1090,7 +1103,7 @@ class Workforce:
             return g is None or g["status"] != D.RUNNING or (g["plan_claim"] or {}).get("attempt") != attempt
 
         broke = self.over_budget(manager)
-        if broke and manager["provider"] == "anthropic" and self.llm:
+        if broke and self.planner.ready(manager):
             self.db.post(workspace_id=wid, kind="system", event="plan.note", task_id=goal["id"], sender=manager["id"],
                          text=f"{manager['name']} {broke}，这次不调用模型，改用规则规划")
         try:
@@ -1352,7 +1365,7 @@ class Workforce:
                 ctx.deadline = time.monotonic() + skill.timeout_s
                 out = skill.run(ctx, dict(t["input"]))
             ctx.check()
-            if t["skill"] == "data_report" and agent["provider"] == "anthropic" and self.llm and self.over_budget(agent) is None:
+            if t["skill"] == "data_report" and self.planner.ready(agent) and self.over_budget(agent) is None:
                 summary, usage = self.planner.summarize(agent, out["report_md"])
                 self._charge(t["id"], agent_id, usage)
                 ctx.check()
@@ -1844,7 +1857,8 @@ class Workforce:
             "cost_usd": round(goals_cost["c"], 6), "tokens": int(goals_cost["t"]),
             "series": [{"hour": r["h"], "status": r["status"], "n": r["n"]} for r in series],
             "performance": sorted(agents, key=lambda a: -(a["tasks_completed"] or 0))[:10],
-            "engine": {"llm": self.llm is not None, "chain": self.reader is not None, "etherscan": self.etherscan is not None,
+            "engine": {"llm": self.llm is not None, "compat": self.compat.model if self.compat else None,
+                       "compat_service": self.compat.label if self.compat else None, "chain": self.reader is not None, "etherscan": self.etherscan is not None,
                        "anchor": self.anchor is not None, "planner": self.planner.label()},
         }
 

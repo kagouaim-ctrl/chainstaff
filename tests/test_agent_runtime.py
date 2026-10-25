@@ -20,7 +20,8 @@ from agent.store import Store
 from agent.workforce import Workforce
 from agent.workforce import db as D
 from agent.workforce.chain import ChainReader
-from agent.workforce.runtime import AnthropicProvider, Limits, price_of
+from agent.workforce.models import price_of
+from agent.workforce.runtime import AnthropicProvider, Limits
 from agent.workforce.skills import REGISTRY, Skill, SkillContext
 from test_workforce import EOA, TOKEN, FakeChain
 
@@ -155,7 +156,8 @@ def test_agent_reasons_calls_tools_reads_real_results_and_answers():
         # tools offered = the agent's own read tools; system prompt carries the runtime rules; key never in the request
         assert sorted(t["name"] for t in llm.requests[0]["tools"]) == ["contract_analysis", "wallet_analysis"]
         assert "You can only read" in llm.requests[0]["system"]
-        assert "fallbacks" in llm.requests[0] and llm.options == {"timeout": 120.0, "max_retries": 0}
+        # default model is Claude Haiku 5.5, which takes no refusal fallback
+        assert llm.requests[0]["model"] == "claude-haiku-5-5" and "fallbacks" not in llm.requests[0] and llm.options == {"timeout": 120.0, "max_retries": 0}
         # every step is on the timeline, in order
         names = [m["event"] for m in evs(wf, g["id"])]
         for e in ("model.start", "agent.delta", "model.done", "tool.call", "tool.result", "tool.done", "task.completed"):
@@ -377,7 +379,8 @@ def test_manager_plans_parallel_agents_that_share_results_with_a_summarizer():
         assert all(x["status"] == D.COMPLETED for x in subs.values())
         # each agent used its own model and its own tools
         by_key = {next(k for k in llm.routes if k in r["messages"][0]["content"]): r for r in llm.requests if len(r["messages"]) == 1}
-        assert by_key["contract side"]["model"] == "claude-sonnet-5-5" and by_key["wallet side"]["model"] == "claude-opus-5-5"
+        assert by_key["contract side"]["model"] == "claude-sonnet-5-5" and by_key["wallet side"]["model"] == "claude-haiku-5-5"
+        assert by_key["contract side"]["fallbacks"] == "default" and "fallbacks" not in by_key["wallet side"]
         assert [t["name"] for t in by_key["wallet side"]["tools"]] == ["wallet_analysis"]
         assert "tools" not in by_key["Combine"]
         # the summarizer was handed both upstream answers (shared, authorized mission context)

@@ -30,24 +30,13 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Callable, Protocol
 
 from .chain import Cancelled
+from .models import anthropic_extras, cost_of
 from .planner import _retryable
 from .skills import SKILL_BY_ID, SkillContext, SkillError, SkillTimeout, validate
 
 if TYPE_CHECKING:  # pragma: no cover
     from .engine import Workforce
 
-DEFAULT_MODEL = "claude-opus-5-5"
-# USD per million tokens (input, output) on the Claude API; CHAINSTAFF_MODEL_PRICE overrides all of them.
-PRICES: dict[str, tuple[Decimal, Decimal]] = {
-    "claude-fable-5-1": (Decimal(10), Decimal(50)),
-    "claude-fable-5": (Decimal(10), Decimal(50)),
-    "claude-opus-5-5": (Decimal(4), Decimal(20)),
-    "claude-opus-5": (Decimal(5), Decimal(25)),
-    "claude-opus-4-8": (Decimal(5), Decimal(25)),
-    "claude-sonnet-5-5": (Decimal(2), Decimal(10)),
-    "claude-sonnet-5": (Decimal(2), Decimal(10)),
-    "claude-haiku-5-5": (Decimal("0.1"), Decimal("0.5")),
-}
 MAX_RESULT_CHARS = 6000  # one tool result as the model reads it; the full result stays on the timeline
 DELTA_EVERY_S = 0.4  # how often streamed text is written to the timeline
 
@@ -58,7 +47,9 @@ You are one agent on KAGOU, a multi-agent platform for BNB Smart Chain. You work
 - You can only read. You cannot sign, send or approve transactions, move funds, or ask for keys. If the task needs that, say so.
 - Call several tools in one turn when they do not depend on each other.
 - When a tool fails, decide whether another tool or other input can still answer; do not repeat the same failing call.
-- Finish with a concise answer in the task's language: what you found, the evidence (tool and value), and what is uncertain.
+- Finish with a concise answer in the task's language, in three labelled parts: on-chain facts (each with the tool, the value
+  and the block it was read at), statistics (what you computed from tool results, and how), and inferences (your own
+  judgement, marked as such, with what is uncertain). Never present an inference as an on-chain fact.
 """.strip()
 
 
@@ -107,6 +98,9 @@ class ModelTurn:
     stop_reason: str
     usage: dict
     model: str
+    price: tuple[Decimal, Decimal] | None = None  # the provider's own price (KAGOU_OPENAI_COMPAT_PRICE)
+    foreign: bool = False  # not a Claude model: CHAINSTAFF_MODEL_PRICE does not apply
+    priced: bool = True
 
 
 class ModelProvider(Protocol):
@@ -114,15 +108,6 @@ class ModelProvider(Protocol):
 
     def complete(self, *, model: str, system: str, messages: list, tools: list[dict], limits: Limits,
                  on_text: Callable[[str], None], should_stop: Callable[[], bool], timeout_s: float) -> ModelTurn: ...
-
-
-def price_of(model: str, override: tuple[Decimal, Decimal] | None) -> tuple[Decimal, Decimal] | None:
-    if override:
-        return override
-    for name, p in PRICES.items():
-        if model == name or model.startswith(name + "-"):
-            return p
-    return None
 
 
 class AnthropicProvider:
@@ -143,9 +128,8 @@ class AnthropicProvider:
             "system": system,
             "messages": messages,
             "output_config": {"effort": limits.effort},
-            # On a safety decline the API re-runs the request on a fallback model inside the same call.
-            "betas": ["server-side-fallback-2026-07-01"],
-            "fallbacks": "default",
+            # On a safety decline the API re-runs the request on a fallback model inside the same call (where the model takes it).
+            **anthropic_extras(model),
         }
         if tools:
             # Tool inputs here are a few short fields, so eager input streaming would buy nothing.
@@ -217,9 +201,10 @@ class AgentRuntime:
             raise SkillError(reason)
         provider = self.providers[agent["provider"]]
         limits = Limits.for_agent(agent, task["input"])
+        wf.gateway.cap(limits)
         tools = self.tools_for(agent)
         offered = {t.id for t in tools}
-        model = agent.get("model") or DEFAULT_MODEL
+        model = agent.get("model") or (provider.model if provider.name == "openai_compat" else wf.planner.model)
         root = wf.db.task(task["root_id"])
         deadline = _deadline(root)
         system = (agent.get("system_prompt") or f"You are {agent['name']}, {agent.get('role') or 'an on-chain analyst'}.") + "\n\n" + RUNTIME_RULES
@@ -230,16 +215,27 @@ class AgentRuntime:
 
         while True:
             self._check_limits(st, limits, root, agent, deadline, ctx)
+            blocked = wf.gateway.blocked(provider.name)
+            if blocked:
+                raise RunLimitError(blocked)
             st.model_calls += 1
             wf.db.post(workspace_id=wid, kind="agent", event="model.start", sender=aid, task_id=tid,
                        text=f"推理中（第 {st.model_calls} 次模型调用）", data={"model": model, "call": st.model_calls})
             buf = _DeltaWriter(lambda text, n=st.model_calls: wf.db.post(
                 workspace_id=wid, kind="agent", event="agent.delta", sender=aid, task_id=tid, text=text[-2000:], data={"call": n}))
             started = time.monotonic()
-            turn = provider.complete(model=model, system=system, messages=messages, tools=[t.tool_param() for t in tools], limits=limits,
-                                     on_text=buf.add, should_stop=lambda: bool(ctx.cancelled and ctx.cancelled()),
-                                     timeout_s=_timeout(limits.call_timeout_s, deadline))
-            cost = self._charge(task, aid, turn)
+            stop = lambda: bool(ctx.cancelled and ctx.cancelled())  # noqa: E731
+            try:
+                with wf.gateway.slot(stop):
+                    turn = provider.complete(model=model, system=system, messages=messages, tools=[t.tool_param() for t in tools], limits=limits,
+                                             on_text=buf.add, should_stop=stop, timeout_s=_timeout(limits.call_timeout_s, deadline))
+            except Cancelled:
+                raise
+            except Exception as e:
+                wf.gateway.failed(provider.name, model, e)
+                raise
+            wf.gateway.succeeded(provider.name)
+            cost = self._charge(task, aid, turn, provider.name)
             st.tokens += turn.usage["input_tokens"] + turn.usage["output_tokens"]
             st.cost += cost
             ctx.check()
@@ -247,6 +243,7 @@ class AgentRuntime:
                        text=turn.text.strip()[:4000] or ("决定调用工具" if turn.tool_uses else "（无文本）"),
                        data={"call": st.model_calls, "model": turn.model, "stop_reason": turn.stop_reason, "secs": round(time.monotonic() - started, 2),
                              "input_tokens": turn.usage["input_tokens"], "output_tokens": turn.usage["output_tokens"], "cost_usd": str(cost),
+                             "priced": turn.priced, "provider": provider.name,
                              "tool_uses": [{"id": u.id, "tool": u.name} for u in turn.tool_uses]})
             if turn.stop_reason == "refusal":
                 raise RunLimitError("模型拒绝了这个任务")
@@ -294,11 +291,13 @@ class AgentRuntime:
             if Decimal(g["budget_usd"]) > 0 and Decimal(g["cost_usd"]) >= Decimal(g["budget_usd"]):
                 raise RunLimitError(f"Mission 预算 ${g['budget_usd']} 已用完")
 
-    def _charge(self, task: dict, aid: str, turn: ModelTurn) -> Decimal:
-        price = price_of(turn.model, self.price_override)
-        cost = Decimal(0)
-        if price:
-            cost = (Decimal(turn.usage["input_tokens"]) * price[0] + Decimal(turn.usage["output_tokens"]) * price[1]) / Decimal(1_000_000)
+    def _charge(self, task: dict, aid: str, turn: ModelTurn, provider: str) -> Decimal:
+        # Priced from the usage the API returned; an unknown price is charged 0 and marked unpriced on the timeline.
+        override = turn.price if turn.foreign else self.price_override
+        known = cost_of(turn.model, turn.usage["input_tokens"], turn.usage["output_tokens"], override)
+        turn.priced = known is not None
+        cost = known or Decimal(0)
+        self.wf.gateway.record(provider, turn.model, turn.usage["input_tokens"], turn.usage["output_tokens"], known)
         self.wf._charge(task["id"], aid, {"input_tokens": turn.usage["input_tokens"], "output_tokens": turn.usage["output_tokens"],
                                           "cost_usd": str(cost)})
         return cost
