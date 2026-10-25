@@ -16,16 +16,23 @@ import time
 
 
 def commands(env: dict) -> dict[str, list[str]]:
-    port = env.get("PORT", "8000")
-    cmds = {"api": [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", port, "--workers", "1",
+    # Fixed argv only: the platform's PORT reaches uvicorn as UVICORN_PORT (see child_env), never as an argument.
+    cmds = {"api": [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--workers", "1",
                     "--timeout-graceful-shutdown", "10", "--proxy-headers", "--forwarded-allow-ips", "*"]}
     if env.get("KAGOU_WORKER", "1") != "0":
         cmds["worker"] = [sys.executable, "-m", "agent.autonomy.worker"]
     return cmds
 
 
+def child_env(env: dict) -> dict:
+    port = str(env.get("PORT") or "8000")
+    if not port.isdigit():
+        raise SystemExit(f"[supervise] PORT must be a number, got {port!r}")
+    return {**env, "UVICORN_PORT": port}
+
+
 def main() -> None:  # pragma: no cover - process entry point; the restart logic is the loop below
-    env = dict(os.environ)
+    env = child_env(dict(os.environ))
     cmds = commands(env)
     procs: dict[str, subprocess.Popen] = {}
     started: dict[str, float] = {}
