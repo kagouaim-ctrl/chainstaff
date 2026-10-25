@@ -36,6 +36,8 @@ from agent.team import ROLE_BY_ID, ROLES, Team
 from agent.workforce import Workforce
 from agent.bsc.service import ChainService
 from backend.chain_api import mount_chain
+from agent.autonomy.service import Autonomy
+from backend.autonomy_api import mount_autonomy
 from backend.workforce_api import mount_workforce
 from agent.skills.finance_ops.employee import FinanceOpsEmployee
 from agent.skills.finance_ops.insights import TelegramSettings, overview, payee_stats, rules_diff
@@ -77,7 +79,7 @@ def cors_origins(value: str | None) -> list[str]:
 
 def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | None = None, env: dict | None = None,
                desk: FrontDesk | None = None, sybil_background: bool = True, workforce: Workforce | None = None,
-               chain_service: ChainService | None = None, viewer_token: str | None = None) -> FastAPI:
+               chain_service: ChainService | None = None, viewer_token: str | None = None, autonomy: Autonomy | None = None) -> FastAPI:
     if not token or len(token) < 16:
         raise RuntimeError("CHAINSTAFF_CONSOLE_TOKEN must be set (at least 16 characters)")
     if viewer_token and (len(viewer_token) < 16 or viewer_token == token):
@@ -185,6 +187,11 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     # The AI workforce terminal: agents, workspaces, tasks, approvals, on-chain records.
     app.state.workforce = workforce or Workforce(store)
     mount_workforce(app, app.state.workforce, auth, OWNER_ID, chain)
+    # Autonomous agents: responsibilities, missions, watchers, the task queue the worker runs, activity, approvals.
+    app.state.autonomy = autonomy or Autonomy(app.state.workforce, env=env)
+    if chain_service is not None and chain_service.autonomy is None:
+        chain_service.attach_autonomy(app.state.autonomy)
+    mount_autonomy(app, app.state.autonomy, auth, OWNER_ID)
     # BSC realtime data layer: status, monitors, events, and the live WebSocket.
     app.state.chain = chain_service
     mount_chain(app, chain_service, auth, token_ok, origin_ok=origin_ok)

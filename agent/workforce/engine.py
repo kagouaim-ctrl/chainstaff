@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
 
+from agent.autonomy.constants import AUTONOMY_PERMISSIONS
 from agent.store import Store, _iso
 
 from . import db as D
@@ -43,7 +44,9 @@ from .planner import Planner, PlanCancelled, PlanError
 from .runtime import AgentRuntime, AnthropicProvider, Limits
 from .skills import ADDRESS_RE, AGENT_TASK, PERMISSIONS, REGISTRY, SKILL_BY_ID, SkillContext, SkillError, validate
 
-EXTRA_PERMISSIONS = {"message:peers": "可以直接给同工作区的其他员工发消息"}
+EXTRA_PERMISSIONS = {"message:peers": "可以直接给同工作区的其他员工发消息",
+                     # Autonomous agents (agent/autonomy): code work in an isolated copy, delegation, HTTP checks, memory.
+                     **{k: v[0] for k, v in AUTONOMY_PERMISSIONS.items()}}
 ALL_PERMISSIONS = {**PERMISSIONS, **EXTRA_PERMISSIONS}
 PROVIDERS = ("none", "anthropic", "openai_compat")
 AUDIT = "workforce"
