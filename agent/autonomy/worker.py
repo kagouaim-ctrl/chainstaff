@@ -45,8 +45,9 @@ class Worker:
         self.running: dict[str, Future] = {}
         self._lock = threading.Lock()
         self._stop = threading.Event()
-        self._last_beat = 0.0
-        self._last_prune = 0.0
+        # -inf, not 0: time.monotonic() can be small on a freshly booted machine, and both must run on the first tick.
+        self._last_beat = float("-inf")
+        self._last_prune = float("-inf")
         self.stats = {"ticks": 0, "runs": 0, "recovered": 0, "events": 0, "errors": 0}
         self._threads: list[threading.Thread] = []
 

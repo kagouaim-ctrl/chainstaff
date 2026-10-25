@@ -268,7 +268,9 @@ def apply_to_local(sb: Sandbox, repo: dict, diff: str, message: str) -> str:
     if repo["provider"] != "local":
         raise SandboxError("只有本地仓库可以由 KAGOU 直接应用补丁；GitHub 仓库请在 GitHub 上合并 Draft PR")
     path = Path(repo["path"])
-    status = sb.git(["status", "--porcelain"], cwd=path).stdout.strip()
+    # Only tracked files count: untracked build output (__pycache__, dist/) is left alone and never committed, and
+    # `git apply --index` refuses a patch that would overwrite an untracked file.
+    status = sb.git(["status", "--porcelain", "--untracked-files=no"], cwd=path).stdout.strip()
     if status:
         raise SandboxError("原仓库有未提交的修改，先处理再应用补丁")
     tmp = path / ".git" / "kagou-approved.patch"

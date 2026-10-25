@@ -136,12 +136,15 @@ def test_apply_to_local_only_after_approval_and_only_clean(tmp_path):
     assert d["files"] == ["a.txt"] and "1 file changed" in d["stat"] and not d["stat"].startswith(" ")
     with pytest.raises(SandboxError, match="本地仓库"):
         apply_to_local(sb, {"provider": "github"}, d["diff"], "m")
-    (src / "dirty.txt").write_text("x")
+    (src / "a.txt").write_text("edited by hand\n")
     with pytest.raises(SandboxError, match="未提交"):
         apply_to_local(sb, _local(src), d["diff"], "m")
-    (src / "dirty.txt").unlink()
+    subprocess.run(["git", "checkout", "--", "a.txt"], cwd=src, check=True)
+    (src / "build.log").write_text("untracked output")  # untracked files neither block the patch nor get committed
     commit = apply_to_local(sb, _local(src), d["diff"].rstrip("\n"), "Apply")
     assert (src / "a.txt").read_text() == "two\n" and len(commit) == 40
+    assert "build.log" not in subprocess.run(["git", "show", "--name-only", "HEAD"], cwd=src, capture_output=True, text=True).stdout
+    (src / "build.log").unlink()
     with pytest.raises(SandboxError, match="git apply"):
         apply_to_local(sb, _local(src), d["diff"], "again")  # already applied
 
