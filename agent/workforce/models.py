@@ -83,17 +83,25 @@ QWEN_SG_PRICES: dict[str, list[tuple[int, Decimal, Decimal]]] = {
 # qwen-plus bills thinking output separately (the other models above list one output price).
 QWEN_SG_THINKING_OUTPUT = {"qwen-plus": [Decimal("4"), Decimal("12")]}
 QWEN_SG_HOSTS = ("dashscope-intl.aliyuncs.com", ".ap-southeast-1.maas.aliyuncs.com")
+# Japan (Tokyo), Global deployment scope, same source: only the Flash models below are priced there.
+QWEN_JP_PRICES: dict[str, list[tuple[int, Decimal, Decimal]]] = {
+    "qwen3.8-flash": [(1024 * K, Decimal("0.113"), Decimal("0.382"))],
+    "qwen3.7-flash": [(32 * K, Decimal("0.028"), Decimal("0.110")), (256 * K, Decimal("0.083"), Decimal("0.330")), (1024 * K, Decimal("0.165"), Decimal("0.660"))],
+    "qwen3.6-flash": [(256 * K, Decimal("0.165"), Decimal("0.99")), (1024 * K, Decimal("0.66"), Decimal("3.961"))],
+}
+QWEN_JP_HOSTS = (".ap-northeast-1.maas.aliyuncs.com",)
 
 
-def qwen_price(model: str, input_tokens: int, thinking: bool = False) -> tuple[Decimal, Decimal] | None:
-    """The Singapore list price for this Qwen model at this request size, or None for a model not in the table."""
-    name = next((n for n in sorted(QWEN_SG_PRICES, key=len, reverse=True) if model == n or model.startswith(n + "-")), None)
+def qwen_price(model: str, input_tokens: int, thinking: bool = False, region: str = "sg") -> tuple[Decimal, Decimal] | None:
+    """The list price for this Qwen model in this region ("sg" or "jp") at this request size, or None if not in the table."""
+    table = QWEN_JP_PRICES if region == "jp" else QWEN_SG_PRICES
+    name = next((n for n in sorted(table, key=len, reverse=True) if model == n or model.startswith(n + "-")), None)
     if name is None:
         return None
-    tiers = QWEN_SG_PRICES[name]
+    tiers = table[name]
     i = next((i for i, (upto, _, _) in enumerate(tiers) if input_tokens <= upto), len(tiers) - 1)
     _, pin, pout = tiers[i]
-    if thinking and name in QWEN_SG_THINKING_OUTPUT:
+    if thinking and region == "sg" and name in QWEN_SG_THINKING_OUTPUT:
         pout = QWEN_SG_THINKING_OUTPUT[name][i]
     return pin, pout
 

@@ -211,6 +211,9 @@ def test_ai_provider_qwen_configuration():
     assert from_env(cn).price_for("qwen-plus", 1000) is None
     assert from_env({**cn, "AI_PRICE": "0.11,0.28"}).price_for("qwen-plus", 1000) == (Decimal("0.11"), Decimal("0.28"))
     assert from_env({**env, "AI_BASE_URL": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"}).price_for("qwen-flash", 1) is not None
+    # Japan (Tokyo): its own (lower) Flash prices; qwen-plus is not priced there
+    jp = from_env({**env, "AI_BASE_URL": "https://llm-abc.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1", "AI_MODEL": "qwen3.7-flash"})
+    assert jp.price_for("qwen3.7-flash", 1000) == (Decimal("0.028"), Decimal("0.110")) and jp.price_for("qwen-plus", 1000) is None
 
 
 def test_ai_provider_errors_and_other_services():
@@ -277,3 +280,4 @@ def test_qwen_price_table():
     assert qwen_price("qwen-plus-2025-12-01", 10) == (Decimal("0.4"), Decimal("1.2"))
     assert qwen_price("qwen3.6-plus", 10, thinking=True) == (Decimal("0.5"), Decimal("3"))  # one output price for this model
     assert qwen_price("qwen-max", 10) == (Decimal("1.6"), Decimal("6.4")) and qwen_price("qwen3.7-max", 10) is None
+    assert qwen_price("qwen3.6-flash", 300 * 1024, region="jp") == (Decimal("0.66"), Decimal("3.961"))

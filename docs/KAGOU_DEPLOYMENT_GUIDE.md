@@ -33,10 +33,10 @@
 | `KAGOU_CHAIN_LISTENER` | 否 | `1`（默认）开新区块监听 |
 | `KAGOU_BACKGROUND` | 否 | `1`（默认） |
 | `AI_PROVIDER` | 否 | 共享模型服务：`qwen`（首选）、`gemini`、`groq`、`openrouter`、`openai_compatible`、`local`（Ollama / vLLM），或 `anthropic` |
-| `AI_BASE_URL` | 用 Qwen 等时必填 | 服务的 OpenAI 兼容地址，从服务控制台复制。Qwen 新加坡：`https://<WorkspaceId>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`（旧地址 `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` 也能用）。必须 https（本机模型除外） |
+| `AI_BASE_URL` | 用 Qwen 等时必填 | 服务的 OpenAI 兼容地址，从服务控制台复制。Qwen 新加坡：`https://<WorkspaceId>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`（旧地址 `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` 也能用）；日本东京：`https://<WorkspaceId>.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1`（只有工作空间专属地址）。必须 https（本机模型除外） |
 | `AI_API_KEY` | 用 Qwen 等时必填 | 只放在这里，浏览器拿不到，也不会出现在 `/api/system` |
 | `AI_MODEL` | 用 Qwen 等时必填 | 必须支持 tool calling。Qwen 测试建议 `qwen-plus` |
-| `AI_PRICE` | 否 | `输入,输出`（美元 / 百万 token）。Qwen 新加坡地址不填时用内置的官方标价；北京区按人民币计价，要自己填换算后的美元价；其他服务不填时调用记为“无价格”，预算对它们不完整 |
+| `AI_PRICE` | 否 | `输入,输出`（美元 / 百万 token）。Qwen 新加坡、东京地址不填时用内置的官方标价（东京只有 Flash 系列有标价）；北京区按人民币计价，要自己填换算后的美元价；其他服务不填时调用记为“无价格”，预算对它们不完整 |
 | `AI_ENABLE_THINKING` | 否 | 仅 Qwen：`1` 开思考模式（更贵）。默认关 |
 | `AI_DAILY_BUDGET_USD` / `AI_MONTHLY_BUDGET_USD` | 建议 | 每天（UTC）/ 每月的模型花费上限，到了就拒绝新的模型调用并给出明确错误。测试建议 `1` / `10` |
 | `AI_MAX_AGENT_STEPS` | 否 | 每次 Agent 运行最多几次模型调用（默认 8，也是上限） |

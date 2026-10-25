@@ -8,7 +8,7 @@ and by local servers (Ollama, vLLM), so one provider covers all of them:
                          https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1. https only, except local
     AI_API_KEY           the provider's API key; stays on the server (optional for local)
     AI_MODEL             the model to use, which must support function calling (Qwen: e.g. qwen-plus)
-    AI_PRICE             "input,output" USD per million tokens. Unset: Qwen on a Singapore endpoint uses the published
+    AI_PRICE             "input,output" USD per million tokens. Unset: Qwen on a Singapore or Tokyo endpoint uses the published
                          list price; local is 0 (your own hardware); anything else is recorded as unpriced
     AI_ENABLE_THINKING   Qwen only: 1 turns on thinking mode (off by default: cheaper, and its function calling
                          examples turn it off)
@@ -31,7 +31,7 @@ from typing import Any, Callable
 from urllib.parse import urlsplit
 
 from .chain import Cancelled
-from .models import QWEN_SG_HOSTS, qwen_price
+from .models import QWEN_JP_HOSTS, QWEN_SG_HOSTS, qwen_price
 
 KINDS = ("qwen", "gemini", "groq", "openrouter", "openai_compatible", "local")
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1", "host.docker.internal")
@@ -227,8 +227,9 @@ def from_env(env: dict, post=None) -> OpenAICompatProvider | None:
             thinking = env.get("AI_ENABLE_THINKING", "").strip().lower() in ("1", "true", "yes", "on")
             extra = {"enable_thinking": thinking}
             host = urlsplit(url).hostname or ""
-            if any(host == h or (h.startswith(".") and host.endswith(h)) for h in QWEN_SG_HOSTS):
-                price_fn = lambda m, n: qwen_price(m, n, thinking)  # noqa: E731
+            for region, hosts in (("sg", QWEN_SG_HOSTS), ("jp", QWEN_JP_HOSTS)):
+                if any(host == h or (h.startswith(".") and host.endswith(h)) for h in hosts):
+                    price_fn = lambda m, n, r=region: qwen_price(m, n, thinking, r)  # noqa: E731
         return OpenAICompatProvider(url, key, model, price, post=post, label=kind, extra_body=extra, price_fn=price_fn)
     url, key, model = env.get("KAGOU_OPENAI_COMPAT_URL"), env.get("KAGOU_OPENAI_COMPAT_KEY"), env.get("KAGOU_OPENAI_COMPAT_MODEL")
     if not (url and key and model):

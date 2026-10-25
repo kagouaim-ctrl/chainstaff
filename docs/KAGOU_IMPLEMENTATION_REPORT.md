@@ -171,6 +171,7 @@ Tool Registry（只读 BSC 工具，后端逐次鉴权）→ RpcPool → BSC
 | 地址（按官方文档核实） | 新加坡：`https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1`；旧域名 `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` 仍可用。北京、美国、东京各有自己的地址，key 按地域绑定，跨地域用会 401 |
 | 模型 | 建议 `qwen-plus`：文档写明支持 function calling，且在新用户免费额度的举例里。更便宜的 `qwen3.7-flash`（≤32K 输入 $0.03 / $0.13 每百万 Token）也在 function calling 支持列表里，但它的模型页对新加坡区写着不支持 function calling，**两份文档矛盾，需要用真实 key 验证后再推荐** |
 | 免费额度 | 只在新加坡区（International）：每个模型通常 100 万 Token，90 天，开通 Model Studio 后自动发放 |
+| 日本东京 | 可以用：OpenAI 兼容地址 `https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1`，要先在东京建工作空间（部署范围选 Global 或 Japan）。官方价格页在东京只列出 Flash 系列（Global 范围），例如 qwen3.7-flash ≤32K 输入 $0.028 / $0.110，比新加坡略低；没有列出 qwen-plus；免费额度文档只写了新加坡。东京标价已内置 |
 | 价格 | 新加坡区内置官方美元标价（分档，按单次请求输入量）：qwen-plus $0.4 / $1.2（≤256K，思考模式输出 $4）、qwen3.7-plus $0.4 / $1.6、qwen-flash $0.05 / $0.4、qwen3.7-flash $0.03 / $0.13（≤32K）等。用标价计成本，所以免费额度期间记录的成本会高于实际账单，不会更低。北京区按人民币另有价格，需要 `AI_PRICE` |
 | 思考模式 | 默认关（`enable_thinking: false`，与官方 function calling 示例一致，也更便宜）；`AI_ENABLE_THINKING=1` 打开 |
 | 统一接口 | `ModelProvider.complete(model, system, messages, tools, limits, on_text, should_stop, timeout_s) -> ModelTurn`（同步，跑在 Agent 线程池里，和现有引擎一致，没有改成 async）。多轮、System Prompt、function calling、超时、重试（429 / 5xx，指数退避）、Token usage、调用日志（时间线 `model.start` / `model.done`）、成本 |
