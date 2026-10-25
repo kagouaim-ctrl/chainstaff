@@ -15,13 +15,16 @@ import sys
 import time
 
 
-def commands(env: dict) -> dict[str, list[str]]:
-    # Fixed argv only: the platform's PORT reaches uvicorn as UVICORN_PORT (see child_env), never as an argument.
-    cmds = {"api": [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--workers", "1",
-                    "--timeout-graceful-shutdown", "10", "--proxy-headers", "--forwarded-allow-ips", "*"]}
-    if env.get("KAGOU_WORKER", "1") != "0":
-        cmds["worker"] = [sys.executable, "-m", "agent.autonomy.worker"]
-    return cmds
+def commands() -> dict[str, list[str]]:
+    # Fixed argv, built from constants only: the platform's PORT reaches uvicorn as UVICORN_PORT (see child_env).
+    return {"api": [sys.executable, "-m", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--workers", "1",
+                    "--timeout-graceful-shutdown", "10", "--proxy-headers", "--forwarded-allow-ips", "*"],
+            "worker": [sys.executable, "-m", "agent.autonomy.worker"]}
+
+
+def wanted(env: dict) -> list[str]:
+    """KAGOU_WORKER=0 runs the API alone (e.g. when the worker is deployed separately)."""
+    return ["api"] if env.get("KAGOU_WORKER", "1") == "0" else ["api", "worker"]
 
 
 def child_env(env: dict) -> dict:
@@ -33,7 +36,9 @@ def child_env(env: dict) -> dict:
 
 def main() -> None:  # pragma: no cover - process entry point; the restart logic is the loop below
     env = child_env(dict(os.environ))
-    cmds = commands(env)
+    cmds = commands()
+    if "worker" not in wanted(env):
+        del cmds["worker"]
     procs: dict[str, subprocess.Popen] = {}
     started: dict[str, float] = {}
     backoff = {k: 1.0 for k in cmds}

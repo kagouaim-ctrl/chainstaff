@@ -12,7 +12,7 @@ from autonomy_kit import Kit, Script, turn
 
 from agent.autonomy import constants as C
 from agent.autonomy.db import iso, now_dt
-from agent.autonomy.supervise import child_env, commands
+from agent.autonomy.supervise import child_env, commands, wanted
 from agent.autonomy.worker import Worker
 
 
@@ -153,10 +153,10 @@ def test_two_workers_never_run_the_same_task(kit):
 
 
 def test_supervisor_commands():
-    cmds = commands({"PORT": "9000"})
+    cmds = commands()
     assert cmds["api"][1:4] == ["-m", "uvicorn", "backend.app:app"] and "--port" not in cmds["api"]
     assert cmds["worker"][1:] == ["-m", "agent.autonomy.worker"]
-    assert "worker" not in commands({"KAGOU_WORKER": "0"})
+    assert wanted({"KAGOU_WORKER": "0"}) == ["api"] and wanted({}) == ["api", "worker"]
     assert child_env({"PORT": "9000"})["UVICORN_PORT"] == "9000" and child_env({})["UVICORN_PORT"] == "8000"
     with pytest.raises(SystemExit):
         child_env({"PORT": "80; rm -rf /"})
