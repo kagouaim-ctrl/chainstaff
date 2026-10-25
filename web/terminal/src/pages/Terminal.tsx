@@ -14,6 +14,7 @@ import { api } from "../lib/api";
 import { useAgentName, useAgents, useApprovals, useMissions, useOverview, useSkills, useSquads } from "../lib/queries";
 import { useLiveMessages, useStreamState } from "../lib/stream";
 import type { Agent, Message } from "../lib/types";
+import { DEMO } from "../lib/demo";
 import { ago, go, setParams, usd, useIsMobile, usePref, type Route } from "../lib/util";
 
 const VIEWS: [View, string, typeof Bot][] = [
@@ -161,6 +162,7 @@ export default function Terminal({ route }: { route: Route }) {
 
 function LiveTag() {
   const s = useStreamState();
+  if (DEMO) return <span className="row gap4 xs muted" title="静态演示，没有实时连接">Snapshot</span>;
   return (
     <span className="row gap4 xs muted" title="Agent 状态来自服务器实时事件流">
       <span className={`ind ${s === "live" ? "ok" : "warn live"}`} /> {s === "live" ? "Live" : "Reconnecting"}

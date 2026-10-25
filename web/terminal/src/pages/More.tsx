@@ -1,4 +1,5 @@
 import { Activity, Blocks, ChevronRight, LogOut, Puzzle, Settings, SquareArrowOutUpRight, Users } from "lucide-react";
+import { DEMO } from "../lib/demo";
 import { setToken } from "../lib/api";
 
 const ITEMS: [string, string, string, typeof Blocks][] = [
@@ -22,7 +23,7 @@ export default function More() {
             <ChevronRight size={16} className="muted" />
           </a>
         ))}
-        <a href="/" className="m-row"><SquareArrowOutUpRight size={18} className="muted" /><span className="grow">Classic console</span><ChevronRight size={16} className="muted" /></a>
+        {!DEMO && <a href="/" className="m-row"><SquareArrowOutUpRight size={18} className="muted" /><span className="grow">Classic console</span><ChevronRight size={16} className="muted" /></a>}
         <button className="m-row" onClick={() => setToken("")}><LogOut size={18} className="muted" /><span className="grow">Sign out</span></button>
       </div>
     </div>

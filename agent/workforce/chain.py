@@ -6,8 +6,10 @@ lives in anchor.py and only runs after a human approval.
 
 from __future__ import annotations
 
+import copy
+import threading
 from decimal import Decimal
-from typing import Any
+from typing import Any, Callable
 
 from eth_abi import decode
 from eth_utils import keccak, to_checksum_address
@@ -81,17 +83,36 @@ def _decode_string(raw: str) -> str | None:
             return None
 
 
+class Cancelled(Exception):
+    """The task this read belongs to was cancelled or timed out; stop instead of reading more."""
+
+
 class ChainReader:
     def __init__(self, rpc: RpcClient, network: str, chain_id: int, explorer_tx_url: str | None = None) -> None:
         self.rpc = rpc
         self.network = network
         self.chain_id = chain_id
         self.explorer_tx_url = explorer_tx_url
-        self.calls = 0  # RPC calls made, reported as the cost of a skill run
+        self.calls = 0  # RPC calls made through this reader
+        self._count_lock = threading.Lock()
+        self._check: Callable[[], None] | None = None
+
+    def fork(self, check: Callable[[], None] | None = None) -> "ChainReader":
+        """A reader for one skill run: its own call counter, and a check that runs before and after every
+        RPC call (it raises Cancelled once the task is cancelled, so a cancelled run stops reading)."""
+        r = copy.copy(self)
+        r.calls, r._count_lock, r._check = 0, threading.Lock(), check
+        return r
 
     def _call(self, method: str, params: list) -> Any:
-        self.calls += 1
-        return self.rpc.call(method, params)
+        if self._check:
+            self._check()
+        with self._count_lock:
+            self.calls += 1
+        out = self.rpc.call(method, params)
+        if self._check:
+            self._check()  # a request already in flight finishes, but its answer is not used
+        return out
 
     def explorer(self, kind: str, value: str) -> str | None:
         if not self.explorer_tx_url:

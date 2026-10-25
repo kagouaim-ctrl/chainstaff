@@ -1,6 +1,6 @@
 import { ArrowRight, Play, Send } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { post } from "../lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { newRequestKey, post, postOnce } from "../lib/api";
 import { useAction, useAgentName, useSkills, useSquads } from "../lib/queries";
 import type { AgentDetail, Task } from "../lib/types";
 import { go } from "../lib/util";
@@ -55,8 +55,14 @@ export function RunPanel({ agent, mode, onMode, presetSkill, onDone }: {
     keys,
     `已派给 ${agent.name}`,
   );
+  const assignKey = useRef<{ sig: string; key: string }>({ sig: "", key: "" });  // same draft, same mission
   const assign = useAction(
-    () => post<Task>(`/api/wf/squads/${space!.id}/missions`, { text: goal, priority: Number(o.priority), budget_usd: o.budget_usd, timeout_s: Number(o.timeout_s), max_steps: Number(o.max_steps) }),
+    () => {
+      const payload = { text: goal, priority: Number(o.priority), budget_usd: o.budget_usd, timeout_s: Number(o.timeout_s), max_steps: Number(o.max_steps) };
+      const sig = JSON.stringify([space!.id, payload]);
+      if (assignKey.current.sig !== sig) assignKey.current = { sig, key: newRequestKey() };
+      return postOnce<Task>(`/api/wf/squads/${space!.id}/missions`, payload, assignKey.current.key);
+    },
     keys,
     "Mission 已提交",
   );
@@ -136,7 +142,7 @@ export function RunPanel({ agent, mode, onMode, presetSkill, onDone }: {
               <Play size={12} /> Run
             </button>
           ) : (
-            <button className="btn primary sm" disabled={!canAssign || assign.isPending} onClick={() => assign.mutate(undefined, { onSuccess: (t) => (setDone(t as Task), onDone?.()) })}>
+            <button className="btn primary sm" disabled={!canAssign || assign.isPending} onClick={() => assign.mutate(undefined, { onSuccess: (t) => ((assignKey.current = { sig: "", key: "" }), setDone(t as Task), onDone?.()) })}>
               <Send size={12} /> Assign
             </button>
           )}

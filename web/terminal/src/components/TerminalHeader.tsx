@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Activity, Bell, ChevronDown, LogOut, Search, Settings, ShieldCheck, SquareArrowOutUpRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, setToken } from "../lib/api";
+import { DEMO } from "../lib/demo";
 import { useAgentName, useAgents, useApprovals, useChain, useMissions } from "../lib/queries";
 import { useStreamState } from "../lib/stream";
 import type { Message } from "../lib/types";
@@ -26,8 +27,7 @@ export function BrandMark({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true">
       <rect width="20" height="20" rx="4" fill="#F0B90B" />
-      <path d="M5 5.5h7.5v2.3H7.4v4.4h5.1v2.3H5z" fill="#0B0E11" />
-      <rect x="13.4" y="8.6" width="2.8" height="2.8" rx="0.6" fill="#0B0E11" />
+      <path d="M5.5 4.5h2.4v4.3l4-4.3h3l-4.6 4.9 4.9 6.1h-3l-3.6-4.6-0.7 0.7v3.9H5.5z" fill="#0B0E11" />
     </svg>
   );
 }
@@ -35,9 +35,9 @@ export function BrandMark({ size = 20 }: { size?: number }) {
 export function TerminalHeader({ route }: { route: Route }) {
   return (
     <header className="head">
-      <a className="brand" href="#/terminal" aria-label="ChainStaff Terminal">
+      <a className="brand" href="#/terminal" aria-label="KAGOU Terminal">
         <BrandMark />
-        <span>ChainStaff</span>
+        <span>KAGOU</span>
       </a>
       <nav className="nav" aria-label="主导航">
         {NAV.map(([id, label]) => (
@@ -48,6 +48,7 @@ export function TerminalHeader({ route }: { route: Route }) {
         <MoreMenu route={route} />
       </nav>
       <div className="head-right">
+        <DemoPill />
         <GlobalSearch />
         <NetworkPill />
         <RunningPill />
@@ -55,6 +56,23 @@ export function TerminalHeader({ route }: { route: Route }) {
         <WalletButton />
       </div>
     </header>
+  );
+}
+
+// Signed in with the read-only demo token: every page works, every change is refused by the server.
+function DemoPill() {
+  const s = useQuery({ queryKey: ["session"], queryFn: () => api<{ role: string }>("/api/session"), staleTime: Infinity, enabled: !DEMO });
+  if (DEMO)
+    return (
+      <span className="pill demo" title="静态演示：示例数据（脚本化模型、模拟链），不连接服务器，不能修改">
+        演示 · 示例数据
+      </span>
+    );
+  if (s.data?.role !== "viewer") return null;
+  return (
+    <span className="pill demo" title="演示账号：可以查看所有页面，不能修改任何内容">
+      演示 · 只读
+    </span>
   );
 }
 
@@ -83,9 +101,13 @@ function MoreMenu({ route }: { route: Route }) {
         <div className="menu" style={{ left: 0, right: "auto", top: "calc(100% + 2px)" }} onClick={() => setOpen(false)}>
           <a href="#/activity"><Activity size={13} /> Activity</a>
           <a href="#/settings"><Settings size={13} /> Settings</a>
-          <div className="pop-sep" />
-          <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
-          <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
+          {!DEMO && (
+            <>
+              <div className="pop-sep" />
+              <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
+              <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -103,8 +125,14 @@ function NetworkPill() {
       <span>{chain.data?.network || "No chain"}</span>
       {rpc?.ok && <span className="mono muted hide-xl">#{num(rpc.block)}</span>}
       <span className="sep" />
-      <span className={`ind ${live === "live" ? "ok" : "warn live"}`} title={live === "live" ? "实时连接正常" : "正在重新连接实时流"} />
-      <span>{live === "live" ? "Live" : "Syncing"}</span>
+      {DEMO ? (
+        <span className="muted" title="静态演示，没有实时连接">Snapshot</span>
+      ) : (
+        <>
+          <span className={`ind ${live === "live" ? "ok" : "warn live"}`} title={live === "live" ? "实时连接正常" : "正在重新连接实时流"} />
+          <span>{live === "live" ? "Live" : "Syncing"}</span>
+        </>
+      )}
     </button>
   );
 }

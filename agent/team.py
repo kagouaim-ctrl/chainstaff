@@ -1,9 +1,10 @@
 """The AI team: which roles exist, which ones this customer has hired, and whether each is on.
 
-One deployment, one Telegram bot, several employees. The finance ops employee is the only
+One deployment, one console, several employees. The finance ops employee is the only
 role that can move money; every other role reads, answers, drafts or alerts.
 The roster lives in the shared SQLite settings table, so the console can hire or switch
-an employee off and the bot picks it up on its next message.
+an employee off without a restart. KAGOU has no Telegram: the chat commands below are only
+used by the console's in-process test bench (/api/chat/simulate).
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ ROLES: tuple[Role, ...] = (
     Role(
         "finance_ops",
         "财务运营员",
-        "群里一句话发起付款，按老板定的规则付、提案或拦截，每周出账。",
+        "一句话发起付款，按老板定的规则付、提案或拦截，每周出账。",
         ("白名单和限额内自动付款", "超额生成 Safe 提案等老板签字", "拦截陌生地址、重复付款和风险地址", "每周对账周报"),
         touches_money=True,
         needs=("规则文件", "测试网或主网钱包（实盘时）"),
@@ -52,7 +53,7 @@ ROLES: tuple[Role, ...] = (
     Role(
         "community_support",
         "社区客服",
-        "7×24 在群里回答常见问题、查交易状态，识别冒充管理员和索要助记词的骗子，答不了的转人工。",
+        "回答常见问题、查交易状态，识别冒充管理员和索要助记词的骗子，答不了的转人工。",
         ("按项目 FAQ 回答问题", "识别骗局：索要助记词、冒充管理员、钓鱼链接、私聊诱导", "查交易状态", "答不了的开工单转给管理员"),
         commands=(
             ("/faq", "常见问题列表", False),
@@ -64,7 +65,7 @@ ROLES: tuple[Role, ...] = (
     Role(
         "chain_monitor",
         "链上监控员",
-        "盯住国库和关键地址：大额转出、陌生对手方、地址投毒、无限授权、余额过低，第一时间在群里报警，每天出简报。",
+        "盯住国库和关键地址：大额转出、陌生对手方、地址投毒、无限授权、余额过低，第一时间记录预警，每天出简报。",
         ("大额转出预警", "陌生对手方和地址投毒识别", "无限授权和 NFT 全部授权预警", "余额低于下限提醒", "每日链上简报"),
         needs=("要盯的地址", "Etherscan API key（BSC 用 V2 多链接口）"),
         commands=(
@@ -76,16 +77,16 @@ ROLES: tuple[Role, ...] = (
     Role(
         "announcement_translator",
         "公告翻译员",
-        "把中文公告翻成英文、日文等，保留术语、数字和地址，老板确认后再发到群里。",
-        ("按项目术语表翻译", "自动核对数字、地址和链接没有翻错", "草稿必须老板确认才发出", "多语言一次出稿"),
+        "把中文公告翻成英文、日文等，保留术语、数字和地址，老板核对后复制发布。",
+        ("按项目术语表翻译", "自动核对数字、地址和链接没有翻错", "草稿必须老板核对", "多语言一次出稿"),
         needs=("ANTHROPIC_API_KEY",),
         commands=(
             ("/translate 公告原文", "生成翻译草稿", True),
-            ("/post 编号", "确认并发到群里", True),
+            ("/post 编号", "确认草稿", True),
             ("/discard 编号", "作废草稿", True),
         ),
     ),
-    Role("market_brief", "市场日报员", "每天早上汇总行情、项目和竞品动态，发一份简报到群里。",
+    Role("market_brief", "市场日报员", "每天早上汇总行情、项目和竞品动态，出一份简报。",
          ("行情和链上数据汇总", "竞品和生态动态", "每日定时推送"), status=SOON),
     Role(
         "campaign_payouts",

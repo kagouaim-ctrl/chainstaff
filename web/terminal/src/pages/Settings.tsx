@@ -4,6 +4,7 @@ import { Dialog, EmptyState, ErrorState, Loading, Seg, Status, Tabs } from "../c
 import { del, post, put, setToken } from "../lib/api";
 import { useAction, useAgents, useMemory, useMeta, useSchedules, useWorkspaces } from "../lib/queries";
 import type { Memory } from "../lib/types";
+import { DEMO } from "../lib/demo";
 import { fmtTime, go, usePref } from "../lib/util";
 
 type Tab = "schedules" | "memory" | "system";
@@ -205,7 +206,7 @@ function System() {
       <div className="label">Session</div>
       <div className="row wrap">
         <button className="btn" onClick={() => (setToken(""), go("terminal"))}><LogOut size={13} /> 退出（清除这个标签页的访问令牌）</button>
-        <a className="btn ghost" href="/">Classic console</a>
+        {!DEMO && <a className="btn ghost" href="/">Classic console</a>}
       </div>
       <div className="note">当前是单用户模式：一个访问令牌对应一个所有者。多用户登录、钱包签名登录、按用户隔离工作区和角色权限还没有实现。</div>
     </div>

@@ -1,5 +1,7 @@
 # 部署到 BNB Chain
 
+> **KAGOU 说明（2026-10）：** Telegram 已从 KAGOU 移除，付款请求原来只从群里进来，现在没有入口；下面的实盘付款步骤暂时不适用。本阶段只做链上读取，链上写操作要先单独设计权限和人工审批。启动命令改为 `uvicorn backend.app:app`。部署 app.kagouai.com 见 [deploy-kagou.md](deploy-kagou.md)。
+
 顺序：本地测试模式 → BSC 测试网（真实链、假钱）→ 主网小额试运行 → 主网。每一步都要老板确认后再进入下一步。
 
 ## 0. 测试模式（现在就能跑，不碰链）
@@ -7,8 +9,7 @@
 ```bash
 pip install -e .
 cp config/policy.example.json config/policy.json      # 改白名单、限额、老板用户名
-export TELEGRAM_BOT_TOKEN=...                           # BotFather 给的 token
-python3 -m bot.main
+uvicorn backend.app:app --port 8000
 ```
 
 绿灯付款只记账，回复里会写「测试模式：没有真的上链」。
@@ -36,7 +37,7 @@ export CHAINSTAFF_CHAIN=config/chain.json
 export CHAINSTAFF_LIVE=1
 export CHAINSTAFF_WALLET=evm                             # 测试网用本地加密钱包
 export CHAINSTAFF_WALLET_PASSWORD=$WALLET_PASSWORD
-python3 -m bot.main
+uvicorn backend.app:app --port 8000
 ```
 
 启动时会核对 RPC 返回的链 ID 和配置是否一致，不一致就拒绝启动。

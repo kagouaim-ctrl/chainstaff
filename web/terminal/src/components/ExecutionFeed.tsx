@@ -7,7 +7,9 @@ import { ApprovalPanel } from "./ApprovalPanel";
 import { Avatar, Pipe } from "./ui";
 
 // Bus bookkeeping and duplicates of other rows: kept for Logs and Messages, not for the feed.
-const HIDDEN = new Set(["task.created", "task.assigned", "task.result", "tool.start", "user.instruction", "goal.submitted", "tool.manual"]);
+// Streamed model text and call bookkeeping live on the Live board; the feed keeps each reply and each tool result.
+const HIDDEN = new Set(["task.created", "task.assigned", "task.result", "tool.start", "user.instruction", "goal.submitted", "tool.manual",
+  "agent.delta", "model.start", "tool.call"]);
 
 /**
  * Mission Execution Feed: what the squad did, in order, each kind of event in its own shape.
@@ -110,6 +112,25 @@ function FeedRow({ m, task, tasks, root, onTask }: { m: Message; task?: T; tasks
           <pre>{[...(m.data?.logs || []), m.data?.error ? `✕ ${m.data.error}` : ""].filter(Boolean).join("\n") || "—"}</pre>
         </details>
       );
+    case "model.done":
+      return (
+        <details className="feed-tool">
+          <summary>{time}<Bot size={12} className="info" />{who(m.sender)}<span className="xs muted">AI 推理 #{m.data?.call}</span>
+            <span className="xs dim ellipsis">{(m.text || "").slice(0, 90)}</span>
+            <span className="muted xs mono">{m.data?.secs}s · {(m.data?.input_tokens || 0) + (m.data?.output_tokens || 0)} tok · ${m.data?.cost_usd}</span></summary>
+          <pre>{m.text}</pre>
+        </details>
+      );
+    case "tool.result":
+      return (
+        <details className="feed-tool">
+          <summary>{time}<Wrench size={12} className={m.data?.ok === false ? "bad" : "muted"} />{who(m.sender)}<span className="mono xs">{m.data?.tool}</span>
+            <span className={`xs ${m.data?.ok === false ? "bad" : "muted"}`}>{m.data?.ok === false ? m.data?.error : `${m.data?.secs}s · ${m.data?.rpc_calls ?? 0} RPC`}</span></summary>
+          <pre>{m.data?.output_preview || m.data?.error || "—"}</pre>
+        </details>
+      );
+    case "tool.cancelled":
+      return <div className="feed-line muted" onClick={open}>{time}<CircleAlert size={13} /><span>{m.text}</span></div>;
     case "task.completed":
       if (task)
         return <div className="feed-line ok" onClick={open}>{time}<CheckCircle2 size={13} />{who(m.sender || task.assigned_agent)}<span className="dim">completed</span>{ref(task)}{m.data?.secs !== undefined && <span className="muted xs mono">{m.data.secs}s · {short(m.data.result_hash, 6)}</span>}</div>;
