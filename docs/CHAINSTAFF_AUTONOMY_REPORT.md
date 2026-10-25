@@ -7,7 +7,7 @@
 - 不需要模型密钥的部分已经在本机真实运行过：任务队列、唤醒、委派、隔离环境测试、审批、Worker 崩溃恢复、Activity 追踪。验证方式是 API 进程、独立 Worker 进程和一个本地模型服务三个进程一起跑。
 - 这些运行里的"模型"是一个按固定规则回答的脚本服务（`tests/support/autonomy_brain.py`），属于 **mock**。它证明的是运行时本身，不能证明模型的分析能力。
 - 用真实模型跑这条流程还没做过，因为这个环境没有 API Key。
-- BSC 测试网的 Token Watcher 检查已经写好并加进 CI。沙箱连不上 BSC 节点，所以要等 PR 的 CI 跑完才有结果。
+- BSC 测试网的 Token Watcher 已经在 CI（GitHub Actions）上对真实测试网跑通：监听跟随新区块，确认的 WBNB 转账被记录为事件，Token Watcher 被唤醒并给出只陈述事实的报告。这只证明了几分钟内的监听。
 
 ## 1. 修改了哪些文件
 
@@ -140,11 +140,17 @@
   - 前端 `tsc -b && vite build` 通过。
   - `scripts/autonomy_check.py`（mock 模型）21/21 通过。
   - `pip-audit` 没有发现漏洞。
-- **没有在本机跑**：
-  - semgrep：沙箱拿不到规则，CI 会跑。
-  - Docker 镜像构建：沙箱没有 Docker daemon，镜像只改了两处（加装 git、换启动命令），在 CI 和 Railway 构建时会验证。
-  - 测试网 Token Watcher：沙箱连不上 BSC，由 CI 的 `bsc-testnet` 任务跑。
-- **没有跑过**：任何真实模型的测试。
+- **PR #17 的 CI 全部通过**（test、terminal、bsc-testnet 三个任务）：
+  - 上面的全部测试、端到端检查、pip-audit 和 semgrep 静态扫描。
+  - `bsc-testnet`：测试网冒烟测试、真实链上的 live check 19/19，以及 `autonomy_check.py --testnet`：真实测试网区块、2 笔确认的 WBNB 转账、Token Watcher 被唤醒并完成任务（模型仍是 mock）。
+  - GitHub 的运行器不允许非特权用户命名空间，所以那里的测试没有断网（`network_isolated: false`，如实记录）。
+- **CI 发现并已修复的问题**：
+  - 原仓库里只有未跟踪文件（比如跑测试生成的 `__pycache__`）时，补丁被拒绝应用。现在只看已跟踪文件。
+  - 刚开机的机器上，Worker 第一次清理隔离副本被跳过。
+  - semgrep 指出 supervisor 把环境变量拼进了启动参数。现在启动命令只由常量组成，`PORT` 通过 `UVICORN_PORT` 传给 uvicorn，并校验必须是数字。
+- **没有跑过**：
+  - Docker 镜像构建：沙箱没有 Docker daemon，CI 也不构建镜像。镜像只改了两处（加装 git、换启动命令），第一次在 Railway 构建时才会验证。supervisor 本身已经在本机用 `PORT=18555` 实测启动正常。
+  - 任何真实模型的测试。
 
 ## 8. 12 项验收测试
 
@@ -160,7 +166,7 @@
 | 8 | 所有交接都能在 Activity 追踪 | 通过（本机） | 每条记录都写明谁触发、为什么、交给谁、结果，以及是否需要人处理 |
 | 9 | Worker 重启后未完成任务能恢复 | 通过（本机） | 用 SIGKILL 杀进程后新 Worker 接手 |
 | 10 | 前端状态和后端一致 | 通过（本机） | 状态从数据库推导；契约测试；截图核对 |
-| 11 | Token Watcher 持续监听 BSC 测试网 | **待 CI** | 检查已写好；只证明几分钟内的监听，不是长时间稳定性测试 |
+| 11 | Token Watcher 持续监听 BSC 测试网 | 部分通过（CI，真实测试网） | 监听、确认、唤醒、报告都在真实测试网上跑通；只持续了几分钟，不是长时间稳定性测试；模型是 mock |
 | 12 | 第二天登录能看到前一天的进度和记录 | 部分 | 数据持久化，Activity 能按时间筛选，重启后都在。没有做跨天的真实运行 |
 
 ## 9. 已知限制
