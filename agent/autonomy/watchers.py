@@ -152,7 +152,8 @@ class Watchers:
                                          min_value=cfg["min_value_raw"], trigger={"watcher_id": w["id"]})
         except ValueError as e:
             return self.db.update_watcher(w["id"], status="error", last_error=str(e)[:300])
-        return self.db.update_watcher(w["id"], state={**(w["state"] or {}), "monitor_id": mon["id"]}, last_error=None, last_heartbeat_at=iso(now_dt()))
+        # No heartbeat yet: the watcher counts as running only once the listener reports a new block.
+        return self.db.update_watcher(w["id"], state={**(w["state"] or {}), "monitor_id": mon["id"]}, last_error=None)
 
     def update(self, wid: str, body: dict, by: str) -> dict:
         w = self.get(wid)
@@ -234,7 +235,9 @@ class Watchers:
             return True, f"每 {w['config']['interval_s']} 秒检查一次"
         if w["kind"] == "bsc_events":
             hb = parse(w["last_heartbeat_at"])
-            if hb is None or (now_dt() - hb).total_seconds() > 120:
+            if hb is None:
+                return False, "还没收到新区块（监听正在连接节点，或节点连不上）"
+            if (now_dt() - hb).total_seconds() > 120:
                 return False, "BSC 监听没有新区块（监听没运行或节点断开）"
             return True, "跟随新区块"
         return True, "等待推送（Webhook / 日志接口）"

@@ -240,7 +240,8 @@ def test_bsc_watcher_without_a_listener_says_so(kit):
         kit.at.events._enrich(ev)
     assert kit.at.db.holder_count(w["id"]) == 0
     bsc = {"status": "active", "kind": "bsc_events", "config": {}}
-    assert kit.at.watchers.healthy({**bsc, "last_heartbeat_at": None}, True) == (False, "BSC 监听没有新区块（监听没运行或节点断开）")
+    assert kit.at.watchers.healthy({**bsc, "last_heartbeat_at": None}, True) == (False, "还没收到新区块（监听正在连接节点，或节点连不上）")
+    assert kit.at.watchers.healthy({**bsc, "last_heartbeat_at": iso(now_dt() - timedelta(minutes=5))}, True) == (False, "BSC 监听没有新区块（监听没运行或节点断开）")
     assert kit.at.watchers.healthy({**bsc, "last_heartbeat_at": iso(now_dt())}, True) == (True, "跟随新区块")
 
 

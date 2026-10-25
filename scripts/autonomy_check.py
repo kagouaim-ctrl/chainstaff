@@ -4,6 +4,7 @@
     python scripts/autonomy_check.py                       # scripted model endpoint (a mock; the report says so)
     python scripts/autonomy_check.py --out autonomy.json   # also write the results as JSON
     AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... python scripts/autonomy_check.py --real-model   # a real model
+    python scripts/autonomy_check.py --testnet --chain-wait 300   # also a Token Watcher on BSC testnet (needs network)
 
 What it does, in order, and records as pass/fail:
   1. bug workflow: a local copy of examples/buggy-service, three agents (bug hunter, investigator, fix agent) and an
@@ -15,6 +16,9 @@ What it does, in order, and records as pass/fail:
      process finds the expired lease, marks the interrupted run and finishes the task.
   3. runtime health and activity: the worker heartbeat shows on /api/at/runtime, and every step above is in the
      activity log with who triggered it.
+  4. (--testnet) Token Watcher: the server follows BSC testnet (config/chain.example.json, public nodes, read only) and a
+     bsc_events watcher on testnet WBNB; confirmed transfers become events, wake the Token Watcher agent, and its tasks
+     finish with a facts-only report. This shows minutes of listening, not a long-running soak.
 
 With the scripted endpoint, the model answers come from fixed rules (tests/support/autonomy_brain.py), so the results
 prove the runtime (queue, wake-up, delegation, sandbox, approvals, recovery), not model quality. Nothing here touches a
@@ -39,6 +43,7 @@ import httpx
 
 ROOT = Path(__file__).resolve().parent.parent
 BRAIN = ROOT / "tests" / "support" / "scripted_autonomy_server.py"
+WBNB_TESTNET = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
 ERROR = {"level": "error", "message": "ZeroDivisionError: division by zero",
          "stack": 'Traceback (most recent call last):\n  File "pricing.py", line 14, in average_price\nZeroDivisionError: division by zero'}
 
@@ -106,6 +111,8 @@ def main() -> int:
     ap.add_argument("--real-model", action="store_true", help="use AI_PROVIDER / API key from the environment instead of the scripted endpoint")
     ap.add_argument("--wait", type=float, default=90, help="seconds to wait for each phase")
     ap.add_argument("--keep", action="store_true", help="keep the temporary directory")
+    ap.add_argument("--testnet", action="store_true", help="also run a Token Watcher on BSC testnet (public nodes, read only)")
+    ap.add_argument("--chain-wait", type=float, default=240, help="seconds to wait for testnet transfers")
     args = ap.parse_args()
     check = Check()
     data = Path(tempfile.mkdtemp(prefix="autonomy-check-"))
@@ -124,6 +131,8 @@ def main() -> int:
     env.update(CHAINSTAFF_CONSOLE_TOKEN=token, CHAINSTAFF_DB=str(data / "kagou.db"), CHAINSTAFF_POLICY=str(policy), KAGOU_BACKGROUND="0",
                KAGOU_CHAIN_LISTENER="0", KAGOU_DATA_DIR=str(data), KAGOU_LOCAL_REPO_ROOTS=str(data / "repos"), KAGOU_LEASE_S="10",
                KAGOU_HEARTBEAT_S="1", KAGOU_WORKER_STALE_S="10", PYTHONUNBUFFERED="1")
+    if args.testnet:
+        env.update(KAGOU_CHAIN_LISTENER="1", CHAINSTAFF_CHAIN=str(ROOT / "config" / "chain.example.json"))
     mode = "real model" if args.real_model else "scripted endpoint (mock model)"
     if not args.real_model:
         env.pop("ANTHROPIC_API_KEY", None)
@@ -208,7 +217,7 @@ def main() -> int:
         check("worker process killed mid-run (SIGKILL)", not worker.alive(), f"exit {worker.p.returncode}")
         worker = Proc("worker", [sys.executable, "-m", "agent.autonomy.worker"], env, data / "worker.log").start()
         procs.append(worker)
-        done = wait_for(lambda: (lambda x: x if x["task"]["status"] in ("completed", "failed") else None)(j(c.get(f"/api/at/tasks/{t['id']}"))), args.wait)
+        done = wait_for(lambda: (lambda x: x if x["task"]["status"] in ("completed", "failed") else None)(j(c.get(f"/api/at/tasks/{t['id']}"))), max(args.wait, 60))
         runs = (done or {}).get("runs") or []
         check("a new worker recovered the task after the lease expired", bool(done) and done["task"]["status"] == "completed",
               (done or {}).get("task", {}).get("status"))
@@ -225,6 +234,23 @@ def main() -> int:
         need = {"event.received", "agent.awakened", "task.delegated", "approval.requested", "approval.decided", "task.completed"}
         check("activity log covers the whole workflow", need <= types, sorted(need - types) or "all present")
         check("every activity row says who triggered it", all(a.get("actor") for a in items), len(items))
+
+        # ---- 4. Token Watcher on BSC testnet
+        if args.testnet:
+            tws = j(c.post("/api/at/workspaces", json={"name": "BSC testnet WBNB"}))
+            tw = j(c.post("/api/at/agents", json={"template": "token_watcher", "name": "Token Watcher", "workspace_ids": [tws["id"]], "activate": True}))["id"]
+            bw = j(c.post("/api/at/watchers", json={"workspace_id": tws["id"], "kind": "bsc_events", "config": {"address": WBNB_TESTNET, "symbol": "WBNB"}}))["watcher"]
+            check("bsc_events watcher created on the live listener", bw["status"] == "active", bw.get("last_error") or bw["id"])
+            hb = wait_for(lambda: next((x for x in j(c.get("/api/at/watchers", params={"workspace_id": tws["id"]})) if x["healthy"]), None), 60, 1)
+            check("watcher follows new testnet blocks", bool(hb), (hb or {}).get("health"))
+            evs = wait_for(lambda: [e for e in j(c.get("/api/at/events", params={"workspace_id": tws["id"], "limit": 500})) if e.get("chain_status") == "confirmed"],
+                           args.chain_wait, 3)
+            check("confirmed WBNB transfers recorded as events", bool(evs), f"{len(evs)} confirmed, blocks {sorted({(e.get('payload') or {}).get('block') for e in evs})[:5]}")
+            done_t = wait_for(lambda: [t for t in tasks(workspace_id=tws["id"]) if t["to_agent_id"] == tw and t["status"] == "completed"], args.wait, 2)
+            check("Token Watcher woke on the events and finished its tasks", bool(done_t),
+                  (done_t[0].get("result") or {}).get("summary", "")[:160] if done_t else [t["status"] for t in tasks(workspace_id=tws["id"])])
+            st = j(c.get("/api/at/runtime")).get("chain") or {}
+            check("listener status reported", bool(st), {k: st.get(k) for k in ("network", "head", "connected", "mode") if k in st})
     except Exception as e:  # report and fail instead of a traceback mid-run
         check("check ran to the end", False, f"{type(e).__name__}: {e}")
     finally:

@@ -38,7 +38,7 @@ jobs:
     # Kept apart from "test" so a slow public node never blocks a PR; the result is evidence, not a gate.
     runs-on: ubuntu-latest
     continue-on-error: true
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -53,10 +53,13 @@ jobs:
       - name: Live-mode check on BSC testnet (real server process, real chain, no model)
         if: always()
         run: python scripts/live_check.py --chain --wait 120 --out live-check-testnet.json
+      - name: Token Watcher agent on BSC testnet (API + worker + scripted model endpoint, a mock; real chain, read only)
+        if: always()
+        run: python scripts/autonomy_check.py --testnet --chain-wait 300 --out autonomy-check-testnet.json
       - name: Results
         if: always()
         run: |
-          for f in testnet-results.json live-check-testnet.json; do
+          for f in testnet-results.json live-check-testnet.json autonomy-check-testnet.json; do
             if [ -f "$f" ]; then
               { echo "### $f"; echo '```json'; cat "$f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
               cat "$f"
