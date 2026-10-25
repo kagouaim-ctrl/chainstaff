@@ -1,7 +1,6 @@
 """The AI team: roster, community support, chain monitor, announcement translator,
 the front desk that routes Telegram messages, and their console APIs."""
 
-import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -638,40 +637,21 @@ def test_build_front_desk_with_chain(env, tmp_path):
     assert chain is None and not plain.translator.configured and plain.monitor.source is None
 
 
-def test_bot_tick_posts_monitor_brief_and_alerts(desk):
-    from bot.main import monitor_once, tick
-
-    class FakeBot:
-        def __init__(self):
-            self.msgs = []
-
-        async def send_message(self, chat, text):
-            self.msgs.append((chat, text))
-
+def test_background_duties_run_the_chain_monitor(desk):
+    from agent.background import BackgroundDuties
     from agent.skills.finance_ops.insights import TelegramSettings
 
     TelegramSettings.validate({"weekly_report": False}).save(desk.store)
-    bot = FakeBot()
-    assert asyncio.run(tick(bot, desk, NOW, {"CHAINSTAFF_REPORT_CHAT": "-9"})) == 1 and "链上简报" in bot.msgs[0][1]
+    assert any("链上简报" in text for _, text in desk.scheduled(NOW))  # still built; no longer posted anywhere
     desk.monitor.source = FakeSource([Transfer("0x" + "aa" * 32, "USDT", TREASURY, STRANGER, Decimal("1"), NOW)])
     desk.monitor.default_watch = [TREASURY]
-    assert asyncio.run(monitor_once(bot, desk, -9)) == 1 and "陌生地址" in bot.msgs[-1][1]
-    assert desk.store.events(("telegram_out",), employee="chain_monitor")
-
-
-def test_bot_mention_detection():
-    pytest.importorskip("aiogram")
-    from bot.main import mentioned
-
-    def msg(text, chat_type="supergroup", reply_from=None):
-        reply = SimpleNamespace(from_user=SimpleNamespace(id=reply_from)) if reply_from else None
-        return SimpleNamespace(text=text, chat=SimpleNamespace(type=chat_type), reply_to_message=reply)
-
-    assert mentioned(msg("hi", "private"), None, None)
-    assert mentioned(msg("hey @ChainStaff_Bot help"), "chainstaff_bot", 1)
-    assert mentioned(msg("thanks", reply_from=1), "chainstaff_bot", 1)
-    assert not mentioned(msg("thanks", reply_from=2), "chainstaff_bot", 1)
-    assert not mentioned(msg("hello"), None, None)
+    duties = BackgroundDuties(desk, every_s=0.01)
+    out = duties.run_once(NOW)
+    assert len(out) == 1 and "陌生地址" in out[0]
+    assert desk.store.events(("alert",), employee="chain_monitor")
+    duties.start()
+    duties.start()  # already running
+    duties.stop()
 
 
 # ---------- console API ----------
@@ -702,12 +682,10 @@ def test_api_team(c, desk):
     assert by["announcement_translator"]["setup"] and "还没写 FAQ" in by["community_support"]["setup"]
 
 
-def test_api_chat_simulate_and_telegram_commands(c):
+def test_api_chat_simulate(c):
     r = c.post("/api/chat/simulate", json={"text": "合约地址是多少？", "username": "@m"}, headers=H).json()
     assert r["employee"] == "community_support" and "官网" in r["reply"]
     assert c.post("/api/chat/simulate", json={"text": " "}, headers=H).status_code == 400
-    cmds = {x["cmd"] for x in c.get("/api/telegram", headers=H).json()["commands"]}
-    assert {"/faq", "/watch", "/translate 公告原文", "/rules"} <= cmds
 
 
 def test_api_support(c, desk):
@@ -743,7 +721,7 @@ def test_api_monitor(c, desk):
 
 def test_api_translator(c, desk):
     t = c.get("/api/translator", headers=H).json()
-    assert t["configured"] and t["model"] == "claude-opus-5-5" and t["languages"]["ja"] == "日本語" and t["chat"] is None
+    assert t["configured"] and t["model"] == "claude-opus-5-5" and t["languages"]["ja"] == "日本語" and "chat" not in t
     assert c.put("/api/translator/settings", json={"languages": ["en"], "tone": "concise"}, headers=H).json()["settings"]["tone"] == "concise"
     assert c.put("/api/translator/settings", json={"tone": "x"}, headers=H).status_code == 400
     d = c.post("/api/translator/drafts", json={"text": "你好"}, headers=H).json()
@@ -751,9 +729,7 @@ def test_api_translator(c, desk):
     assert c.post("/api/translator/drafts", json={"text": "你好", "languages": ["fr"]}, headers=H).status_code == 400
     assert c.put(f"/api/translator/drafts/{d['id']}", json={"outputs": {"en": "Hi"}}, headers=H).json()["outputs"]["en"] == "Hi"
     assert c.put(f"/api/translator/drafts/{d['id']}", json={"outputs": "x"}, headers=H).status_code == 400
-    assert c.post(f"/api/translator/drafts/{d['id']}/post", headers=H).status_code == 400  # no group yet
-    desk.store.set_setting("telegram_chat", "-100")
-    assert c.post(f"/api/translator/drafts/{d['id']}/post", headers=H).json()["outbox"]
+    assert c.post(f"/api/translator/drafts/{d['id']}/post", headers=H).status_code == 404  # no group to post to any more
     d2 = c.post("/api/translator/drafts", json={"text": "再见", "languages": ["ja"]}, headers=H).json()
     assert d2["outputs"] == {"ja": "こんにちは"}
     assert c.post(f"/api/translator/drafts/{d2['id']}/discard", headers=H).json()["ok"]

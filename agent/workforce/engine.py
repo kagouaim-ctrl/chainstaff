@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sqlite3
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -34,8 +35,11 @@ from agent.store import Store, _iso
 from . import db as D
 from .cron import Cron
 from .db import WorkforceDB
-from .planner import Planner, PlanError
-from .skills import ADDRESS_RE, PERMISSIONS, SKILL_BY_ID, SKILLS, SkillContext, SkillError, validate
+from . import chaintools  # noqa: F401 - registers the extra read-only chain tools
+from .chain import Cancelled
+from .planner import Planner, PlanCancelled, PlanError
+from .runtime import AgentRuntime, AnthropicProvider, Limits
+from .skills import ADDRESS_RE, AGENT_TASK, PERMISSIONS, REGISTRY, SKILL_BY_ID, SkillContext, SkillError, validate
 
 EXTRA_PERMISSIONS = {"message:peers": "可以直接给同工作区的其他员工发消息"}
 ALL_PERMISSIONS = {**PERMISSIONS, **EXTRA_PERMISSIONS}
@@ -52,6 +56,8 @@ DEFAULT_SQUAD_PERMISSIONS = ["manager_executes", "anchor_results"]
 # Skills the rule planner can plan with (it only understands addresses in the goal).
 RULE_SKILLS = ("wallet_analysis", "contract_analysis", "token_info", "contract_events", "tx_history")
 MAX_ATTACHMENT_CHARS = 12000
+# A goal whose planning was interrupted this many times (restarts mid-plan) fails instead of planning again.
+MAX_PLAN_ATTEMPTS = 3
 
 
 class WorkforceError(ValueError):
@@ -81,18 +87,27 @@ class Workforce:
     def __init__(self, store: Store, *, reader=None, etherscan: Callable[[dict], Any] | None = None,
                  tokens: dict[str, tuple[str, int]] | None = None, llm: Callable[[], Any] | None = None,
                  anchor=None, max_workers: int = 4, msg_timeout_s: int = 300,
-                 price_per_mtok: tuple[Decimal, Decimal] | None = None) -> None:
+                 price_per_mtok: tuple[Decimal, Decimal] | None = None, plan_timeout_s: float = 60.0, plan_retries: int = 2,
+                 plan_workers: int = 2) -> None:
         self.store = store
         self.db = WorkforceDB(store)
         self.reader = reader
         self.etherscan = etherscan
         self.tokens = tokens or {}
-        self.planner = Planner(llm, price_per_mtok)
+        self.planner = Planner(llm, price_per_mtok, timeout_s=plan_timeout_s, retries=plan_retries)
         self.llm = llm
+        # Agents that reason with a model run here; one provider per configured model API (only Anthropic today).
+        self.runtime = AgentRuntime(self, {"anthropic": AnthropicProvider(llm)} if llm else {}, price_per_mtok)
         self.anchor = anchor
+        self.events = None  # set by the BSC listener (agent.bsc) when it runs; chain tools query it
         self.msg_timeout = timedelta(seconds=msg_timeout_s)
+        self.instance = D.new_id("eng")  # names this process in planning claims
         self.pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="wf-agent")
+        # Planning calls a model and can take a while, so it never runs on the scheduler thread.
+        self.plan_pool = ThreadPoolExecutor(max_workers=plan_workers, thread_name_prefix="wf-plan")
         self._inflight: dict[int, Future] = {}
+        self._cancel_events: dict[str, threading.Event] = {}  # running subtask id -> set when it is cancelled
+        self._wake = threading.Event()  # set when there is new work, so the loop does not wait out its interval
         self._tick_lock = threading.Lock()
         self._goal_locks: dict[str, threading.RLock] = {}
         self._locks_lock = threading.Lock()
@@ -123,7 +138,7 @@ class Workforce:
             mc = body["model_config"] or {}
             if not isinstance(mc, dict):
                 raise WorkforceError("模型配置必须是对象")
-            f["model_config"] = {k: mc[k] for k in ("max_tokens", "effort") if k in mc}
+            f["model_config"] = {k: mc[k] for k in ("effort", *(b[0] for b in Limits.BOUNDS)) if k in mc}
         if "skills" in body:
             skills = list(dict.fromkeys(body["skills"] or []))
             bad = [s for s in skills if s not in SKILL_BY_ID]
@@ -214,6 +229,17 @@ class Workforce:
     def _open_tasks_of(self, aid: str) -> int:
         return self.db.tasks(agent=aid, status=[D.PENDING, D.ASSIGNED, D.RUNNING, D.WAITING], limit=1)[1]
 
+    @staticmethod
+    def over_budget(agent: dict) -> str | None:
+        """The agent's own spending cap (budget_usd, 0 = none): None while it has room, else why it is out."""
+        try:
+            cap, spent = Decimal(str(agent.get("budget_usd") or "0")), Decimal(str(agent.get("cost_usd") or "0"))
+        except InvalidOperation:
+            return None
+        if cap > 0 and spent >= cap:
+            return f"预算已用完（${spent} / ${cap}）"
+        return None
+
     def can_run(self, agent: dict, skill_id: str) -> str | None:
         """None if the agent may run the skill, else the reason it may not."""
         skill = SKILL_BY_ID.get(skill_id)
@@ -229,6 +255,8 @@ class Workforce:
         missing = [p for p in skill.permissions if p not in agent["permissions"]]
         if missing:
             return f"{agent['name']} 缺少权限：{', '.join(ALL_PERMISSIONS[p] for p in missing)}"
+        if skill_id == AGENT_TASK:
+            return self.runtime.available(agent)
         return None
 
     # =====================================================================
@@ -614,9 +642,14 @@ class Workforce:
 
     def submit_goal(self, wid: str, text: str, by: str, *, priority: int = 2, max_steps: int = 20,
                     budget_usd: Any = "1", timeout_s: int = 600, squad_id: str | None = None, manager_id: str | None = None,
-                    attachments: list[dict] | None = None) -> dict:
+                    attachments: list[dict] | None = None, idempotency_key: str | None = None) -> dict:
         self.workspace_or_404(wid)
         text = text.strip()
+        key = (idempotency_key or "").strip()[:128] or None
+        if key:
+            prior = self.db.task_by_idempotency_key(key)
+            if prior:
+                return self._replayed(prior, wid, text, by)
         if not text:
             raise WorkforceError("任务内容不能为空")
         if not (0 <= int(priority) <= 3):
@@ -635,9 +668,16 @@ class Workforce:
         manager = self.db.agent(check["manager_id"])
         squad = self.db.squad(check["squad_id"])
         deadline = _now() + timedelta(seconds=int(timeout_s))
-        goal = self.db.add_task(workspace_id=wid, kind="goal", title=text.splitlines()[0][:120], description=full[:4000 + MAX_ATTACHMENT_CHARS],
-                                assigned_agent=manager["id"], priority=int(priority), status=D.PENDING, max_steps=int(max_steps),
-                                budget_usd=str(budget), timeout_s=int(timeout_s), deadline_at=_iso(deadline), created_by=by, squad_id=squad["id"])
+        try:
+            goal = self.db.add_task(workspace_id=wid, kind="goal", title=text.splitlines()[0][:120], description=full[:4000 + MAX_ATTACHMENT_CHARS],
+                                    assigned_agent=manager["id"], priority=int(priority), status=D.PENDING, max_steps=int(max_steps),
+                                    budget_usd=str(budget), timeout_s=int(timeout_s), deadline_at=_iso(deadline), created_by=by, squad_id=squad["id"],
+                                    idempotency_key=key)
+        except sqlite3.IntegrityError:
+            prior = self.db.task_by_idempotency_key(key) if key else None
+            if prior is None:
+                raise
+            return self._replayed(prior, wid, text, by)  # the same request won a race a moment ago
         self.db.post(workspace_id=wid, kind="user", event="user.instruction", sender="user", text=text, task_id=goal["id"],
                      data={"by": by, "squad": squad["id"], "attachments": [{"name": f["name"], "chars": len(f["text"])} for f in files]})
         self.db.post(workspace_id=wid, kind="task", event="task.created", task_id=goal["id"],
@@ -647,7 +687,14 @@ class Workforce:
         self.db.post(workspace_id=wid, kind="agent", event="goal.submitted", sender="user", recipient=manager["id"], task_id=goal["id"],
                      text=text, dedupe_key=f"goal:{goal['id']}")
         self._audit(f"提交任务 {goal['id']}：{goal['title']}（Squad {squad['name']}）", by, {"task": goal["id"], "squad": squad["id"]})
+        self._wake.set()
         return goal
+
+    def _replayed(self, prior: dict, wid: str, text: str, by: str) -> dict:
+        """A retried submit: hand back the mission the first attempt created instead of creating another."""
+        if prior["kind"] != "goal" or prior["workspace_id"] != wid or prior["created_by"] != by or not prior["description"].startswith(text):
+            raise WorkforceError("这个请求编号（Idempotency-Key）已经用于另一个任务，请换一个新的编号")
+        return {**prior, "replayed": True}
 
     @staticmethod
     def _attachments(files: Any) -> list[dict]:
@@ -736,6 +783,7 @@ class Workforce:
             raise WorkforceError(f"任务已经{root['status']}，不能取消")
         self._end_goal(root, D.CANCELLED, reason or f"由 {by} 取消")
         self._audit(f"取消任务 {root['id']}", by, {"task": root["id"]})
+        self._wake.set()
         return self.db.task(root["id"])
 
     def retry(self, tid: str, by: str) -> dict:
@@ -763,16 +811,23 @@ class Workforce:
             raise WorkforceError(f"没有任务 {tid}")
         return t
 
-    def _end_goal(self, root: dict, status: str, reason: str) -> None:
-        for s in self.db.subtasks(root["id"]):
-            if s["status"] not in D.FINAL:
-                self.db.transition(s["id"], (s["status"],), D.CANCELLED, error=reason[:500])
-        for m in self.db.messages(root_id=root["id"], limit=1000):
-            if m["recipient"] and m["status"] in (D.QUEUED, D.DELIVERED) and m["id"] not in self._inflight:
-                self.db.set_message_status(m["id"], (D.QUEUED, D.DELIVERED), D.EXPIRED)
-        self.db.transition(root["id"], (D.PENDING, D.RUNNING, D.WAITING, D.REVIEW), status, error=reason[:500])
-        self.db.post(workspace_id=root["workspace_id"], kind="task", event=f"task.{status}", task_id=root["id"],
-                     text=f"任务 {root['id']} {dict(failed='失败', cancelled='已取消')[status]}：{reason}")
+    def _end_goal(self, root: dict, status: str, reason: str) -> bool:
+        """Fail or cancel a goal and everything under it. Running skills are told to stop, and whatever they
+        return afterwards is discarded (see _execute). Returns False if the goal had already ended."""
+        with self._goal_lock(root["id"]):
+            if not self.db.transition(root["id"], (D.PENDING, D.RUNNING, D.WAITING, D.REVIEW), status, error=reason[:500]):
+                return False
+            for s in self.db.subtasks(root["id"]):
+                if s["status"] not in D.FINAL and self.db.transition(s["id"], (s["status"],), D.CANCELLED, error=reason[:500]):
+                    ev = self._cancel_events.get(s["id"])
+                    if ev:
+                        ev.set()
+            for m in self.db.messages(root_id=root["id"], limit=1000):
+                if m["recipient"] and m["status"] in (D.QUEUED, D.DELIVERED) and m["id"] not in self._inflight:
+                    self.db.set_message_status(m["id"], (D.QUEUED, D.DELIVERED), D.EXPIRED)
+            self.db.post(workspace_id=root["workspace_id"], kind="task", event=f"task.{status}", task_id=root["id"],
+                         text=f"任务 {root['id']} {dict(failed='失败', cancelled='已取消')[status]}：{reason}")
+            return True
 
     # =====================================================================
     # the bus
@@ -823,18 +878,22 @@ class Workforce:
                     self.tick()
                 except Exception as e:  # keep the loop alive; the error is on the timeline
                     self.db.post(workspace_id="", kind="system", event="engine.error", text=f"调度出错：{e}"[:500])
-                self._stop.wait(interval_s)
+                # Finished work and new missions wake the loop at once; the interval is only the idle heartbeat.
+                self._wake.wait(interval_s)
+                self._wake.clear()
 
         self._thread = threading.Thread(target=loop, name="wf-engine", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
         self._stop.set()
+        self._wake.set()
+        self.plan_pool.shutdown(wait=True)
         self.pool.shutdown(wait=True)
 
     def recover(self) -> int:
         """After a restart: in-flight work from the previous process is put back in the queue."""
-        n = 0
+        n = self._recover_planning()
         for m in self.db.stale_messages(_now() + timedelta(days=1)):
             if m["status"] == D.DELIVERED:
                 self.db.set_message_status(m["id"], (D.DELIVERED,), D.QUEUED, bump=True)
@@ -845,6 +904,40 @@ class Workforce:
                 n += 1
         if n:
             self.db.post(workspace_id="", kind="system", event="engine.recovered", text=f"重启后恢复了 {n} 项进行中的工作")
+        return n
+
+    def _recover_planning(self) -> int:
+        """Goals the previous process had claimed for planning (status running) but never finished planning.
+
+        Planning writes all subtasks and moves the goal to waiting in one transaction, so a running goal has
+        either no subtasks (the plan was lost: plan again) or, from older versions, all of them (carry on).
+        """
+        n = 0
+        for g in self.db.open_goals():
+            if g["status"] != D.RUNNING or (g["plan_claim"] or {}).get("engine") == self.instance:
+                continue
+            claim = g["plan_claim"] or {}
+            if self.db.subtasks(g["id"]):
+                if self.db.transition(g["id"], (D.RUNNING,), D.WAITING):
+                    self.db.post(workspace_id=g["workspace_id"], kind="system", event="plan.recovered", task_id=g["id"],
+                                 text="重启前已写好的子任务继续执行")
+                    n += 1
+                continue
+            if int(claim.get("attempt") or 1) >= MAX_PLAN_ATTEMPTS:
+                self._end_goal(g, D.FAILED, f"规划被中断 {claim.get('attempt')} 次，不再重试")
+                n += 1
+                continue
+            if not self.db.transition(g["id"], (D.RUNNING,), D.PENDING, plan_claim={**claim, "interrupted_at": _iso(_now())}):
+                continue
+            msg = self.db.goal_message(g["id"])
+            if msg:
+                self.db.requeue_message(msg["id"])
+            else:
+                self.db.post(workspace_id=g["workspace_id"], kind="agent", event="goal.submitted", sender="system", recipient=g["assigned_agent"],
+                             task_id=g["id"], text=g["title"], dedupe_key=f"goal:{g['id']}:replan:{claim.get('attempt') or 1}")
+            self.db.post(workspace_id=g["workspace_id"], kind="system", event="plan.requeued", task_id=g["id"],
+                         text="规划在重启前被中断，已重新排队规划（不会重复创建子任务）")
+            n += 1
         return n
 
     def tick(self) -> int:
@@ -859,6 +952,11 @@ class Workforce:
             n += self._redispatch()
             n += self._poll_anchors()
             return n
+
+    def drain(self, timeout_s: float = 30) -> None:
+        """Wait for the agent runs and plans that are in flight right now (tests, CLI)."""
+        for f in list(self._inflight.values()):
+            f.result(timeout=timeout_s)
 
     def run_until_idle(self, max_rounds: int = 200, timeout_s: float = 60) -> None:
         """Drive the loop synchronously until nothing is left to do (tests, CLI)."""
@@ -889,7 +987,9 @@ class Workforce:
                 if ev == "task.assign":
                     self._inflight[m["id"]] = self.pool.submit(self._execute_safe, a["id"], m)
                 elif ev == "goal.submitted":
-                    self._plan(a, m)
+                    goal = self._claim_plan(m)
+                    if goal:
+                        self._inflight[m["id"]] = self.plan_pool.submit(self._plan_job, goal["id"], a["id"], m["id"])
                 elif ev == "task.result":
                     self._collect(m)
                 else:
@@ -944,22 +1044,88 @@ class Workforce:
             return self._goal_locks.setdefault(root_id, threading.RLock())
 
     def _plan(self, manager: dict, m: dict) -> None:
-        goal = self.db.task(m["task_id"])
-        self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
-        if goal is None or not self.db.transition(goal["id"], (D.PENDING,), D.RUNNING):
+        """Claim and plan a goal on the calling thread (tests and tools; the loop plans on plan_pool)."""
+        goal = self._claim_plan(m)
+        if goal:
+            self._plan_job(goal["id"], manager["id"], m["id"])
+
+    def _claim_plan(self, m: dict) -> dict | None:
+        """Take a submitted goal for planning: pending -> running, with a claim saying who and which attempt."""
+        goal = self.db.task(m["task_id"]) if m["task_id"] else None
+        if goal is None or goal["status"] != D.PENDING:
+            self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
+            return None
+        attempt = int((goal["plan_claim"] or {}).get("attempt") or 0) + 1
+        claim = {"engine": self.instance, "at": _iso(_now()), "attempt": attempt, "message": m["id"]}
+        if not self.db.transition(goal["id"], (D.PENDING,), D.RUNNING, plan_claim=claim):
+            self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
+            return None
+        return self.db.task(goal["id"])
+
+    def _plan_job(self, goal_id: str, manager_id: str, mid: int) -> None:
+        try:
+            self._plan_claimed(goal_id, manager_id)
+        except Exception as e:  # an unexpected error must not leave the goal in planning forever
+            g = self.db.task(goal_id)
+            if g and g["status"] == D.RUNNING:
+                self._end_goal(g, D.FAILED, f"规划出错：{type(e).__name__}: {e}"[:300])
+        finally:
+            self.db.set_message_status(mid, (D.DELIVERED,), D.PROCESSED)
+            self._wake.set()
+
+    def _plan_claimed(self, goal_id: str, manager_id: str) -> None:
+        goal = self.db.task(goal_id)
+        manager = self.db.agent(manager_id)
+        if goal is None or goal["status"] != D.RUNNING or manager is None:
             return
+        attempt = (goal["plan_claim"] or {}).get("attempt")
         members = self._roster(goal)
         wid = goal["workspace_id"]
         self.db.post(workspace_id=wid, kind="agent", event="agent.started", sender=manager["id"], task_id=goal["id"],
                      text=f"收到任务，正在按 {len(members)} 名在岗员工的技能拆分工作流",
                      data={"executors": [a["id"] for a in members], "squad": goal.get("squad_id")})
+
+        def gone() -> bool:
+            g = self.db.task(goal_id)
+            return g is None or g["status"] != D.RUNNING or (g["plan_claim"] or {}).get("attempt") != attempt
+
+        broke = self.over_budget(manager)
+        if broke and manager["provider"] == "anthropic" and self.llm:
+            self.db.post(workspace_id=wid, kind="system", event="plan.note", task_id=goal["id"], sender=manager["id"],
+                         text=f"{manager['name']} {broke}，这次不调用模型，改用规则规划")
         try:
-            plan = self.planner.plan(goal["description"], manager, members, self)
+            plan = self.planner.plan(goal["description"], manager, members, self, use_model=broke is None, cancelled=gone)
+        except PlanCancelled as e:
+            self._charge(goal["id"], manager["id"], e.usage)
+            self._discard_plan(goal, manager["id"])
+            return
         except PlanError as e:
+            if gone():
+                self._discard_plan(goal, manager["id"])
+                return
             self.db.bump_task(goal["id"], steps=1)
             self._end_goal(self.db.task(goal["id"]), D.FAILED, str(e))
             return
-        self._charge(goal["id"], manager["id"], plan.usage)
+        self._charge(goal["id"], manager["id"], plan.usage)  # the model was paid for even if the plan is thrown away
+        with self._goal_lock(goal_id), self.db.atomic():
+            if gone():
+                written = None
+            elif self.db.subtasks(goal_id):
+                return  # pragma: no cover - already planned (cannot happen with one claim, but never write a second set of subtasks)
+            else:
+                written = self._write_plan(goal, manager, plan)
+        if written is None:
+            self._discard_plan(goal, manager["id"])
+            return
+        self._dispatch(goal_id)
+
+    def _discard_plan(self, goal: dict, manager_id: str) -> None:
+        self.db.post(workspace_id=goal["workspace_id"], kind="system", event="plan.discarded", task_id=goal["id"], sender=manager_id,
+                     text="任务在规划期间已结束（取消或超时），规划结果作废，没有创建子任务")
+
+    def _write_plan(self, goal: dict, manager: dict, plan) -> list[str]:
+        """Subtasks, the plan event and goal running -> waiting; the caller holds a transaction around it."""
+        wid = goal["workspace_id"]
         self.db.update_task(goal["id"], planner=plan.planner)
         if plan.notes:
             self.db.post(workspace_id=wid, kind="system", event="plan.note", task_id=goal["id"], sender=manager["id"], text="；".join(plan.notes))
@@ -978,13 +1144,19 @@ class Workforce:
                                                                "agent": s.agent_id, "depends_on": [keys[k] for k in s.depends_on]} for s in plan.steps]})
         self.db.bump_task(goal["id"], steps=1)
         self.db.transition(goal["id"], (D.RUNNING,), D.WAITING)
-        self._dispatch(goal["id"])
+        return list(keys.values())
 
     def _dispatch(self, root_id: str) -> int:
         with self._goal_lock(root_id):
             goal = self.db.task(root_id)
             if goal is None or goal["status"] != D.WAITING:
                 return 0
+            # Dynamic delegation: once the manager knows what kind of address it is, it adds the right follow-ups.
+            # Done here, before anything is handed out, so the report never starts ahead of the follow-ups.
+            if goal["planner"] == "rules":
+                for s in self.db.subtasks(root_id):
+                    if s["status"] == D.COMPLETED and s["skill"] == "wallet_analysis" and not self.db.has_message(f"expand:{s['id']}"):
+                        self._expand(goal, s)
             subs = {s["id"]: s for s in self.db.subtasks(root_id)}
             n = 0
             for s in sorted(subs.values(), key=lambda x: (x["priority"], x["created_at"])):
@@ -1054,11 +1226,7 @@ class Workforce:
         root = self.db.task(t["root_id"])
         if root["status"] != D.WAITING:
             return
-        with self._goal_lock(root["id"]):
-            # Dynamic delegation: once the manager knows what kind of address it is, it adds the right follow-ups.
-            if t["status"] == D.COMPLETED and t["skill"] == "wallet_analysis" and root["planner"] == "rules":
-                self._expand(root, t)
-            self._dispatch(root["id"])
+        self._dispatch(root["id"])  # expands rule plans first, see _dispatch
 
     def _expand(self, root: dict, done: dict) -> None:
         addr = done["input"]["address"]
@@ -1089,7 +1257,10 @@ class Workforce:
             if skipped:
                 text += f"；团队里没有会 {', '.join(skipped)} 的员工，跳过"
             self.db.post(workspace_id=root["workspace_id"], kind="agent", event="plan.expanded", sender=root["assigned_agent"], task_id=root["id"],
-                         text=text, data={"added": [t["id"] for t in added]})
+                         text=text, data={"added": [t["id"] for t in added]}, dedupe_key=f"expand:{done['id']}")
+        else:
+            self.db.post(workspace_id=root["workspace_id"], kind="system", event="plan.checked", task_id=root["id"],
+                         text=f"{addr[:10]}… 不需要追加子任务", dedupe_key=f"expand:{done['id']}")
 
     def _maybe_finalize(self, root_id: str) -> None:
         goal = self.db.task(root_id)
@@ -1131,6 +1302,8 @@ class Workforce:
             self._execute(agent_id, m)
         except Exception as e:  # pragma: no cover - last-resort guard so a thread never dies silently
             self.db.post(workspace_id=m["workspace_id"], kind="system", event="engine.error", task_id=m["task_id"], text=f"执行出错：{e}"[:500])
+        finally:
+            self._wake.set()
 
     def _execute(self, agent_id: str, m: dict) -> None:
         agent = self.db.agent(agent_id)
@@ -1145,8 +1318,18 @@ class Workforce:
             self.db.transition(t["id"], (D.ASSIGNED,), D.RUNNING)
             self._fail_attempt(self.db.task(t["id"]), f"权限拒绝：{reason}", transient=False, reassignable=True)
             return
-        if not self.db.transition(t["id"], (D.ASSIGNED,), D.RUNNING):
-            return
+        # Registered before the claim, so a cancel that lands right after it still reaches this run.
+        stop = self._cancel_events[t["id"]] = threading.Event()
+        try:
+            if not self.db.transition(t["id"], (D.ASSIGNED,), D.RUNNING):
+                self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
+                return
+            self._run_skill(agent, t, m, stop)
+        finally:
+            self._cancel_events.pop(t["id"], None)
+
+    def _run_skill(self, agent: dict, t: dict, m: dict, stop: threading.Event) -> None:
+        agent_id, wid = agent["id"], t["workspace_id"]
         skill = SKILL_BY_ID[t["skill"]]
         handoffs = [h for h in self.db.inbox(agent_id, limit=200) if h["event"] == "handoff" and (h["data"] or {}).get("task") in t["depends_on"]]
         upstream = [h["data"] for h in handoffs]
@@ -1154,46 +1337,81 @@ class Workforce:
                      text=f"开始：{t['title']}" + (f"（收到 {len(upstream)} 份同事交接的结果）" if upstream else ""))
         self.db.post(workspace_id=wid, kind="tool", event="tool.start", sender=agent_id, task_id=t["id"], text=f"{skill.id} v{skill.version}",
                      data={"skill": skill.id, "input": t["input"]})
-        ctx = SkillContext(self.reader, self.etherscan, self.tokens, upstream)
+        ctx = SkillContext(None, None, self.tokens, upstream, cancelled=stop.is_set, events=self.events)
+        # This run's own reader: it counts only this run's RPC calls and stops reading once the task is cancelled.
+        ctx.reader = self.reader.fork(ctx.check) if self.reader else None
+        if self.etherscan:
+            ctx.etherscan = lambda params: self._checked(ctx, self.etherscan, params)
         started = time.monotonic()
         try:
             validate(skill.input_schema, t["input"])
-            out = skill.run(ctx, dict(t["input"]))
-            if t["skill"] == "data_report" and agent["provider"] == "anthropic" and self.llm:
+            ctx.check()
+            if t["skill"] == AGENT_TASK:
+                out = self.runtime.run(agent, t, ctx)  # the agent reasons and calls its own tools; each has its own timeout
+            else:
+                ctx.deadline = time.monotonic() + skill.timeout_s
+                out = skill.run(ctx, dict(t["input"]))
+            ctx.check()
+            if t["skill"] == "data_report" and agent["provider"] == "anthropic" and self.llm and self.over_budget(agent) is None:
                 summary, usage = self.planner.summarize(agent, out["report_md"])
                 self._charge(t["id"], agent_id, usage)
+                ctx.check()
                 out["report_md"] += "\n\n## 摘要（模型生成）\n\n" + summary
                 out["sha256"] = "0x" + hashlib.sha256(out["report_md"].encode()).hexdigest()
                 ctx.log(f"模型摘要 {usage['input_tokens']}+{usage['output_tokens']} tokens")
-        except SkillError as e:
-            self._tool_done(t, agent_id, ctx, started, error=str(e))
-            self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
-            self._fail_attempt(self.db.task(t["id"]), str(e), transient=False)
+        except Cancelled:
+            self._discard_run(t, agent_id, ctx, started, m)
             return
         except Exception as e:
-            self._tool_done(t, agent_id, ctx, started, error=f"{type(e).__name__}: {e}"[:300])
-            self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
-            self._fail_attempt(self.db.task(t["id"]), f"{type(e).__name__}: {e}"[:300], transient=True)
+            error = str(e) if isinstance(e, SkillError) else f"{type(e).__name__}: {e}"[:300]
+            with self._goal_lock(t["root_id"]):
+                if stop.is_set() or (self.db.task(t["id"]) or {}).get("status") != D.RUNNING:
+                    self._discard_run(t, agent_id, ctx, started, m)
+                    return
+                self._tool_done(t, agent_id, ctx, started, error=error)
+                self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
+                self._fail_attempt(self.db.task(t["id"]), error, transient=not isinstance(e, SkillError))
             return
-        self._tool_done(t, agent_id, ctx, started, output=out)
-        for h in handoffs:
-            self.db.set_message_status(h["id"], (D.QUEUED, D.DELIVERED), D.PROCESSED)
         h = out.get("sha256") if t["skill"] == "data_report" else result_hash(out)
-        self.db.transition(t["id"], (D.RUNNING,), D.COMPLETED, result=out, result_hash=h, error=None)
-        self.db.post(workspace_id=wid, kind="task", event="task.completed", sender=agent_id, task_id=t["id"],
-                     text=f"{t['title']} 完成", data={"result_hash": h, "secs": round(time.monotonic() - started, 2)})
-        self.db.remember("agent", agent_id, f"[{t['id']}] {t['title']}：{self._brief(out)}", source=t["id"], ttl_days=90)
-        if t["skill"] == "data_report":
-            self.db.remember("workspace", wid, f"[{t['root_id']}] {out['title']}：" + ("；".join(out["findings"]) or "无风险点"), source=t["id"])
-        self._handoff(t, agent_id, out)
-        self._report_to_manager(t, agent_id, ok=True)
+        # Commit under the goal lock: a cancel either lands first (and the result is discarded) or after (and
+        # everything below is already on the timeline before the cancellation). Never both.
+        with self._goal_lock(t["root_id"]):
+            if stop.is_set() or not self.db.transition(t["id"], (D.RUNNING,), D.COMPLETED, result=out, result_hash=h, error=None):
+                self._discard_run(t, agent_id, ctx, started, m)
+                return
+            self._tool_done(t, agent_id, ctx, started, output=out)
+            for hm in handoffs:
+                self.db.set_message_status(hm["id"], (D.QUEUED, D.DELIVERED), D.PROCESSED)
+            self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)  # the assignment is done; do not deliver it again
+            self.db.post(workspace_id=wid, kind="task", event="task.completed", sender=agent_id, task_id=t["id"],
+                         text=f"{t['title']} 完成", data={"result_hash": h, "secs": round(time.monotonic() - started, 2)})
+            self.db.remember("agent", agent_id, f"[{t['id']}] {t['title']}：{self._brief(out)}", source=t["id"], ttl_days=90)
+            if t["skill"] == "data_report":
+                self.db.remember("workspace", wid, f"[{t['root_id']}] {out['title']}：" + ("；".join(out["findings"]) or "无风险点"), source=t["id"])
+            self._handoff(t, agent_id, out)
+            self._report_to_manager(t, agent_id, ok=True)
+
+    @staticmethod
+    def _checked(ctx: SkillContext, fn: Callable[[dict], Any], params: dict) -> Any:
+        ctx.check()
+        out = fn(params)
+        ctx.check()
+        return out
+
+    def _discard_run(self, t: dict, agent_id: str, ctx: SkillContext, started: float, m: dict) -> None:
+        """The task was cancelled or timed out while this run was going: nothing it produced is committed."""
+        self.db.set_message_status(m["id"], (D.DELIVERED,), D.PROCESSED)
+        self.db.post(workspace_id=t["workspace_id"], kind="tool", event="tool.cancelled", sender=agent_id, task_id=t["id"],
+                     text="任务已取消或超时，停止执行，本次结果作废",
+                     data={"skill": t["skill"], "secs": round(time.monotonic() - started, 3), "logs": ctx.logs,
+                           "rpc_calls": ctx.reader.calls if ctx.reader else 0})
 
     def _tool_done(self, t: dict, agent_id: str, ctx: SkillContext, started: float, output: dict | None = None, error: str | None = None) -> None:
         secs = round(time.monotonic() - started, 3)
-        calls = ctx.reader.calls if ctx.reader else 0
+        calls = ctx.reader.calls if ctx.reader else 0  # this run's calls only (each run reads through its own fork)
         self.db.post(workspace_id=t["workspace_id"], kind="tool", event="tool.error" if error else "tool.done", sender=agent_id, task_id=t["id"],
                      text=(f"失败：{error}" if error else f"完成，用时 {secs}s"),
-                     data={"skill": t["skill"], "secs": secs, "logs": ctx.logs, "error": error, "rpc_calls_total": calls,
+                     data={"skill": t["skill"], "secs": secs, "logs": ctx.logs, "error": error, "rpc_calls": calls,
                            "output_preview": json.dumps(output, ensure_ascii=False)[:1500] if output else None})
 
     def _handoff(self, t: dict, agent_id: str, out: dict) -> None:
@@ -1275,7 +1493,7 @@ class Workforce:
         elif a["status"] != D.AGENT_ACTIVE:
             reason = f"不在岗（{a['status']}）"
         else:
-            reason = self.can_run(a, t["skill"])
+            reason = self.can_run(a, t["skill"]) or self.over_budget(a)
             if reason is None and goal["planner"] != "direct" and goal.get("squad_id") and a["id"] not in {x["id"] for x in self._roster(goal)}:
                 reason = "已不在这个 Squad 里"
             if reason and reason.startswith(a["name"]):
@@ -1455,19 +1673,22 @@ class Workforce:
 
     def _seed_skills(self) -> None:
         states = self.db.skill_states()
-        for s in SKILLS:
+        for s in REGISTRY.all():
             if s.id not in states:
                 self.db.set_skill_state(s.id, True, True, s.version)
 
     def skill_state(self, sid: str) -> dict:
         st = self.db.skill_states().get(sid)
+        if st is None and sid in SKILL_BY_ID:  # a tool registered after start: installed and enabled, like the built-ins
+            self.db.set_skill_state(sid, True, True, SKILL_BY_ID[sid].version)
+            st = self.db.skill_states().get(sid)
         return {"installed": bool(st and st["installed"]), "enabled": bool(st and st["enabled"]), "version": st["version"] if st else None}
 
     def skills_view(self) -> list[dict]:
         states = self.db.skill_states()
         agents = self.db.agents(include_archived=False)
         out = []
-        for s in SKILLS:
+        for s in REGISTRY.all():
             st = states.get(s.id) or {}
             missing = [e for e in s.requires if not self._requirement_met(e)]
             out.append({**s.public(), "installed": bool(st.get("installed")), "enabled": bool(st.get("enabled")),
@@ -1510,7 +1731,9 @@ class Workforce:
             raise WorkforceError(f"没有技能 {sid}")
         if not self.skill_state(sid)["enabled"]:
             raise WorkforceError(f"技能 {s.name} 没有启用")
-        ctx = SkillContext(self.reader, self.etherscan, self.tokens)
+        if sid == AGENT_TASK:
+            raise WorkforceError("自主执行要交给一个员工（它用自己的模型和权限），不能在技能页直接运行")
+        ctx = SkillContext(self.reader, self.etherscan, self.tokens, deadline=time.monotonic() + s.timeout_s, events=self.events)
         try:
             validate(s.input_schema, inp)
             out = s.run(ctx, dict(inp))

@@ -540,6 +540,7 @@ def test_bad_model_plans_fall_back_to_rules(wf, bad, why):
     llm.texts = [json.dumps(bad).replace("CONTRACT", t.contract["id"]) if isinstance(bad, dict) else bad]
     g = wf.submit_goal(t.ws["id"], f"Analyze {TOKEN}", "owner")
     wf.tick()
+    wf.drain()  # planning runs off the scheduler thread
     note = [m["text"] for m in wf.db.messages(root_id=g["id"], limit=100) if m["event"] == "plan.note"][0]
     assert why in note and "改用规则规划" in note
     assert wf.db.task(g["id"])["planner"] == "rules"

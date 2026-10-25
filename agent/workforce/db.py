@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 import secrets
 import sqlite3
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
@@ -223,6 +225,10 @@ CREATE TABLE IF NOT EXISTS wf_chain_records (
 MIGRATIONS = (
     ("wf_tasks", "squad_id", "TEXT"),
     ("wf_agents", "max_concurrency", "INTEGER NOT NULL DEFAULT 2"),
+    # The client's request key for a mission submit; the same key never creates a second mission.
+    ("wf_tasks", "idempotency_key", "TEXT"),
+    # Who is planning a goal and since when: {"engine": instance id, "at": iso time, "attempt": n}.
+    ("wf_tasks", "plan_claim", "TEXT"),
 )
 
 SQUAD_ACTIVE, SQUAD_PAUSED, SQUAD_DELETED = "active", "paused", "deleted"
@@ -241,7 +247,7 @@ def _load(v: str | None, default: Any = None) -> Any:
 
 
 AGENT_JSON = ("model_config", "skills", "permissions", "onchain")
-TASK_JSON = ("input", "depends_on", "result")
+TASK_JSON = ("input", "depends_on", "result", "plan_claim")
 
 
 class WorkforceDB:
@@ -256,6 +262,32 @@ class WorkforceDB:
             if col not in cols:
                 self._db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         self._db.execute("CREATE INDEX IF NOT EXISTS wf_tasks_squad ON wf_tasks(squad_id, status)")
+        self._db.execute("CREATE UNIQUE INDEX IF NOT EXISTS wf_tasks_idem ON wf_tasks(idempotency_key) WHERE idempotency_key IS NOT NULL")
+        self._tx = threading.local()
+
+    @contextmanager
+    def atomic(self):
+        """One SQLite transaction; other threads wait on the shared lock until it commits or rolls back."""
+        with self._lock:
+            depth = getattr(self._tx, "depth", 0)
+            if depth:
+                self._tx.depth = depth + 1
+                try:
+                    yield
+                finally:
+                    self._tx.depth = depth
+                return
+            self._db.execute("BEGIN IMMEDIATE")
+            self._tx.depth = 1
+            try:
+                yield
+            except BaseException:
+                self._db.execute("ROLLBACK")
+                raise
+            else:
+                self._db.execute("COMMIT")
+            finally:
+                self._tx.depth = 0
 
     # ---- agents ----
 
@@ -459,6 +491,10 @@ class WorkforceDB:
         r = self._db.execute("SELECT * FROM wf_tasks WHERE id = ?", (tid,)).fetchone()
         return self._task(r) if r else None
 
+    def task_by_idempotency_key(self, key: str) -> dict | None:
+        r = self._db.execute("SELECT * FROM wf_tasks WHERE idempotency_key = ?", (key,)).fetchone()
+        return self._task(r) if r else None
+
     def subtasks(self, root_id: str) -> list[dict]:
         rows = self._db.execute("SELECT * FROM wf_tasks WHERE root_id = ? AND id != ? ORDER BY created_at, id", (root_id, root_id)).fetchall()
         return [self._task(r) for r in rows]
@@ -559,6 +595,7 @@ class WorkforceDB:
         d["input"] = _load(d["input"], {})
         d["depends_on"] = _load(d["depends_on"], [])
         d["result"] = _load(d["result"])
+        d["plan_claim"] = _load(d.get("plan_claim"))
         return d
 
     # ---- messages / timeline ----
@@ -629,6 +666,19 @@ class WorkforceDB:
         sql = (f"UPDATE wf_messages SET status = ?, updated_at = ?{', attempts = attempts + 1' if bump else ''}"
                f" WHERE id = ? AND status IN ({','.join('?' * len(allowed_from))})")
         return self._db.execute(sql, (to, _now(), mid, *allowed_from)).rowcount == 1
+
+    def has_message(self, dedupe_key: str) -> bool:
+        return self._db.execute("SELECT 1 FROM wf_messages WHERE dedupe_key = ?", (dedupe_key,)).fetchone() is not None
+
+    def goal_message(self, task_id: str) -> dict | None:
+        r = self._db.execute("SELECT * FROM wf_messages WHERE task_id = ? AND event = 'goal.submitted' ORDER BY id DESC LIMIT 1",
+                             (task_id,)).fetchone()
+        return self._msg(r) if r else None
+
+    def requeue_message(self, mid: int) -> bool:
+        """Put a directed message back in its recipient's inbox, whatever state it reached."""
+        return self._db.execute("UPDATE wf_messages SET status = ?, updated_at = ? WHERE id = ? AND recipient IS NOT NULL",
+                                (QUEUED, _now(), mid)).rowcount == 1
 
     def reroute_handoffs(self, task_id: str, recipient: str) -> int:
         return self._db.execute("UPDATE wf_messages SET recipient = ?, updated_at = ? WHERE task_id = ? AND event = 'handoff' AND status IN (?, ?)",

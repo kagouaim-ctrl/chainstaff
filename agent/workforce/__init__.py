@@ -18,8 +18,6 @@ def build_workforce(store, chain=None, env=None, rpc_factory=None, anthropic_fac
     import os
     from decimal import Decimal
 
-    from agent.execution.rpc import RpcClient
-
     from .anchor import Anchor
     from .chain import ChainReader
 
@@ -27,7 +25,12 @@ def build_workforce(store, chain=None, env=None, rpc_factory=None, anthropic_fac
     reader = etherscan = anchor = None
     tokens = {}
     if chain:
-        rpc = (rpc_factory or RpcClient)(chain.rpc_url)
+        if rpc_factory is None:
+            from agent.bsc.rpc import RpcPool
+
+            # Several endpoints with failover, retries, rate limits and a short cache; still a plain RpcClient to callers.
+            rpc_factory = lambda url: RpcPool(chain.http_endpoints, chain_id=chain.chain_id)  # noqa: E731
+        rpc = rpc_factory(chain.rpc_url)
         reader = ChainReader(rpc, chain.network, chain.chain_id, chain.explorer_tx_url)
         tokens = {s: (t.address, t.decimals) for s, t in chain.tokens.items() if t.address}
         if chain.explorer_api_url and env.get("ETHERSCAN_API_KEY"):

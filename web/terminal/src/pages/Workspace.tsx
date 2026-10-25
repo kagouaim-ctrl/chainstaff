@@ -4,6 +4,7 @@ import { AgentStatus } from "../components/AgentStatus";
 import { ExecutionLogs } from "../components/Execution";
 import { ExecutionFeed } from "../components/ExecutionFeed";
 import { ExecutionInspector, type ExecTab } from "../components/ExecutionInspector";
+import { LiveBoard } from "../components/LiveBoard";
 import { MissionHeader, MissionStage } from "../components/Mission";
 import { AddMemberDialog, SquadForm } from "../components/SquadForm";
 import { TaskComposer } from "../components/TaskComposer";
@@ -231,6 +232,7 @@ function MissionView({ m, d, ws, squad, taskId, onTask, onLaunched, onSquad, mob
                 {mobile && <button className="btn ghost xs" onClick={() => setLogs(!logs)}>{logs ? "Hide logs" : "Logs"}</button>}
               </div>
               <div className="brief"><span className="label">Brief</span>{d.messages.find((x) => x.event === "user.instruction")?.text || m.brief}</div>
+              <LiveBoard d={d} onTask={(id) => onTask(id)} />
               <ExecutionFeed d={d} onTask={(id) => onTask(id)} />
               {mobile && logs && <div style={{ marginTop: 10 }}><ExecutionLogs d={d} /></div>}
             </section>

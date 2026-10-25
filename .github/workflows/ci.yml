@@ -23,7 +23,32 @@ jobs:
       - name: Static security scan
         run: |
           pip install semgrep
-          semgrep scan --config p/python --config p/secrets --error agent bot backend scripts
+          semgrep scan --config p/python --config p/secrets --error agent backend scripts
+
+  bsc-testnet:
+    # Read-only checks against the real BSC testnet (public RPC and WebSocket nodes): no keys, no transactions.
+    # Kept apart from "test" so a slow public node never blocks a PR; the result is evidence, not a gate.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: BSC testnet smoke test
+        env:
+          KAGOU_TESTNET: "1"
+          KAGOU_TESTNET_OUT: testnet-results.json
+        run: pytest tests/test_bsc_testnet.py -v -p no:cacheprovider
+      - name: Results
+        if: always()
+        run: |
+          if [ -f testnet-results.json ]; then
+            { echo '### BSC testnet'; echo '```json'; cat testnet-results.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            cat testnet-results.json
+          fi
 
   terminal:
     runs-on: ubuntu-latest

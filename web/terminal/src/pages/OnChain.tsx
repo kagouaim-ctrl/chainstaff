@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Play, RefreshCw, Search, X } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
+import { ChainLive } from "../components/ChainLive";
 import { ExecutionSteps } from "../components/Execution";
 import { OnChainLedger, PROOF_ORDER, proofCounts } from "../components/OnChainLedger";
 import { ChainPanel, VerifyButton } from "../components/TransactionStatus";
@@ -11,7 +12,7 @@ import { useAction, useAgentName, useAgents, useChain, useLedger, useMission, us
 import type { LedgerRow, Proof, ProofState } from "../lib/types";
 import { fmtTime, go, num, plural, setParams, short, useIsMobile, weiToBnb, weiToGwei, type Route } from "../lib/util";
 
-type Tab = "ledger" | "tx" | "registry" | "events" | "wallet";
+type Tab = "ledger" | "live" | "tx" | "registry" | "events" | "wallet";
 
 /** The trust layer: which agent did what, what it produced, and whether that result is provably on chain. */
 export default function OnChain({ route }: { route: Route }) {
@@ -27,9 +28,10 @@ export default function OnChain({ route }: { route: Route }) {
         <Tabs<Tab>
           value={tab}
           onChange={(t) => go("onchain", undefined, t === "ledger" ? {} : { tab: t })}
-          options={[["ledger", "Execution ledger"], ["tx", "Transactions"], ["registry", "Agent registry"], ["events", "Contract events"], ["wallet", "Wallet lookup"]]}
+          options={[["ledger", "Execution ledger"], ["live", "Live chain"], ["tx", "Transactions"], ["registry", "Agent registry"], ["events", "Contract events"], ["wallet", "Wallet lookup"]]}
         />
         {tab === "ledger" && <Ledger route={route} />}
+        {tab === "live" && <ChainLive />}
         {tab === "tx" && <TxTable q={route.params.get("q") || ""} />}
         {tab === "registry" && <Registry />}
         {tab === "events" && <SkillRunner skill="contract_events" extra={{ blocks: 1000 }} label="Read events" />}

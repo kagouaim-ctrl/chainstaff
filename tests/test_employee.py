@@ -23,7 +23,7 @@ def send(emp, text, rid, at=NOW, who="@lina"):
 
 def test_config_loads(emp):
     assert len(emp.policy.whitelist) == 3
-    assert emp.owners == frozenset({"your_telegram_username"})
+    assert emp.owners == frozenset({"owner_username"})
 
 
 def test_green_reply_says_dry_run(emp):
@@ -79,10 +79,10 @@ def test_daily_limit_accumulates_through_employee(emp):
 def test_only_owner_can_pause(emp):
     assert "只有老板" in emp.pause("lina", 123)
     assert not emp.policy.paused
-    assert "已暂停" in emp.pause("Your_Telegram_Username", 999)
+    assert "已暂停" in emp.pause("Owner_Username", 999)
     assert send(emp, "付 Alice 1 USDT 设计", "r1").decision.outcome is Outcome.BLOCK
     assert "只有老板" in emp.resume("lina")
-    assert "已恢复" in emp.resume("@your_telegram_username")
+    assert "已恢复" in emp.resume("@owner_username")
     assert send(emp, "付 Alice 1 USDT 设计", "r2").decision.outcome is Outcome.AUTO_PAY
 
 
@@ -97,7 +97,7 @@ def test_rules_text(emp):
     assert "USDT：单笔 ≤ 500，每日自动付 ≤ 2,000" in t
     assert "Mia（需审批）" in t
     assert "KOL" in t
-    emp.pause("your_telegram_username")
+    emp.pause("owner_username")
     assert "已暂停" in emp.rules_text()
 
 
@@ -119,13 +119,9 @@ def test_today_text(emp):
     assert "还没有付款请求" in emp.today_text(NOW + timedelta(days=1))
 
 
-def test_bot_dispatcher_builds(emp):
-    pytest.importorskip("aiogram")
-    from bot.main import PAYMENT_PREFIX, build_dispatcher
+def test_payment_prefix():
+    from agent.front_desk import PAYMENT_PREFIX
 
-    from agent.front_desk import FrontDesk
-
-    assert build_dispatcher(FrontDesk(emp)) is not None
     assert PAYMENT_PREFIX.match("付 Alice 300 USDT")
     assert PAYMENT_PREFIX.match("pay Bob 1 BNB")
     assert not PAYMENT_PREFIX.match("今天开会吗")
@@ -139,7 +135,7 @@ from decimal import Decimal  # noqa: E402
 from agent.execution import DraftSafeProposer, TokenInfo  # noqa: E402
 from agent.store import Store  # noqa: E402
 
-OWNER = "your_telegram_username"
+OWNER = "owner_username"
 
 
 def test_pending_approve_reject(emp):
@@ -252,23 +248,13 @@ def test_weekly_report_text(emp):
     assert "国库余额" not in emp.weekly_report_text(NOW)
 
 
-# ---------- bot helpers ----------
+# ---------- background duties ----------
 
-def test_next_monday_9am():
-    from bot.main import next_monday_9am
-    sh = "Asia/Shanghai"
-    tue = datetime(2026, 10, 20, 2, tzinfo=timezone.utc)  # Tue 10:00 Shanghai
-    assert next_monday_9am(tue, sh).isoformat() == "2026-10-26T09:00:00+08:00"
-    mon_early = datetime(2026, 10, 26, 0, 30, tzinfo=timezone.utc)  # Mon 08:30 Shanghai
-    assert next_monday_9am(mon_early, sh).isoformat() == "2026-10-26T09:00:00+08:00"
-    mon_late = datetime(2026, 10, 26, 1, 30, tzinfo=timezone.utc)  # Mon 09:30 Shanghai
-    assert next_monday_9am(mon_late, sh).isoformat() == "2026-11-02T09:00:00+08:00"
-
-
-def test_alerts_sent_once(emp):
-    import asyncio
+def test_treasury_alerts_are_logged_once(emp):
+    from agent.background import BackgroundDuties
+    from agent.skills.finance_ops.insights import TelegramSettings
+    from agent.front_desk import FrontDesk
     from agent.skills.finance_ops.alerts import Transfer
-    from bot.main import check_alerts_once
 
     treasury = "0x2222222222222222222222222222222222222222"
 
@@ -276,15 +262,11 @@ def test_alerts_sent_once(emp):
         def transfers(self, addr, since):
             return [Transfer("0xt1", "USDT", treasury, "0x4c8e0000000000000000000000000000000091Aa", Decimal("50000"), NOW)]
 
-    class FakeBot:
-        def __init__(self):
-            self.msgs = []
-
-        async def send_message(self, chat, text):
-            self.msgs.append((chat, text))
-
-    bot = FakeBot()
-    run = lambda: asyncio.run(check_alerts_once(bot, emp, -100, Src(), [treasury], {"USDT": Decimal("10000")}, NOW))  # noqa: E731
-    assert len(run()) == 2
-    assert run() == []  # deduplicated
-    assert len(bot.msgs) == 2 and bot.msgs[0][0] == -100
+    duties = BackgroundDuties(FrontDesk(emp), Src(), [treasury], {"USDT": Decimal("10000")})
+    TelegramSettings.validate({"treasury_alerts": False}).save(emp.store)
+    assert duties.run_once(NOW) == [] and emp.store.events(("alert",)) == []  # turned off in the console
+    TelegramSettings.validate({"treasury_alerts": True}).save(emp.store)
+    assert len(duties.run_once(NOW)) == 2
+    assert duties.run_once(NOW) == []  # deduplicated, also across restarts (the keys are in the ledger)
+    assert len(emp.store.events(("alert",))) == 2
+    assert BackgroundDuties(FrontDesk(emp)).run_once(NOW) == []  # no transfer source: nothing to check

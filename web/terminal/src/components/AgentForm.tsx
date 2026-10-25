@@ -15,6 +15,9 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
     model: agent?.model || "",
     effort: agent?.model_config?.effort || "",
     max_tokens: agent?.model_config?.max_tokens ? String(agent.model_config.max_tokens) : "",
+    max_tool_calls: agent?.model_config?.max_tool_calls ? String(agent.model_config.max_tool_calls) : "",
+    max_model_calls: agent?.model_config?.max_model_calls ? String(agent.model_config.max_model_calls) : "",
+    call_timeout_s: agent?.model_config?.call_timeout_s ? String(agent.model_config.call_timeout_s) : "",
     skills: agent?.skills || [],
     permissions: agent?.permissions || [],
     is_manager: agent?.is_manager || false,
@@ -29,7 +32,10 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
       const body = {
         name: f.name, role: f.role, description: f.description, system_prompt: f.system_prompt, provider: f.provider,
         model: f.provider === "anthropic" ? f.model : "", is_manager: f.is_manager, budget_usd: f.budget_usd || "0",
-        model_config: { ...(f.effort ? { effort: f.effort } : {}), ...(f.max_tokens ? { max_tokens: Number(f.max_tokens) } : {}) },
+        model_config: {
+          ...(f.effort ? { effort: f.effort } : {}),
+          ...Object.fromEntries((["max_tokens", "max_tool_calls", "max_model_calls", "call_timeout_s"] as const).filter((k) => f[k]).map((k) => [k, Number(f[k])])),
+        },
         skills: f.skills, permissions: f.permissions, onchain: { agent_id: f.onchain_id, address: f.onchain_address },
       };
       return agent ? put(`/api/wf/agents/${agent.id}`, body) : post("/api/wf/agents", body);
@@ -98,6 +104,8 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
                 <option value="low">low</option>
                 <option value="medium">medium</option>
                 <option value="high">high</option>
+                <option value="xhigh">xhigh</option>
+                <option value="max">max</option>
               </select>
             </label>
             <label className="field">
@@ -105,6 +113,15 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
               <input className="input mono" inputMode="numeric" value={f.max_tokens} onChange={(e) => set("max_tokens", e.target.value.replace(/\D/g, ""))} />
             </label>
           </div>
+          <div className="grid3">
+            {([["max_tool_calls", "Max tool calls", "12"], ["max_model_calls", "Max model calls", "8"], ["call_timeout_s", "Call timeout (s)", "120"]] as const).map(([k, label, ph]) => (
+              <label key={k} className="field">
+                <span>{label}</span>
+                <input className="input mono" inputMode="numeric" placeholder={ph} value={f[k]} onChange={(e) => set(k, e.target.value.replace(/\D/g, ""))} />
+              </label>
+            ))}
+          </div>
+          <small className="muted">执行上限：一次「自主执行」任务里最多调用几次工具和模型、每次模型调用的超时。留空用默认值。</small>
           <label className="field">
             <span>System prompt</span>
             <textarea className="input" rows={4} value={f.system_prompt} onChange={(e) => set("system_prompt", e.target.value)} />

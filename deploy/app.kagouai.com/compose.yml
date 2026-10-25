@@ -1,0 +1,42 @@
+# app.kagouai.com — prepared, not deployed. Nothing here touches DNS, kagouai.com or the landing page.
+# Usage (on the server, after DNS for app.kagouai.com points at it):
+#   cp kagou.env.example kagou.env      # fill in; never commit kagou.env
+#   cp ../../config/chain.example.json chain.json
+#   docker compose up -d --build
+services:
+  kagou:
+    build: ../..
+    image: kagou:${KAGOU_VERSION:-local}
+    restart: unless-stopped
+    env_file: kagou.env
+    volumes:
+      - kagou-data:/data                          # SQLite ledger + policy.json; back this up
+      - ./chain.json:/app/config/chain.json:ro
+    expose:
+      - "8000"                                    # only the proxy reaches it; no public port
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      kagou:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  kagou-data:
+  caddy-data:
+  caddy-config:

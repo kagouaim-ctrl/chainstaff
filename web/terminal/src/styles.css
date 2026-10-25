@@ -1,4 +1,4 @@
-/* ChainStaff Terminal — design system.
+/* KAGOU Terminal — design system.
 
    Principles
    - Structure is hard, interaction is soft: layout, rails and tables are square; things you press,
@@ -983,3 +983,23 @@ button.pick-row { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---- Live board: what each task of a mission is doing right now ---- */
+.live-board { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin: 8px 0 12px; overflow: hidden; }
+.live-board-h { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border-subtle); }
+.live-row { display: grid; grid-template-columns: 28px minmax(0, 1.4fr) minmax(0, .8fr) auto; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; text-align: left; background: none; border: 0; color: inherit; cursor: pointer; font: inherit; }
+.live-row + .live-row { border-top: 1px solid var(--border-subtle); }
+.live-row:hover { background: var(--bg-row-hover); }
+.live-detail { grid-column: 2 / -1; color: var(--text-regular); opacity: .8; }
+@media (max-width: 640px) {
+  .live-row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .live-who { display: none; }
+}
+
+/* ---- Live chain tab ---- */
+.chain-live { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; }
+.chain-feed { display: flex; flex-direction: column; gap: 2px; max-height: 560px; overflow-y: auto; }
+.chain-feed .feed-line { cursor: default; }
+.chain-strip { padding: var(--space-4) var(--space-5) var(--space-2); align-items: center; }
+.tbl-x { overflow-x: auto; max-width: 100%; }
+@media (max-width: 1100px) { .chain-live { grid-template-columns: minmax(0, 1fr); } }

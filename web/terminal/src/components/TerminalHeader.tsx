@@ -26,8 +26,7 @@ export function BrandMark({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true">
       <rect width="20" height="20" rx="4" fill="#F0B90B" />
-      <path d="M5 5.5h7.5v2.3H7.4v4.4h5.1v2.3H5z" fill="#0B0E11" />
-      <rect x="13.4" y="8.6" width="2.8" height="2.8" rx="0.6" fill="#0B0E11" />
+      <path d="M5.5 4.5h2.4v4.3l4-4.3h3l-4.6 4.9 4.9 6.1h-3l-3.6-4.6-0.7 0.7v3.9H5.5z" fill="#0B0E11" />
     </svg>
   );
 }
@@ -35,9 +34,9 @@ export function BrandMark({ size = 20 }: { size?: number }) {
 export function TerminalHeader({ route }: { route: Route }) {
   return (
     <header className="head">
-      <a className="brand" href="#/terminal" aria-label="ChainStaff Terminal">
+      <a className="brand" href="#/terminal" aria-label="KAGOU Terminal">
         <BrandMark />
-        <span>ChainStaff</span>
+        <span>KAGOU</span>
       </a>
       <nav className="nav" aria-label="主导航">
         {NAV.map(([id, label]) => (
