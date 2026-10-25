@@ -1,24 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Bell, ChevronDown, LogOut, Search, Settings, ShieldCheck, SquareArrowOutUpRight } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Search, ShieldCheck, SquareArrowOutUpRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, setToken } from "../lib/api";
+import { api, post, setToken } from "../lib/api";
+import { refreshAt, useAtAgents, useAtApprovals, useAtMissions, useAtNotifications, useAtOverview } from "../lib/at";
 import { DEMO } from "../lib/demo";
-import { useAgentName, useAgents, useApprovals, useChain, useMeta, useMissions } from "../lib/queries";
+import { useApprovals, useChain, useMeta } from "../lib/queries";
 import { useStreamState } from "../lib/stream";
-import type { Message } from "../lib/types";
-import { ago, go, num, short, usePref, type Route } from "../lib/util";
-import { WalletButton } from "./WalletStatus";
+import { ago, go, num, short, type Route } from "../lib/util";
 
+// The whole product: create an agent, give it a job, let it work. Older pages (Squads, the goal pipeline, the
+// skill catalogue, the BSC live view) stay reachable from Settings and their own links, not from the main navigation.
 export const NAV: [string, string][] = [
-  ["terminal", "Terminal"],
+  ["overview", "Overview"],
   ["agents", "Agents"],
-  ["squads", "Squads"],
+  ["missions", "Missions"],
   ["workspace", "Workspace"],
-  ["tasks", "Tasks"],
-  ["onchain", "On-Chain"],
-  ["skills", "Skills"],
-];
-export const SECONDARY: [string, string][] = [
   ["activity", "Activity"],
   ["settings", "Settings"],
 ];
@@ -35,7 +31,7 @@ export function BrandMark({ size = 20 }: { size?: number }) {
 export function TerminalHeader({ route }: { route: Route }) {
   return (
     <header className="head">
-      <a className="brand" href="#/terminal" aria-label="KAGOU Terminal">
+      <a className="brand" href="#/overview" aria-label="KAGOU">
         <BrandMark />
         <span>KAGOU</span>
       </a>
@@ -45,7 +41,6 @@ export function TerminalHeader({ route }: { route: Route }) {
             {label}
           </a>
         ))}
-        <MoreMenu route={route} />
       </nav>
       <div className="head-right">
         <DemoPill />
@@ -53,7 +48,7 @@ export function TerminalHeader({ route }: { route: Route }) {
         <NetworkPill />
         <RunningPill />
         <Notifications />
-        <WalletButton />
+        <AccountMenu />
       </div>
     </header>
   );
@@ -98,27 +93,18 @@ function useOutside(ref: React.RefObject<HTMLElement>, on: boolean, close: () =>
   }, [on, close, ref]);
 }
 
-function MoreMenu({ route }: { route: Route }) {
+function AccountMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useOutside(ref, open, () => setOpen(false));
-  const active = SECONDARY.some(([id]) => id === route.page);
+  if (DEMO) return null;
   return (
-    <div className="rel" ref={ref} style={{ display: "flex" }}>
-      <a href="#" role="button" aria-expanded={open} aria-current={active ? "page" : undefined} onClick={(e) => (e.preventDefault(), setOpen(!open))}>
-        {active ? SECONDARY.find(([id]) => id === route.page)![1] : "More"} <ChevronDown size={12} />
-      </a>
+    <div className="rel" ref={ref}>
+      <button className="btn ghost icon" aria-label="账户" aria-expanded={open} onClick={() => setOpen(!open)}><ChevronDown size={14} /></button>
       {open && (
-        <div className="menu" style={{ left: 0, right: "auto", top: "calc(100% + 2px)" }} onClick={() => setOpen(false)}>
-          <a href="#/activity"><Activity size={13} /> Activity</a>
-          <a href="#/settings"><Settings size={13} /> Settings</a>
-          {!DEMO && (
-            <>
-              <div className="pop-sep" />
-              <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
-              <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
-            </>
-          )}
+        <div className="menu" onClick={() => setOpen(false)}>
+          <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
+          <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
         </div>
       )}
     </div>
@@ -149,40 +135,35 @@ function NetworkPill() {
 }
 
 function RunningPill() {
-  const missions = useMissions({ status: "pending,running,waiting", limit: 200 });
-  const agents = useAgents();
-  const n = missions.data?.length || 0;
-  const busy = agents.data?.filter((a) => a.live === "busy").length || 0;
+  const o = useAtOverview();
+  const busy = o.data?.agents.filter((a) => a.state === "running" || a.state === "investigating").length || 0;
+  const watching = o.data?.agents.filter((a) => a.state === "watching").length || 0;
   return (
-    <button className={`pill d-only ${n ? "acc" : ""}`} onClick={() => go("tasks", undefined, { f: "running" })} title={`${n} 个 Mission 正在执行，${busy} 个员工在工作`}>
-      <span className={`ind ${n ? "info live" : ""}`} />
-      <span className="mono">{n}</span>
-      <span className="hide-l">running</span>
-      <span className="muted mono hide-xl">· {busy} busy</span>
+    <button className={`pill d-only ${busy ? "acc" : ""}`} onClick={() => go("agents")} title={`${busy} 个 Agent 正在工作，${watching} 个在监控`}>
+      <span className={`ind ${busy ? "info live" : ""}`} />
+      <span className="mono">{busy}</span>
+      <span className="hide-l">working</span>
+      <span className="muted mono hide-xl">· {watching} watching</span>
     </button>
   );
 }
-
-const NOTIFY = new Set(["approval.requested", "task.failed", "chain.confirmed", "chain.failed", "goal.review", "message.expired", "engine.error", "schedule.failed"]);
 
 function Notifications() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useOutside(ref, open, () => setOpen(false));
-  const approvals = useApprovals("pending");
-  const name = useAgentName();
-  const [seen, setSeen] = usePref<number>("notify-seen", 0);
-  const events = useQuery({
-    queryKey: ["activity", "notify"],
-    queryFn: () => api<Message[]>("/api/wf/activity?kinds=system,task,chain,agent&limit=200"),
-    select: (rows) => rows.filter((m) => NOTIFY.has(m.event) && (m.event !== "task.failed" || !!m.task_id)).slice(0, 30),
-  });
+  const approvals = useAtApprovals("pending");
+  const legacy = useApprovals("pending");
+  const notes = useAtNotifications();
   const pending = approvals.data || [];
-  const unseen = (events.data || []).filter((m) => m.id > seen).length;
-  const badge = pending.length + unseen;
-  const toggle = () => {
-    if (!open && events.data?.[0]) setSeen(events.data[0].id);
+  const unread = notes.data?.unread || 0;
+  const badge = pending.length + unread + (legacy.data?.length || 0);
+  const toggle = async () => {
     setOpen(!open);
+    if (!open && unread && !DEMO) {
+      await post("/api/at/notifications/read", {}).catch(() => undefined);
+      refreshAt();
+    }
   };
   return (
     <div className="rel" ref={ref}>
@@ -191,30 +172,43 @@ function Notifications() {
         {badge > 0 && <span className="count-dot">{badge > 99 ? "99+" : badge}</span>}
       </button>
       {open && (
-        <div className="pop" style={{ width: 360 }}>
+        <div className="pop" style={{ width: 380 }}>
           <div className="pop-h">
-            <span className="label grow">Needs you · <span className="mono">{pending.length}</span></span>
-            <a className="btn ghost xs" href="#/tasks?f=review" onClick={() => setOpen(false)}>Review queue</a>
+            <span className="label grow">Needs you · <span className="mono">{pending.length + (legacy.data?.length || 0)}</span></span>
+            <a className="btn ghost xs" href="#/activity?human=1" onClick={() => setOpen(false)}>All</a>
           </div>
           <div className="pop-b">
             {pending.map((a) => (
-              <button key={a.id} className="pop-item" onClick={() => (setOpen(false), a.task_id && go("workspace", a.workspace_id, { m: a.task_id }))}>
+              <button key={a.id} className="pop-item" onClick={() => (setOpen(false), a.task_id && go("missions", undefined, { task: a.task_id }))}>
                 <ShieldCheck size={14} className="acc" style={{ flex: "none" }} />
                 <span className="col gap2 grow">
                   <span className="ellipsis">{a.title}</span>
-                  <span className="muted xs">{a.kind === "over_budget" ? "预算用完，等你决定" : "结果等你审批"} · {name(a.requested_by)} · {ago(a.at)}</span>
+                  <span className="muted xs">{a.agent_name || "—"} · {ago(a.at)}</span>
                 </span>
               </button>
             ))}
-            {!pending.length && <div className="pop-empty">没有等你处理的事项</div>}
-            <div className="pop-h sep"><span className="label">Recent</span></div>
-            {(events.data || []).map((m) => (
-              <button key={m.id} className="pop-item" onClick={() => (setOpen(false), m.task_id ? go("tasks", m.task_id) : go("activity"))}>
-                <span className={`ind ${m.event.includes("fail") || m.event.includes("error") || m.event.includes("expired") ? "bad" : m.event.startsWith("chain.confirmed") ? "ok" : "warn"}`} />
-                <span className="ellipsis grow sm">{m.text}</span>
-                <span className="muted mono xs">{ago(m.at)}</span>
+            {(legacy.data || []).map((a) => (
+              <button key={`l${a.id}`} className="pop-item" onClick={() => (setOpen(false), a.task_id && go("tasks", a.task_id))}>
+                <ShieldCheck size={14} className="acc" style={{ flex: "none" }} />
+                <span className="col gap2 grow">
+                  <span className="ellipsis">{a.title}</span>
+                  <span className="muted xs">旧流程的审批 · {ago(a.at)}</span>
+                </span>
               </button>
             ))}
+            {!pending.length && !legacy.data?.length && <div className="pop-empty">没有等你处理的事项</div>}
+            <div className="pop-h sep"><span className="label">Notifications</span></div>
+            {(notes.data?.items || []).slice(0, 30).map((n) => (
+              <button key={n.id} className="pop-item" onClick={() => (setOpen(false), n.task_id ? go("missions", undefined, { task: n.task_id }) : go("activity"))}>
+                <span className={`ind ${n.severity === "high" || n.severity === "critical" ? "bad" : n.severity === "medium" ? "warn" : ""}`} />
+                <span className="col gap2 grow" style={{ minWidth: 0 }}>
+                  <span className={`ellipsis sm ${n.read_at ? "muted" : ""}`}>{n.title}</span>
+                  {n.body && <span className="muted xs ellipsis">{n.body}</span>}
+                </span>
+                <span className="muted mono xs">{ago(n.at)}</span>
+              </button>
+            ))}
+            {!notes.data?.items.length && <div className="pop-empty">还没有通知</div>}
           </div>
         </div>
       )}
@@ -229,8 +223,8 @@ function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [i, setI] = useState(0);
   const input = useRef<HTMLInputElement>(null);
-  const agents = useAgents();
-  const missions = useMissions({ limit: 300 });
+  const agents = useAtAgents();
+  const missions = useAtMissions();
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
       const typing = /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName);
@@ -246,13 +240,14 @@ function GlobalSearch() {
     const s = q.trim().toLowerCase();
     if (!s) return [];
     const out: Hit[] = [];
-    agents.data?.forEach((a) => (a.name + " " + a.role + " " + a.id + " " + a.skills.join(" ")).toLowerCase().includes(s) &&
-      out.push({ kind: "Agent", label: a.name, sub: a.role || a.id, go: () => go("terminal", a.id) }));
-    missions.data?.forEach((m) => (m.name + " " + m.id + " " + m.brief).toLowerCase().includes(s) &&
-      out.push({ kind: "Mission", label: m.name, sub: m.id, go: () => go("workspace", m.workspace_id, { m: m.id }) }));
-    if (/^0x[0-9a-f]{64}$/i.test(s)) out.push({ kind: "Tx", label: short(s, 10), sub: "Execution ledger", go: () => go("onchain", undefined, { q: s }) });
+    agents.data?.forEach((a) => (a.name + " " + a.role + " " + a.id + " " + a.responsibility).toLowerCase().includes(s) &&
+      out.push({ kind: "Agent", label: a.name, sub: a.id, go: () => go("agents", a.id) }));
+    missions.data?.forEach((m) => (m.name + " " + m.id + " " + m.goal).toLowerCase().includes(s) &&
+      out.push({ kind: "Mission", label: m.name, sub: m.id, go: () => go("missions", m.id) }));
+    if (/^0x[0-9a-f]{64}$/i.test(s)) out.push({ kind: "Tx", label: short(s, 10), sub: "BSC live data", go: () => go("onchain", undefined, { q: s }) });
     if (/^0x[0-9a-f]{40}$/i.test(s)) out.push({ kind: "Address", label: short(s, 8), sub: "Wallet lookup", go: () => go("onchain", undefined, { tab: "wallet", address: s }) });
-    if (/^tsk_/.test(s)) out.push({ kind: "Task", label: s, sub: "Task terminal", go: () => go("tasks", s) });
+    if (/^job_/.test(s)) out.push({ kind: "Task", label: s, sub: "Agent task", go: () => go("missions", undefined, { task: s }) });
+    if (/^tsk_/.test(s)) out.push({ kind: "Task", label: s, sub: "Legacy goal", go: () => go("tasks", s) });
     return out.slice(0, 12);
   }, [q, agents.data, missions.data]);
   useEffect(() => setI(0), [q]);
@@ -268,7 +263,7 @@ function GlobalSearch() {
       <input
         ref={input}
         className="input"
-        placeholder="Agent、Mission、任务、交易哈希"
+        placeholder="Agent、Mission、任务 ID、地址"
         value={q}
         onChange={(e) => (setQ(e.target.value), setOpen(true))}
         onFocus={() => setOpen(true)}

@@ -404,7 +404,7 @@ class AutonomyDB:
     @staticmethod
     def _agent(a: dict) -> dict:
         for k in AGENT_JSON:
-            a[k] = _load(a.get(k), [] if k == "workspace_ids" else {}) if isinstance(a.get(k), (str, type(None))) else a[k]
+            a[k] = _load(a.get(k), {"workspace_ids": [], "wake_on": None}.get(k, {})) if isinstance(a.get(k), (str, type(None))) else a[k]
         a["autonomous"] = bool(a.get("autonomous"))
         return a
 

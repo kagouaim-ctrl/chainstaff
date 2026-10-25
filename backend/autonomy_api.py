@@ -301,14 +301,20 @@ def mount_autonomy(app: FastAPI, at: Autonomy, auth: Callable, owner: str, write
         rows = db.activity(after=after, before=before, agent_id=agent_id or None, workspace_id=workspace_id or None, mission_id=mission_id or None,
                            task_id=task_id or None, severity=_csv(severity), types=_csv(types), needs_human=needs_human, since=_since(range),
                            limit=max(1, min(limit, 1000)), newest_first=not after)
+        return _named(rows)
+
+    def _named(rows: list[dict]) -> list[dict]:
         names: dict[str, str] = {}
+
+        def name(i: str) -> str:
+            if i not in names:
+                names[i] = i if i.startswith("wkr-") else at.name(i)
+            return names[i]
+
         for r in rows:
-            for k in ("agent_id", "target_agent_id"):
-                if r.get(k) and r[k] not in names:
-                    names[r[k]] = at.name(r[k])
-            r["agent_name"] = names.get(r.get("agent_id") or "")
-            r["target_agent_name"] = names.get(r.get("target_agent_id") or "")
-            r["actor_name"] = at.name(r["actor"]) if r["actor"] not in ("system",) and not r["actor"].startswith(("wkr-", "wch")) else r["actor"]
+            r["agent_name"] = name(r["agent_id"]) if r.get("agent_id") else None
+            r["target_agent_name"] = name(r["target_agent_id"]) if r.get("target_agent_id") else None
+            r["actor_name"] = name(r["actor"])
         return rows
 
     @app.get("/api/at/stream", dependencies=A)
@@ -320,7 +326,7 @@ def mount_autonomy(app: FastAPI, at: Autonomy, auth: Callable, owner: str, write
             cursor, idle = start, 0.0
             yield "retry: 2000\n\n"
             while True:
-                rows = db.activity(after=cursor, limit=500, newest_first=False)
+                rows = _named(db.activity(after=cursor, limit=500, newest_first=False))
                 for m in rows:
                     cursor = m["id"]
                     yield f"id: {m['id']}\nevent: activity\ndata: {json.dumps(m, ensure_ascii=False, default=str)}\n\n"

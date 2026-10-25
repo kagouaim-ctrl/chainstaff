@@ -1,6 +1,6 @@
 import { LogOut, Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Dialog, EmptyState, ErrorState, Loading, Seg, Status, Tabs } from "../components/ui";
+import { Dialog, EmptyState, ErrorState, Loading, Seg, Status } from "../components/ui";
 import { del, post, put, setToken } from "../lib/api";
 import { useAction, useAgents, useMemory, useMeta, useSchedules, useSystem, useWorkspaces } from "../lib/queries";
 import { API_BASE } from "../lib/api";
@@ -8,22 +8,8 @@ import type { AiUsage, Memory } from "../lib/types";
 import { DEMO } from "../lib/demo";
 import { SERVICE, fmtTime, go, usePref } from "../lib/util";
 
-type Tab = "schedules" | "memory" | "system";
-
-export default function Settings() {
-  const [tab, setTab] = usePref<Tab>("settings-tab", "schedules");
-  return (
-    <div className="page">
-      <div className="toolbar"><h1>Settings</h1></div>
-      <Tabs<Tab> value={tab} onChange={setTab} options={[["schedules", "Scheduled missions"], ["memory", "Memory"], ["system", "System"]]} />
-      {tab === "schedules" && <Schedules />}
-      {tab === "memory" && <MemoryAdmin />}
-      {tab === "system" && <System />}
-    </div>
-  );
-}
-
-function Schedules() {
+/** Sections the new Settings page shows as they were: legacy schedules, memory and the server's own report. */
+export function Schedules() {
   const q = useSchedules();
   const ws = useWorkspaces();
   const [adding, setAdding] = useState(false);
@@ -96,7 +82,7 @@ function ScheduleForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function MemoryAdmin() {
+export function MemoryAdmin() {
   const agents = useAgents();
   const ws = useWorkspaces();
   const [q, setQ] = useState("");
@@ -231,7 +217,7 @@ function AiSpend({ u }: { u: AiUsage }) {
   );
 }
 
-function System() {
+export function System() {
   const meta = useMeta();
   const [density, setDensity] = usePref("density", "compact");
   if (meta.isLoading) return <Loading />;
@@ -255,7 +241,7 @@ function System() {
       <div className="row"><span className="dim">Table density</span><Seg value={density} onChange={setDensity} options={[["compact", "Compact"], ["detailed", "Detailed"]]} /></div>
       <div className="label">Session</div>
       <div className="row wrap">
-        <button className="btn" onClick={() => (setToken(""), go("terminal"))}><LogOut size={13} /> 退出（清除这个标签页的访问令牌）</button>
+        <button className="btn" onClick={() => (setToken(""), go("overview"))}><LogOut size={13} /> 退出（清除这个标签页的访问令牌）</button>
         {!DEMO && <a className="btn ghost" href="/">Classic console</a>}
       </div>
       <div className="note">当前是单用户模式：一个访问令牌对应一个所有者。多用户登录、钱包签名登录、按用户隔离工作区和角色权限还没有实现。</div>

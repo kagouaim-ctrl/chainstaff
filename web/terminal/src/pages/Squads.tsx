@@ -142,7 +142,7 @@ function SquadMembers({ s }: { s: Squad }) {
               const r = runnable(a, perms);
               const executes = !mgr || s.permissions.includes("manager_executes");
               return (
-                <tr key={a.id} className="click" onClick={() => go("agents", a.id)}>
+                <tr key={a.id} className="click" onClick={() => go("team", a.id)}>
                   <td><span className="row gap6"><Avatar name={a.name} mgr={a.is_manager} /><span className="col" style={{ minWidth: 0 }}><span className="strong ellipsis">{a.name}</span><span className="muted xs ellipsis">{mgr ? <span className="acc">Manager</span> : "Member"} · {a.role || "—"}</span></span></span></td>
                   <td><AgentStatus agent={a} /></td>
                   <td className="ellipsis" style={{ maxWidth: 180 }}>{a.current_task ? <span className="dim">{a.current_task.title}</span> : <span className="muted">—</span>}</td>
@@ -235,7 +235,7 @@ function SquadInspector({ s, onEdit }: { s: Squad; onEdit: () => void }) {
         )}
         <div className="insp-sec">
           <dl className="kv">
-            <dt>Manager</dt><dd>{mgr ? <a className="link" href={`#/agents/${mgr.id}`}>{mgr.name}</a> : <span className="bad">未指定</span>}</dd>
+            <dt>Manager</dt><dd>{mgr ? <a className="link" href={`#/team/${mgr.id}`}>{mgr.name}</a> : <span className="bad">未指定</span>}</dd>
             <dt>Members</dt><dd>{s.members.length}</dd>
             <dt>Can execute</dt><dd>{s.executors.length} agents</dd>
             <dt>Running now</dt><dd className="mono">{s.running}{s.max_parallel ? ` / ${s.max_parallel}` : ""}</dd>
@@ -260,7 +260,7 @@ function SquadInspector({ s, onEdit }: { s: Squad; onEdit: () => void }) {
         <div className="insp-sec">
           <span className="label">Missions</span>
           {(missions.data || []).map((m) => (
-            <button key={m.id} className="list-row click" style={{ background: "none", border: 0, width: "100%", textAlign: "left", color: "inherit" }} onClick={() => go("workspace", m.workspace_id, { s: s.id, m: m.id })}>
+            <button key={m.id} className="list-row click" style={{ background: "none", border: 0, width: "100%", textAlign: "left", color: "inherit" }} onClick={() => go("board", m.workspace_id, { s: s.id, m: m.id })}>
               <span className="ellipsis grow">{m.name}</span>
               <MissionStage m={m} />
               <span style={{ width: 70 }}><Progress done={m.progress.completed} failed={m.progress.failed} total={m.progress.total} compact /></span>

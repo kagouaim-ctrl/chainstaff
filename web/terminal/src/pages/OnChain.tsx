@@ -113,7 +113,7 @@ function Verification({ id, onClose }: { id: string; onClose: () => void }) {
           </div>
           <button className="btn ghost sm icon" onClick={onClose} aria-label="关闭"><X size={14} /></button>
         </div>
-        <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => go("workspace", t.root.workspace_id, { m: t.root.id })}>Open mission <ArrowRight size={12} /></button>
+        <button className="btn sm" style={{ alignSelf: "flex-start" }} onClick={() => go("board", t.root.workspace_id, { m: t.root.id })}>Open mission <ArrowRight size={12} /></button>
       </div>
       <div className="insp-b">
         <div className="insp-sec">

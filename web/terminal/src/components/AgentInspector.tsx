@@ -136,7 +136,7 @@ function CurrentExecution({ a, full }: { a: AgentDetail; full?: boolean }) {
         {task && task.attempts > 1 && <span className="muted">attempt {task.attempts}</span>}
       </div>
       {m && m.id !== cur.id && (
-        <button className="row gap6 xs plain-btn" onClick={() => go("workspace", m.workspace_id, { m: m.id, t: cur.id })}>
+        <button className="row gap6 xs plain-btn" onClick={() => go("board", m.workspace_id, { m: m.id, t: cur.id })}>
           <span className="muted">Mission</span>
           <span className="ellipsis dim grow">{m.name}</span>
           <Progress done={m.progress.completed} failed={m.progress.failed} total={m.progress.total} />
@@ -151,7 +151,7 @@ function CurrentExecution({ a, full }: { a: AgentDetail; full?: boolean }) {
         </div>
       ))}
       <div className="row gap6">
-        <button className="btn sm" onClick={() => go("workspace", m?.workspace_id, { m: m?.id || cur.id, t: m && m.id !== cur.id ? cur.id : "" })}>Open in workspace</button>
+        <button className="btn sm" onClick={() => go("board", m?.workspace_id, { m: m?.id || cur.id, t: m && m.id !== cur.id ? cur.id : "" })}>Open in workspace</button>
         <button className="btn ghost sm" onClick={() => go("tasks", cur.id)}>Task</button>
       </div>
     </div>

@@ -184,6 +184,8 @@ def agent_state(db: AutonomyDB, agent: dict, *, worker_alive: bool, watched: set
             return {"state": C.A_WAITING, "detail": f"下一次定时执行 {nxt.strftime('%m-%d %H:%M')} UTC"}
         except ValueError:
             pass
+    if agent.get("wake_on") == []:
+        return {"state": C.A_WAITING, "detail": "等待其他 Agent 或你交给它任务"}
     return {"state": C.A_WAITING, "detail": "可以被事件或任务唤醒，目前没有工作"}
 
 

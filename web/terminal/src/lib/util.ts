@@ -8,15 +8,14 @@ export interface Route {
   params: URLSearchParams;
 }
 
-// Pages from the first terminal keep working as links: the old dashboard opens the Agent Terminal,
-// the old roster opens Agents with the same agent selected.
-const LEGACY: Record<string, string> = { overview: "terminal", workforce: "agents" };
+// Old links keep working: the first terminal's roster opens Agents.
+const LEGACY: Record<string, string> = { workforce: "agents" };
 
 function parse(): Route {
   const h = location.hash.replace(/^#\/?/, "");
   const [path, qs] = h.split("?");
   const [page, id] = path.split("/");
-  return { page: LEGACY[page] || page || "terminal", id: id ? decodeURIComponent(id) : undefined, params: new URLSearchParams(qs || "") };
+  return { page: LEGACY[page] || page || "overview", id: id ? decodeURIComponent(id) : undefined, params: new URLSearchParams(qs || "") };
 }
 
 export function useRoute(): Route {

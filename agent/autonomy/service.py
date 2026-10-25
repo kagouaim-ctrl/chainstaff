@@ -67,6 +67,11 @@ class Autonomy:
             return "System"
         if aid in ("user", "console"):
             return "User"
+        if aid.startswith("wch_"):
+            w = self.db.watcher(aid)
+            return f"Watcher {w['name']}" if w else aid
+        if aid == "system":
+            return "System"
         a = self.db.agent(aid)
         return a["name"] if a else aid
 
@@ -112,6 +117,8 @@ class Autonomy:
                 auto["approval_rules"] = {"patch": "always", "delegate_outside_mission": False, "max_task_budget_usd": None}
             if not auto.get("notify_rules"):
                 auto["notify_rules"] = {"min_severity": "medium", "on_failure": True, "on_completion": False}
+            if body.get("activate") and auto.get("work_mode") != "on_demand" and not auto["workspace_ids"]:
+                raise AgentError("激活前请绑定至少一个 Workspace（On-demand 模式除外）")
             a = self.wf.create_agent(base, by)
         except (AgentError, WorkforceError) as e:
             raise AutonomyError(str(e)) from None
@@ -322,7 +329,7 @@ class Autonomy:
 
             raise ToolError(str(e)) from None
         try:
-            code, ms, preview = self.watchers.get(url, 10.0)
+            code, ms, preview = self.watchers.http_get(url, 10.0)
             return {"url": url, "status": code, "latency_ms": ms, "ok": 200 <= code < 400, "body_preview": preview[:400]}
         except Exception as e:
             return {"url": url, "status": None, "ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}"}
@@ -337,7 +344,7 @@ class Autonomy:
                 healthy_ws.add(w["workspace_id"])
         out = set()
         for m in self.db.missions(status=[C.M_ACTIVE], limit=1000):
-            if m.get("responsibility_of") and m["type"] in ("event_driven", "continuous") and m["workspace_id"] in healthy_ws:
+            if m.get("responsibility_of") and m["type"] in ("event_driven", "continuous") and m.get("triggers") and m["workspace_id"] in healthy_ws:
                 out.add(m["responsibility_of"])
         return out
 

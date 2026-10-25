@@ -251,7 +251,7 @@ class RepoCopy:
         names = self.sb.git(["diff", "--cached", "--name-only", self.head or "HEAD"], cwd=self.path).stdout.split()
         d = self.sb.git(["diff", "--cached", "--no-ext-diff", "--no-color", self.head or "HEAD"], cwd=self.path).stdout
         stat = self.sb.git(["diff", "--cached", "--stat", self.head or "HEAD"], cwd=self.path).stdout.strip().splitlines()
-        return {"files": names, "diff": d, "stat": stat[-1] if stat else "", "base": self.head}
+        return {"files": names, "diff": d, "stat": stat[-1].strip() if stat else "", "base": self.head}
 
     def commit_branch(self, branch: str, message: str) -> str:
         self.sb.git(["checkout", "-B", branch], cwd=self.path)

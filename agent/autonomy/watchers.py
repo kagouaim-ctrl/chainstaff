@@ -70,7 +70,7 @@ class Watchers:
         self.act = activity
         self.events = events
         self.env = env or {}
-        self.get = get or http_get
+        self.http_get = get or http_get
         self.chain = None  # agent.bsc.service.ChainService, in the process that runs the listener
 
     @property
@@ -105,7 +105,7 @@ class Watchers:
                      data={"watcher_id": w["id"], "kind": kind}, severity="info" if w["status"] == "active" else "medium",
                      result=w.get("last_error") or "")
         self.act.audit(f"建立 Watcher {name}（{w['id']}）", by, {"watcher": w["id"]})
-        return w, secret
+        return public(w), secret
 
     def _config(self, kind: str, cfg: dict) -> dict:
         if not isinstance(cfg, dict):
@@ -169,7 +169,7 @@ class Watchers:
             except ValueError as e:
                 raise WatcherError(str(e)) from None
         self.act.audit(f"修改 Watcher {w['name']}", by, {"watcher": wid})
-        return w
+        return public(w)
 
     def set_status(self, wid: str, active: bool, by: str) -> dict:
         w = self.get(wid)
@@ -185,7 +185,7 @@ class Watchers:
         self.act.log("watcher.started" if active else "watcher.paused", f"Watcher {w['name']} {'已恢复' if active else '已暂停'}", workspace_id=w["workspace_id"], actor=by,
                      data={"watcher_id": wid})
         self.act.audit(f"Watcher {w['name']} → {'active' if active else 'paused'}", by, {"watcher": wid})
-        return w
+        return public(w)
 
     def rotate(self, wid: str, by: str) -> tuple[dict, str]:
         w = self.get(wid)
@@ -198,7 +198,7 @@ class Watchers:
         else:
             raise WatcherError("这个 Watcher 没有密钥")
         self.act.audit(f"更换 Watcher {w['name']} 的密钥", by, {"watcher": wid})
-        return w, secret
+        return public(w), secret
 
     def delete(self, wid: str, by: str) -> None:
         w = self.get(wid)
@@ -212,7 +212,7 @@ class Watchers:
         w = self.db.watcher(wid)
         if w is None:
             raise WatcherError(f"没有 Watcher {wid}")
-        return w
+        return public(w)
 
     def token_ok(self, w: dict, token: str | None) -> bool:
         import hmac
@@ -258,7 +258,7 @@ class Watchers:
             cfg, st = w["config"], dict(w["state"] or {})
             self.db.update_watcher(w["id"], next_check_at=iso(now + timedelta(seconds=int(cfg["interval_s"]))))
             try:
-                code, ms, preview = self.get(cfg["url"], float(cfg["timeout_s"]))
+                code, ms, preview = self.http_get(cfg["url"], float(cfg["timeout_s"]))
                 ok, err = code == int(cfg["expect_status"]), None if code == int(cfg["expect_status"]) else f"HTTP {code}"
             except Exception as e:
                 code, ms, preview, ok, err = None, None, "", False, f"{type(e).__name__}: {str(e)[:200]}"
@@ -388,6 +388,13 @@ class Watchers:
             if (a["meta"] or {}).get("pr_url") == url:
                 return a
         return None
+
+
+def public(w: dict) -> dict:
+    """A watcher as the console sees it: never its token hash or webhook secret."""
+    out = {k: v for k, v in w.items() if k not in ("secret_hash", "webhook_secret")}
+    out["has_secret"] = bool(w.get("secret_hash") or w.get("webhook_secret"))
+    return out
 
 
 def _ts(v: Any) -> str | None:

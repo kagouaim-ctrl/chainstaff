@@ -211,9 +211,15 @@ def _run_tests(ctx, a):
     ctx.svc.activity.log("tests.passed" if r["passed"] else "tests.failed",
                          f"{ctx.agent['name']} 运行测试：{'通过' if r['passed'] else '失败'}（exit {r['exit_code']}，{r['secs']}s）",
                          severity="info" if r["passed"] else "low", workspace_id=ctx.task["workspace_id"], agent_id=ctx.agent["id"], task_id=ctx.task["id"],
-                         run_id=ctx.run_id, mission_id=ctx.task["mission_id"], actor=ctx.agent["id"], result=r["output"][-600:],
-                         data={"command": r["command"], "exit_code": r["exit_code"], "network_isolated": r["network_isolated"]})
+                         run_id=ctx.run_id, mission_id=ctx.task["mission_id"], actor=ctx.agent["id"], result=_test_summary(r["output"]),
+                         data={"command": r["command"], "exit_code": r["exit_code"], "network_isolated": r["network_isolated"], "output_tail": r["output"][-600:]})
     return r
+
+
+def _test_summary(output: str) -> str:
+    """The last two meaningful lines of a test run (e.g. "Ran 2 tests in 0.001s · OK"), skipping separator rules."""
+    lines = [ln.strip() for ln in output.splitlines() if ln.strip() and set(ln.strip()) - set("-=_ ")]
+    return " · ".join(lines[-2:])[:300]
 
 
 def _submit_patch(ctx, a):

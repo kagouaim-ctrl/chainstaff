@@ -17,7 +17,7 @@ import { ago, go, setParams, useIsMobile, usePref, type Route } from "../lib/uti
 /**
  * Mission Workspace: the squad on the left, the selected mission in the middle as structured
  * sections (brief, assignment, collaboration, results, approval), and its execution on the right.
- *   #/workspace/<workspace>?m=<mission>&t=<task>&tab=<inspector tab>
+ *   #/board/<workspace>?m=<mission>&t=<task>&tab=<inspector tab>
  */
 export default function Workspace({ route }: { route: Route }) {
   const ws = useWorkspaces();
@@ -144,7 +144,7 @@ function SquadPanel({ ws, all, squads, squad, members, missions, current, scope,
   return (
     <>
       <div className="pane-h" style={{ gap: 6 }}>
-        <select className="input sm grow" value={ws.id} onChange={(e) => go("workspace", e.target.value)} aria-label="切换工作区">
+        <select className="input sm grow" value={ws.id} onChange={(e) => go("board", e.target.value)} aria-label="切换工作区">
           {all.filter((w) => !w.archived).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
         <button className="btn ghost sm icon" onClick={onCreate} title="新建工作区" aria-label="新建工作区"><Plus size={13} /></button>
@@ -170,7 +170,7 @@ function SquadPanel({ ws, all, squads, squad, members, missions, current, scope,
           const mgr = a.id === squad?.manager_id;
           const m = a.current_task && missions.find((x) => x.id === a.current_task!.id || x.tasks.some((t) => t.id === a.current_task!.id));
           return (
-            <div key={a.id} className="squad-item" role="button" tabIndex={0} onClick={() => (m ? onPick(m.id) : go("agents", a.id))} title={m ? "打开它正在做的 Mission" : "打开员工详情"}>
+            <div key={a.id} className="squad-item" role="button" tabIndex={0} onClick={() => (m ? onPick(m.id) : go("team", a.id))} title={m ? "打开它正在做的 Mission" : "打开员工详情"}>
               <Avatar name={a.name} mgr={a.is_manager} />
               <span className="who">
                 <span className="ellipsis">{a.name}</span>{mgr && <span className="tag acc">MGR</span>}
@@ -349,7 +349,7 @@ export function WorkspaceForm({ ws, onClose }: { ws?: WS; onClose: () => void })
       footer={
         <>
           <button className="btn" onClick={onClose}>取消</button>
-          <button className="btn primary" disabled={!name.trim() || save.isPending} onClick={() => save.mutate(undefined, { onSuccess: (w: any) => (onClose(), !ws && go("workspace", w.id)) })}>保存</button>
+          <button className="btn primary" disabled={!name.trim() || save.isPending} onClick={() => save.mutate(undefined, { onSuccess: (w: any) => (onClose(), !ws && go("board", w.id)) })}>保存</button>
         </>
       }
     >

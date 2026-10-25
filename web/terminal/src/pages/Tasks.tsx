@@ -134,7 +134,7 @@ function ApprovalLog({ route }: { route: Route }) {
               <div key={a.id} className="col gap4">
                 <div className="row gap6 xs muted">
                   <span>Mission</span>
-                  <a className="link" href={`#/workspace/${a.workspace_id}?m=${a.task_id}`}>{missions.data?.find((m) => m.id === a.task_id)?.name || a.task_id}</a>
+                  <a className="link" href={`#/board/${a.workspace_id}?m=${a.task_id}`}>{missions.data?.find((m) => m.id === a.task_id)?.name || a.task_id}</a>
                 </div>
                 <ApprovalPanel approval={a} />
               </div>

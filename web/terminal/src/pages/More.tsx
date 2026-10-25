@@ -1,13 +1,10 @@
-import { Activity, Blocks, ChevronRight, LogOut, Puzzle, Settings, SquareArrowOutUpRight, Users } from "lucide-react";
+import { Boxes, ChevronRight, LogOut, Settings, SquareArrowOutUpRight } from "lucide-react";
 import { DEMO } from "../lib/demo";
 import { setToken } from "../lib/api";
 
-const ITEMS: [string, string, string, typeof Blocks][] = [
-  ["squads", "Squads", "Teams of agents, their manager and policy", Users],
-  ["onchain", "On-Chain", "Execution ledger, transactions, agent registry", Blocks],
-  ["skills", "Skills", "Web3 skills and who can run them", Puzzle],
-  ["activity", "Activity", "Every event, live", Activity],
-  ["settings", "Settings", "Scheduled missions, memory, system", Settings],
+const ITEMS: [string, string, string, typeof Boxes][] = [
+  ["workspace", "Workspace", "Repositories, contracts, tokens, wallets, endpoints, watchers", Boxes],
+  ["settings", "Settings", "Models, API keys, tools, permissions, runtime, audit", Settings],
 ];
 
 /** Phone hub for the pages that don't fit in the bottom bar. */
