@@ -446,7 +446,7 @@ export function WorkspacePicker({ value, onChange, options }: { value: string[];
 }
 
 const WAKE_TYPES: [string, string][] = [
-  ["app.error", "Application errors"], ["ci.failed", "CI failures"], ["health.down", "API down"], ["github.workflow_failed", "GitHub workflow failed"],
+  ["app.error", "Application errors"], ["ci.failed", "CI failures"], ["health.down", "API down"], ["health.recovered", "API recovered (verify)"], ["github.workflow_failed", "GitHub workflow failed"],
   ["patch.applied", "A fix was applied (verify)"], ["pr.merged", "A PR was merged (verify)"], ["bsc.*", "All BSC events"], ["bsc.large_transfer", "BSC large transfers"],
   ["bsc.contract_event", "BSC contract events"], ["github.push", "GitHub pushes"], ["github.issue.*", "GitHub issues"], ["manual.report", "Reports you file"],
 ];

@@ -401,8 +401,11 @@ class AgentRunner:
             svc.wakeup.reject(db.task(t["id"]), a, f["reason"], ctx.run_id)
             return C.R_COMPLETED
         if f and f["action"] == "complete":
+            # Everything this task handed out, across all its runs (a resumed run only saw its own hand-offs).
+            delegated = list(dict.fromkeys([*(c["id"] for c in db.tasks(parent_id=t["id"], limit=200, order="created_at")), *ctx.delegated]))
+            artifacts = list(dict.fromkeys([*(x["id"] for x in reversed(db.artifacts(task_id=t["id"], limit=50))), *ctx.artifacts]))
             result = {"summary": f["summary"], "outcome": f["outcome"], "details": f.get("details") or {}, "findings": f.get("findings") or [],
-                      "delegated": ctx.delegated, "artifacts": ctx.artifacts, **({"tests": _tests_brief(ctx.last_tests)} if ctx.last_tests else {})}
+                      "delegated": delegated, "artifacts": artifacts, **({"tests": _tests_brief(ctx.last_tests)} if ctx.last_tests else {})}
             if not db.transition(t["id"], (C.T_RUNNING,), C.T_COMPLETED, result=result, checkpoint=None, waiting_on=[]):
                 raise Cancelled("任务状态已变")
             db.update_run(ctx.run_id, status=C.R_COMPLETED, finished_at=end, summary=f["summary"][:1000])
@@ -410,7 +413,7 @@ class AgentRunner:
             svc.activity.log(typ, f"{a['name']} 完成：{t['objective'][:100]}", workspace_id=t["workspace_id"], agent_id=a["id"], mission_id=t["mission_id"],
                              task_id=t["id"], run_id=ctx.run_id, actor=a["id"], result=f["summary"][:1500],
                              needs_human=f["outcome"] == "needs_human", severity="medium" if f["outcome"] == "needs_human" else "info",
-                             data={"outcome": f["outcome"], "delegated": ctx.delegated, "artifacts": ctx.artifacts})
+                             data={"outcome": f["outcome"], "delegated": delegated, "artifacts": artifacts})
             rules = a.get("notify_rules") or {}
             if f["outcome"] == "needs_human":
                 svc.activity.notify(f"{a['name']} 需要你处理：{t['objective'][:80]}", f["summary"][:1500], severity="medium", agent_id=a["id"],

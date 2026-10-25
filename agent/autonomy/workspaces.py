@@ -71,7 +71,7 @@ def _item(kind: str, x: Any, env: dict | None) -> dict:
                 argv = shlex.split(test)
             except ValueError as e:
                 raise ResourceError(f"测试命令格式不对：{e}") from None
-            if not argv:
+            if not any(argv):
                 raise ResourceError("测试命令不能为空")
         if provider == "github":
             url = _s(x.get("url"), 300)

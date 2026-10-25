@@ -354,9 +354,6 @@ class AutonomyDB:
                 if col not in cols:
                     self._db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
 
-    def atomic(self):
-        return self.wdb.atomic()
-
     # ------------------------------------------------------------------ generic row helpers
 
     def _row(self, table: str, r: sqlite3.Row | None) -> dict | None:

@@ -256,7 +256,7 @@ class RepoCopy:
     def commit_branch(self, branch: str, message: str) -> str:
         self.sb.git(["checkout", "-B", branch], cwd=self.path)
         self.sb.git(["add", "-A"], cwd=self.path)
-        self.sb.git(["commit", "-m", message], cwd=self.path)
+        self.sb.git(["-c", "user.name=KAGOU Agent", "-c", "user.email=agent@kagou.invalid", "commit", "-m", message], cwd=self.path)
         return self.sb.git(["rev-parse", "HEAD"], cwd=self.path).stdout.strip()
 
     def push(self, branch: str) -> None:

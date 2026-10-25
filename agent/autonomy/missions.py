@@ -23,7 +23,7 @@ class MissionError(ValueError):
 
 
 # Event types that are problems in a project; a responsibility mission listens to these by default.
-DEFAULT_TRIGGER_TYPES = ["app.error", "ci.failed", "health.down", "github.workflow_failed", "bsc.*", "patch.applied", "pr.merged"]
+DEFAULT_TRIGGER_TYPES = ["app.error", "ci.failed", "health.down", "health.recovered", "github.workflow_failed", "bsc.*", "patch.applied", "pr.merged"]
 
 
 def clean_triggers(db: AutonomyDB, wid: str, triggers: Any) -> list[dict]:
@@ -196,12 +196,14 @@ class Missions:
         workspace's events (event-driven and continuous agents), by its schedule (scheduled agents), or only by tasks."""
         out = []
         mode = agent.get("work_mode") or "event"
-        for wid in (agent.get("workspace_ids") or []) if mode != "on_demand" else []:
+        wake = agent.get("wake_on")
+        wake = DEFAULT_TRIGGER_TYPES if wake is None else wake
+        triggers = [] if mode == "scheduled" or not wake else [{"types": list(wake), "min_severity": "medium"}]
+        # On-demand agents, and event-driven agents that no event type wakes, only work when given a task: no standing mission.
+        standing = mode != "on_demand" and not (mode == "event" and not triggers)
+        for wid in (agent.get("workspace_ids") or []) if standing else []:
             existing = self.db.missions(workspace_id=wid, responsibility_of=agent["id"], limit=1)
             typ = {"event": "event_driven", "continuous": "continuous", "scheduled": "scheduled"}[mode]
-            wake = agent.get("wake_on")
-            wake = DEFAULT_TRIGGER_TYPES if wake is None else wake
-            triggers = [] if mode == "scheduled" or not wake else [{"types": list(wake), "min_severity": "medium"}]
             cron = agent.get("schedule_cron") if mode in ("scheduled", "continuous") else None
             f = dict(goal=agent.get("responsibility") or "", type=typ, triggers=triggers, schedule_cron=cron,
                      next_run_at=iso(Cron.parse(cron).next_after(now_dt())) if cron else None)
@@ -217,9 +219,9 @@ class Missions:
             self.act.log("mission.created", f"{agent['name']} 的长期职责 Mission 已建立", workspace_id=wid, mission_id=m["id"], agent_id=agent["id"], actor=by,
                          data={"type": typ, "triggers": triggers})
             out.append(m)
-        # Workspaces the agent was removed from (or an on-demand agent): its standing mission there stops.
+        # Workspaces the agent was removed from (or no standing mission any more): its standing mission there stops.
         for m in self.db.missions(responsibility_of=agent["id"], status=[C.M_ACTIVE, C.M_PAUSED], limit=100):
-            if mode == "on_demand" or m["workspace_id"] not in (agent.get("workspace_ids") or []):
+            if not standing or m["workspace_id"] not in (agent.get("workspace_ids") or []):
                 self.db.update_mission(m["id"], status=C.M_STOPPED)
         return out
 

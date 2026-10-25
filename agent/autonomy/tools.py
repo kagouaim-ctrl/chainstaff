@@ -82,8 +82,6 @@ def _reject(ctx: "RunContext", a: dict) -> dict:
 def _delegate(ctx: "RunContext", a: dict) -> dict:
     from .wakeup import TaskError
 
-    if "delegate" not in ctx.agent["permissions"]:
-        raise ToolError("你没有把任务交给其他 Agent 的权限（delegate）")
     wait = bool(a.get("wait_for_result", True))
     try:
         t, info = ctx.svc.wakeup.create_task(
