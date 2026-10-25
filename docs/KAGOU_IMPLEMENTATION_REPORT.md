@@ -83,11 +83,20 @@
 
 ### 真实 BSC 调用验证
 
-本沙箱连不上 BSC 节点（DNS 被拦），真实测试网验证在 GitHub Actions 的 `bsc-testnet` job 里进行：除 PR #15 已有的 3 项冒烟测试，新增一次 `live_check.py --chain`（真实服务器进程 + 真实测试网 + 新区块监听，分析 WBNB 测试网合约）。结果见 PR 的 CI 运行记录，会补到这里。
+本沙箱连不上 BSC 节点（DNS 被拦），真实测试网验证在 GitHub Actions 的 `bsc-testnet` job 里进行（[运行记录](https://github.com/kagouaim-ctrl/chainstaff/actions/runs/40169456021/job/121097160117)，2026-10-25 06:33 UTC，chain id 97）：
+
+| 检查 | 结果 |
+|---|---|
+| 3 个公共 RPC 节点 | 全部返回 chain id 97；延迟 353 / 215 / 310 ms；区块 138798223–138798224 |
+| WebSocket 新区块监听 | `wss://bsc-testnet-rpc.publicnode.com`，6.7 秒跟到 13 个区块，补块 1 次，0 次重连，0 次重组；单区块处理 P50 170 ms，P95 190 ms |
+| 合约读取 | WBNB `symbol()=WBNB`、`decimals()=18`；近 200 个区块 43 条 Transfer |
+| `live_check.py --chain`（真实服务器进程 + 真实测试网 + 新区块监听开着） | **19/19 通过**：分析 WBNB 测试网合约的 Mission 2.0 秒到待审核，审批后 `offchain_completed`，重启后 Agent、Mission、幂等键都在 |
+
+这是规则规划 + 只读工具，没有模型参与。
 
 ### 性能
 
-只有上面的单机数字（启动 1.4 秒；无模型的 Mission 到待审核 1.0 秒）。没有做负载测试。
+只有单机数字：启动 0.9–1.4 秒；无模型的 Mission 到待审核 1.0 秒（模拟链）/ 2.0 秒（真实测试网）。没有做负载测试。
 
 ### 安全
 
