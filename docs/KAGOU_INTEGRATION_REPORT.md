@@ -217,7 +217,8 @@ Agent 的工具和链上监听共用同一个 `RpcPool`。
 10. **内部旧名字**：`TelegramSettings`、`FrontDesk` 的聊天命令、`outbox` 表、`CHAINSTAFF_*` 环境变量、前端包名 `chainstaff-terminal`。不影响功能，后续可以统一改名。
 11. **PR 状态**：PR #10–#13 和本分支的草稿 PR #15 都没合并。合并和关闭由你决定。
 12. **`docs/KAGOU_TECHNICAL_AUDIT.md`** 是整合前的审计快照，里面提到的 `bot/main.py` 等已不存在。
-13. 需要你确认：`kagouaim-ctrl/kagou`（LINE 集成）这个仓库是否也要纳入。
+13. **一次偶发测试失败**：本地在 Docker 构建刚结束、机器负载高时，整套测试里有 1 项失败过一次，之后连跑 10 次都通过，没能复现出是哪一项。CI 上没有出现过。
+14. 需要你确认：`kagouaim-ctrl/kagou`（LINE 集成）这个仓库是否也要纳入。
 
 ## 12. 部署方案
 
