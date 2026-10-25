@@ -381,6 +381,7 @@ a.tag.acc:hover { color: var(--accent-hover); }
 .pill .mono { font-size: 11px; }
 .pill .sep { width: 1px; height: 12px; background: var(--border-primary); }
 .pill.acc { color: var(--text-primary); }
+.pill.demo { color: var(--accent, #F0B90B); border-color: currentColor; cursor: default; }
 .ind { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--status-neutral); flex: none; }
 .ind.ok { background: var(--status-success); } .ind.bad { background: var(--status-danger); } .ind.warn { background: var(--status-warning); } .ind.info { background: var(--status-info); }
 .ind.live { animation: blink 1.8s ease-in-out infinite; }

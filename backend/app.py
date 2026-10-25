@@ -20,8 +20,8 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from agent.config import ChainConfig
 from agent.front_desk import FrontDesk
@@ -57,9 +57,11 @@ def _when(v: str | None) -> datetime | None:
 
 def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | None = None, env: dict | None = None,
                desk: FrontDesk | None = None, sybil_background: bool = True, workforce: Workforce | None = None,
-               chain_service: ChainService | None = None) -> FastAPI:
+               chain_service: ChainService | None = None, viewer_token: str | None = None) -> FastAPI:
     if not token or len(token) < 16:
         raise RuntimeError("CHAINSTAFF_CONSOLE_TOKEN must be set (at least 16 characters)")
+    if viewer_token and (len(viewer_token) < 16 or viewer_token == token):
+        raise RuntimeError("KAGOU_DEMO_TOKEN must be at least 16 characters and differ from the console token")
     env = dict(os.environ if env is None else env)
     store = employee.store
     desk = desk or FrontDesk(employee)
@@ -67,12 +69,27 @@ def create_app(employee: FinanceOpsEmployee, token: str, chain: ChainConfig | No
     started = datetime.now(timezone.utc)
     app = FastAPI(title="ChainStaff console", docs_url=None, redoc_url=None)
 
+    def is_viewer(given: str) -> bool:
+        return bool(viewer_token) and hmac.compare_digest(given.strip().encode(), viewer_token.encode())
+
     def token_ok(given: str) -> bool:
-        return hmac.compare_digest(given.strip().encode(), token.encode())
+        return hmac.compare_digest(given.strip().encode(), token.encode()) or is_viewer(given)
 
     def auth(authorization: str = Header(default="")) -> None:
         if not token_ok(authorization.removeprefix("Bearer ")):
             raise HTTPException(401, "令牌不对")
+
+    # Read-only demo login (KAGOU_DEMO_TOKEN): every page and stream, no change of any kind. Checked once here for the
+    # whole app, so a new write endpoint is read-only for demo visitors without anyone remembering to mark it.
+    @app.middleware("http")
+    async def viewer_read_only(request: Request, call_next):
+        if request.method not in ("GET", "HEAD", "OPTIONS") and is_viewer(request.headers.get("authorization", "").removeprefix("Bearer ")):
+            return JSONResponse({"detail": "演示账号只能查看，不能修改"}, status_code=403)
+        return await call_next(request)
+
+    @app.get("/api/session", dependencies=[Depends(auth)])
+    def session(authorization: str = Header(default="")) -> dict:
+        return {"role": "viewer" if is_viewer(authorization.removeprefix("Bearer ")) else "owner"}
 
     # The console acts as the owner, so it bypasses the chat-handle owner list.
     def as_owner(fn, *args):
@@ -658,7 +675,8 @@ def _default_app() -> FastAPI:  # pragma: no cover - process entry point
             source = EtherscanV2Source(chain.explorer_api_url, api_key, {s: t.address for s, t in chain.tokens.items()})
         BackgroundDuties(desk, source, chain.treasury_addresses if chain else (),
                          chain.alert_outflow_threshold if chain else {}).start()
-    return create_app(desk.finance, os.environ.get("CHAINSTAFF_CONSOLE_TOKEN", ""), chain, desk=desk, workforce=wf, chain_service=svc)
+    return create_app(desk.finance, os.environ.get("CHAINSTAFF_CONSOLE_TOKEN", ""), chain, desk=desk, workforce=wf, chain_service=svc,
+                      viewer_token=os.environ.get("KAGOU_DEMO_TOKEN") or None)
 
 
 def __getattr__(name: str):  # pragma: no cover - lets `uvicorn backend.app:app` build lazily

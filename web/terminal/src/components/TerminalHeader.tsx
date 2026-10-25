@@ -47,6 +47,7 @@ export function TerminalHeader({ route }: { route: Route }) {
         <MoreMenu route={route} />
       </nav>
       <div className="head-right">
+        <DemoPill />
         <GlobalSearch />
         <NetworkPill />
         <RunningPill />
@@ -54,6 +55,17 @@ export function TerminalHeader({ route }: { route: Route }) {
         <WalletButton />
       </div>
     </header>
+  );
+}
+
+// Signed in with the read-only demo token: every page works, every change is refused by the server.
+function DemoPill() {
+  const s = useQuery({ queryKey: ["session"], queryFn: () => api<{ role: string }>("/api/session"), staleTime: Infinity });
+  if (s.data?.role !== "viewer") return null;
+  return (
+    <span className="pill demo" title="演示账号：可以查看所有页面，不能修改任何内容">
+      演示 · 只读
+    </span>
   );
 }
 
