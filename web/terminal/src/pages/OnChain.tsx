@@ -12,7 +12,7 @@ import { useAction, useAgentName, useAgents, useChain, useLedger, useMission, us
 import type { LedgerRow, Proof, ProofState } from "../lib/types";
 import { fmtTime, go, num, plural, setParams, short, useIsMobile, weiToBnb, weiToGwei, type Route } from "../lib/util";
 
-type Tab = "ledger" | "live" | "tx" | "registry" | "events" | "wallet";
+type Tab = "ledger" | "live" | "tx" | "registry" | "events" | "wallet" | "contract";
 
 /** The trust layer: which agent did what, what it produced, and whether that result is provably on chain. */
 export default function OnChain({ route }: { route: Route }) {
@@ -28,7 +28,7 @@ export default function OnChain({ route }: { route: Route }) {
         <Tabs<Tab>
           value={tab}
           onChange={(t) => go("onchain", undefined, t === "ledger" ? {} : { tab: t })}
-          options={[["ledger", "Execution ledger"], ["live", "Live chain"], ["tx", "Transactions"], ["registry", "Agent registry"], ["events", "Contract events"], ["wallet", "Wallet lookup"]]}
+          options={[["ledger", "Execution ledger"], ["live", "Live chain"], ["tx", "Transactions"], ["registry", "Agent registry"], ["events", "Contract events"], ["wallet", "Wallet lookup"], ["contract", "Contract analysis"]]}
         />
         {tab === "ledger" && <Ledger route={route} />}
         {tab === "live" && <ChainLive />}
@@ -36,6 +36,7 @@ export default function OnChain({ route }: { route: Route }) {
         {tab === "registry" && <Registry />}
         {tab === "events" && <SkillRunner skill="contract_events" extra={{ blocks: 1000 }} label="Read events" />}
         {tab === "wallet" && <SkillRunner skill="wallet_analysis" label="Analyze wallet" initial={route.params.get("address") || ""} />}
+        {tab === "contract" && <SkillRunner key="contract" skill="contract_analysis" label="Analyze contract" initial={route.params.get("address") || ""} />}
       </section>
       {selected && !mobile && <aside className="pane insp" aria-label="Verification">{insp}</aside>}
       {selected && mobile && <Sheet onClose={close} tall>{insp}</Sheet>}
@@ -298,6 +299,7 @@ function SkillRunner({ skill, extra, label, initial = "" }: { skill: string; ext
             {Object.entries(out.output.tokens || {}).map(([s, v]) => <span key={s} style={{ display: "contents" }}><dt>{s}</dt><dd className="mono">{String(v)}</dd></span>)}
           </dl>
         )}
+        {out && skill === "contract_analysis" && <Json value={out.output} />}
         {out && (
           <details className="log">
             <summary className="muted">Execution log</summary>

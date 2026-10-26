@@ -8,8 +8,8 @@ export interface Route {
   params: URLSearchParams;
 }
 
-// Old links keep working: the first terminal's roster opens Agents.
-const LEGACY: Record<string, string> = { workforce: "agents" };
+// Old links keep working: the first terminal's roster opens Agents. "workers" is the name the navigation uses.
+const LEGACY: Record<string, string> = { workforce: "agents", workers: "agents" };
 
 function parse(): Route {
   const h = location.hash.replace(/^#\/?/, "");
