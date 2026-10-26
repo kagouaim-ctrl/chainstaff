@@ -62,13 +62,14 @@ class AgentError(ValueError):
     pass
 
 
-def clean_autonomy(body: dict, db: AutonomyDB, partial: bool = False) -> dict:
+def clean_autonomy(body: dict, db: AutonomyDB, partial: bool = False, need_responsibility: bool = True) -> dict:
     """The autonomy fields of an agent body, checked. Base fields (name, model, skills, permissions) go through
-    the workforce's own validation."""
+    the workforce's own validation. need_responsibility=False lets a draft agent be saved with a name only;
+    activation still refuses an agent without one."""
     f: dict[str, Any] = {}
     if "responsibility" in body or not partial:
         r = str(body.get("responsibility") or "").strip()
-        if not r and not partial:
+        if not r and not partial and need_responsibility:
             raise AgentError("请写下这个 Agent 的工作职责")
         f["responsibility"] = r[:4000]
     if "work_mode" in body or not partial:
@@ -117,7 +118,22 @@ def clean_autonomy(body: dict, db: AutonomyDB, partial: bool = False) -> dict:
     if "template" in body:
         t = str(body.get("template") or "")
         f["template"] = t if t in TEMPLATE_BY_ID else ""
+    if "appearance" in body:
+        ap = body.get("appearance") or {}
+        if not isinstance(ap, dict):
+            raise AgentError("外观必须是对象")
+        shape, color = ap.get("shape"), ap.get("color")
+        if shape is not None and shape not in AVATAR_SHAPES:
+            raise AgentError(f"头像形状只能是 {', '.join(AVATAR_SHAPES)}")
+        if color is not None and color not in AVATAR_COLORS:
+            raise AgentError(f"头像颜色只能是 {', '.join(AVATAR_COLORS)}")
+        f["appearance"] = {k: v for k, v in (("shape", shape), ("color", color)) if v}
     return f
+
+
+# The console's geometric avatars (web/terminal/src/components/WorkerAvatar.tsx draws them).
+AVATAR_SHAPES = ("hex", "orbit", "prism", "grid", "pulse", "shield", "node", "spark")
+AVATAR_COLORS = ("gold", "amber", "emerald", "azure", "coral", "slate")
 
 
 def _money(v: Any, what: str) -> str | None:

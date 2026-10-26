@@ -293,6 +293,7 @@ MIGRATIONS = (
     ("wf_agents", "autonomous", "INTEGER NOT NULL DEFAULT 0"),
     ("wf_agents", "activated_at", "TEXT"),
     ("wf_agents", "wake_on", "TEXT"),                    # event types that wake the agent; NULL = the default problem events
+    ("wf_agents", "appearance", "TEXT NOT NULL DEFAULT '{}'"),  # avatar shape and colour chosen in the console; display only
     ("wf_workspaces", "resources", "TEXT NOT NULL DEFAULT '{}'"),
 )
 
@@ -306,7 +307,7 @@ JSON_COLS = {
     "at_artifacts": ("meta",),
     "at_workers": ("running", "stats"),
 }
-AGENT_JSON = ("workspace_ids", "approval_rules", "notify_rules", "wake_on")
+AGENT_JSON = ("workspace_ids", "approval_rules", "notify_rules", "wake_on", "appearance")
 
 
 def _j(v: Any) -> str:

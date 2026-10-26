@@ -111,7 +111,7 @@ class Autonomy:
         if not base.get("provider"):
             base["provider"], base["model"] = self._default_provider()
         try:
-            auto = clean_autonomy(body, self.db)
+            auto = clean_autonomy(body, self.db, need_responsibility=bool(body.get("activate")))
             auto.setdefault("workspace_ids", [])
             if not auto.get("approval_rules"):
                 auto["approval_rules"] = {"patch": "always", "delegate_outside_mission": False, "max_task_budget_usd": None}
@@ -359,7 +359,8 @@ class Autonomy:
                 "activated": bool(a.get("activated_at")), "state": st["state"], "state_detail": st["detail"],
                 "current_task": {"id": cur["id"], "objective": cur["objective"], "kind": cur["kind"], "status": cur["status"]} if cur else None,
                 "last_wake_at": self.db.last_wake(a["id"]), "last_activity_at": self.db.last_activity_at(a["id"]), "provider": a.get("provider"), "model": a.get("model"),
-                "model_ready": a.get("provider") in self.providers, "spent_usd": a.get("spent_usd"), "budget_usd": a.get("budget_usd")}
+                "model_ready": a.get("provider") in self.providers, "spent_usd": a.get("spent_usd"), "budget_usd": a.get("budget_usd"),
+                "appearance": a.get("appearance") or {}}
 
     def agent_rows(self, include_archived: bool = False) -> list[dict]:
         alive = self.worker_alive()
