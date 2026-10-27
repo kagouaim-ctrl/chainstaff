@@ -28,7 +28,7 @@ const OUT = process.argv[2];
     return p;
   }
   const p = await newPage({ width: 1440, height: 900 });
-  await p.goto(BASE + "#/terminal");
+  await p.goto(BASE + "#/chat");
   await p.waitForTimeout(1500);
   const api = (path) => p.evaluate(async ([path, t]) => (await fetch(path, { headers: { Authorization: "Bearer " + t } })).json(), [path, TOKEN]);
   const agents = await api("/api/wf/agents");
@@ -48,6 +48,18 @@ const OUT = process.argv[2];
     for (const t of detail.subtasks || detail.tasks || []) routes.push(`#/workspace/${m.workspace_id}?m=${m.id}&t=${t.id}`, `#/tasks/${t.id}`);
   }
   for (const t of Array.isArray(taskList) ? taskList : []) routes.push(`#/tasks/${t.id}`);
+  // Autonomous workers (/api/at): every page of the current navigation, each worker's tabs, each mission and task.
+  routes.unshift("#/chat", "#/usage");
+  for (const c of await api("/api/at/chats")) routes.push(`#/chat/${c.id}`);
+  routes.push("#/missions", "#/missions?status=running", "#/missions?status=completed,failed,stopped", "#/missions?type=scheduled&status=active,paused",
+    "#/missions?tab=tasks", "#/activity", "#/activity?human=1", "#/onchain?tab=contract", "#/more");
+  for (const s of ["models", "keys", "tools", "permissions", "notifications", "runtime", "audit", "legacy"]) routes.push(`#/settings?s=${s}`);
+  for (const a of await api("/api/at/agents?archived=false"))
+    for (const tab of ["", "overview", "work", "activity", "tools", "memory", "settings"]) routes.push(`#/agents/${a.id}${tab ? "?tab=" + tab : ""}`);
+  for (const w of await api("/api/at/workspaces"))
+    for (const tab of ["", "watchers", "events", "agents"]) routes.push(`#/workspace/${w.id}${tab ? "?tab=" + tab : ""}`);
+  for (const m of await api("/api/at/missions?status=")) routes.push(`#/missions/${m.id}`);
+  for (const t of (await api("/api/at/tasks?limit=200")).items || []) routes.push(`#/missions?task=${t.id}`);
   const seen = new Set();
   for (const r of routes) {
     if (seen.has(r)) continue;
@@ -56,7 +68,7 @@ const OUT = process.argv[2];
     await p.waitForTimeout(r.includes("tab=live") ? 15000 : 900);
   }
   const m = await newPage({ width: 390, height: 844 });
-  for (const r of ["#/terminal", "#/workspace", "#/tasks", "#/onchain?tab=live", "#/agents", "#/more"]) {
+  for (const r of ["#/chat", "#/terminal", "#/workspace", "#/tasks", "#/onchain?tab=live", "#/agents", "#/missions", "#/more"]) {
     await m.goto(BASE + r);
     await m.waitForTimeout(900);
   }

@@ -26,7 +26,7 @@ from agent.workforce.chain import KNOWN_TOPICS, TRANSFER_TOPIC
 
 from .hub import Hub
 from .rpc import _pct, _redact
-from .store import CONFIRMED, PENDING, ChainStore
+from .store import CONFIRMED, PENDING, REORGED, ChainStore
 
 
 def _int(v: Any) -> int:
@@ -49,6 +49,7 @@ class ChainProcessor:
         self.max_backfill = max_backfill
         self.keep_blocks = keep_blocks
         self.on_event = on_event
+        self.on_block: Callable[[int], None] | None = None  # called after each stored block (autonomy watcher heartbeats)
         self.lock = threading.RLock()  # one block at a time, in order
         self.block_ms: deque[float] = deque(maxlen=1000)  # head received -> block fully processed
         self.event_ms: deque[float] = deque(maxlen=1000)  # head received -> event published
@@ -138,6 +139,11 @@ class ChainProcessor:
             if mon:
                 self._notify(ev, mon, CONFIRMED)
         self.store.prune_blocks(self.keep_blocks)
+        if self.on_block:
+            try:
+                self.on_block(n)
+            except Exception as e:  # a failed hook never stops the listener
+                self.hub.publish("trigger.error", event_id=None, monitor_id=None, error=str(e)[:200])
         self.block_ms.append((time.perf_counter() - received) * 1000)
         return True
 
@@ -165,6 +171,9 @@ class ChainProcessor:
         self.hub.publish("reorg", **self.last_reorg, event_ids=[e["id"] for e in removed])
         for ev in removed:
             self.hub.publish("event.reorged", event=ev)
+            mon = self.store.monitor(ev["monitor_id"])
+            if mon:
+                self._notify(ev, mon, REORGED)
         for k in range(a + 1, n + 1):
             if not self._process(k, received, depth=depth):
                 return

@@ -236,7 +236,7 @@ function FeedItem({ m }: { m: ChainMsg }) {
       return (
         <div className="feed-line acc">
           {t}<Activity size={12} /><span className="xs">{m.replayed ? "事件已有任务" : "已自动创建分析任务"}</span>
-          <button className="btn ghost xs" onClick={() => go("workspace", undefined, { m: m.task_id })}>打开</button>
+          <button className="btn ghost xs" onClick={() => go("board", undefined, { m: m.task_id })}>打开</button>
         </div>
       );
     case "trigger.error":

@@ -272,7 +272,7 @@ export function NewMissionDialog({ onClose, workspaceId, squadId }: { onClose: (
           {current && (
             <div>
               <TaskComposer ws={current} squadId={sq || (firstReady?.workspace_id === wid ? firstReady.id : undefined)} onSquad={setSq} autoFocus rows={4}
-                onSubmitted={(t) => (onClose(), go("workspace", t.workspace_id, { m: t.id, ...(t.squad_id ? { s: t.squad_id } : {}) }))} />
+                onSubmitted={(t) => (onClose(), go("board", t.workspace_id, { m: t.id, ...(t.squad_id ? { s: t.squad_id } : {}) }))} />
             </div>
           )}
         </>

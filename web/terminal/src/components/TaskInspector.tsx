@@ -38,7 +38,7 @@ export function TaskInspector({ id, onClose }: { id: string; onClose?: () => voi
             </div>
             <h2 className="clamp2" title={t.title}>{t.title}</h2>
             {!isMission && (
-              <button className="row gap6 xs plain-btn" onClick={() => go("workspace", d.root.workspace_id, { m: d.root.id, t: t.id })}>
+              <button className="row gap6 xs plain-btn" onClick={() => go("board", d.root.workspace_id, { m: d.root.id, t: t.id })}>
                 <span className="muted nowrap">in mission</span><span className="dim ellipsis">{d.root.title}</span><ArrowRight size={11} className="muted" />
               </button>
             )}
@@ -46,7 +46,7 @@ export function TaskInspector({ id, onClose }: { id: string; onClose?: () => voi
           {onClose && <button className="btn ghost sm icon" onClick={onClose} aria-label="关闭"><X size={14} /></button>}
         </div>
         <div className="row gap6">
-          <button className="btn sm primary" onClick={() => go("workspace", d.root.workspace_id, { m: d.root.id, ...(isMission ? {} : { t: t.id }) })}>Open in workspace</button>
+          <button className="btn sm primary" onClick={() => go("board", d.root.workspace_id, { m: d.root.id, ...(isMission ? {} : { t: t.id }) })}>Open in workspace</button>
           <CancelButton root={d.root} />
         </div>
       </div>

@@ -1,39 +1,56 @@
-import { Bot, Boxes, LayoutGrid, ListChecks, MoreHorizontal, RefreshCw, WifiOff } from "lucide-react";
-import type { ReactNode } from "react";
+import { RefreshCw, WifiOff } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
 import { queryClient } from "../lib/api";
+import { useAtApprovals } from "../lib/at";
 import { useHealth } from "../lib/health";
-import { useApprovals } from "../lib/queries";
-import type { Route } from "../lib/util";
-import { TerminalHeader } from "./TerminalHeader";
+import { closeOps, setSideOpen, useShell } from "../lib/shell";
+import { useMedia, usePref, type Route } from "../lib/util";
+import { CreateWorker } from "./CreateWorker";
+import { LiveOps } from "./LiveOps";
+import { NAV, Sidebar } from "./Sidebar";
+import { navCurrent, TerminalHeader } from "./TerminalHeader";
 
-const MOBILE: [string, string, typeof Bot][] = [
-  ["terminal", "Terminal", LayoutGrid],
-  ["agents", "Agents", Bot],
-  ["workspace", "Workspace", Boxes],
-  ["tasks", "Tasks", ListChecks],
-  ["more", "More", MoreHorizontal],
-];
-const UNDER_MORE = ["more", "squads", "onchain", "skills", "activity", "settings"];
-
-/** Compact top navigation on desktop, a five-item bottom bar on phones; pages fill the rest. */
+/**
+ * Header across the top, the sidebar on the left (an icon rail when collapsed, a drawer on phones), the page in
+ * the middle, and Live Operations on the right: floating when opened, a column when pinned.
+ */
 export function TerminalShell({ route, children }: { route: Route; children: ReactNode }) {
-  const approvals = useApprovals("pending");
+  const approvals = useAtApprovals("pending");
   const pending = approvals.data?.length || 0;
-  const current = UNDER_MORE.includes(route.page) ? "more" : route.page;
+  const shell = useShell();
+  const [collapsedPref, setCollapsed] = usePref<boolean>("side-collapsed", false);
+  const [pinned, setPinned] = usePref<boolean>("ops-pinned", false);
+  const narrow = useMedia("(max-width: 1120px)");
+  const phone = useMedia("(max-width: 760px)");
+  const collapsed = phone ? false : narrow || collapsedPref;
+  const current = navCurrent(route.page);
+  const opsCol = !!shell.ops && pinned && !narrow;
+  useEffect(() => setSideOpen(false), [route.page, route.id]);
   return (
-    <div className="app">
-      <TerminalHeader route={route} />
+    <div className="app" data-side={collapsed ? "collapsed" : "open"} data-ops={opsCol ? "pinned" : undefined} data-drawer={shell.sideOpen ? "open" : undefined}>
+      <TerminalHeader />
       <ConnectionBanner />
-      <main className="main">{children}</main>
+      <Sidebar route={route} collapsed={collapsed} onCollapse={setCollapsed} />
+      {shell.sideOpen && <div className="scrim side-scrim" onClick={() => setSideOpen(false)} />}
+      <main className="main">
+        <div className="route" key={route.page + (route.id || "")}>{children}</div>
+      </main>
+      {shell.ops && (
+        <>
+          {!opsCol && <div className="ops-scrim" onClick={closeOps} />}
+          <LiveOps tab={shell.ops} pinned={opsCol} onPin={setPinned} />
+        </>
+      )}
       <nav className="mnav" aria-label="底部导航">
-        {MOBILE.map(([id, label, Icon]) => (
+        {NAV.map(([id, label, Icon]) => (
           <a key={id} href={`#/${id}`} aria-current={current === id ? "page" : undefined}>
-            <Icon size={19} strokeWidth={1.8} />
+            <Icon size={20} strokeWidth={1.8} />
             {label}
-            {id === "workspace" && pending > 0 && <span className="count-dot">{pending}</span>}
+            {id === "chat" && pending > 0 && <span className="count-dot">{pending}</span>}
           </a>
         ))}
       </nav>
+      {shell.creating && <CreateWorker />}
     </div>
   );
 }

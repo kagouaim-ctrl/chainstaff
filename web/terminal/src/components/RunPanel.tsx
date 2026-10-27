@@ -75,7 +75,7 @@ export function RunPanel({ agent, mode, onMode, presetSkill, onDone }: {
       <div className="col gap6">
         <div className="note acc row sp">
           <span className="ellipsis">已创建 <span className="mono">{done.id}</span> · {done.title}</span>
-          <button className="btn sm primary" onClick={() => go("workspace", done.workspace_id, { m: done.id })}>Open mission <ArrowRight size={12} /></button>
+          <button className="btn sm primary" onClick={() => go("board", done.workspace_id, { m: done.id })}>Open mission <ArrowRight size={12} /></button>
         </div>
         <button className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={() => (setDone(null), setGoal(""), setInput({}), setTitle(""))}>再派一个</button>
       </div>

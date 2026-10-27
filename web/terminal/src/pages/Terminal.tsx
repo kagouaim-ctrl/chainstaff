@@ -175,7 +175,7 @@ function SquadLinks() {
   return (
     <>
       {(squads.data || []).map((q) => (
-        <button key={q.id} className="rail-item" onClick={() => go("workspace", q.workspace_id, { s: q.id })}>
+        <button key={q.id} className="rail-item" onClick={() => go("board", q.workspace_id, { s: q.id })}>
           <span className={`ind ${q.status === "paused" ? "" : q.ready ? "ok" : "bad"}`} />
           <span className="ellipsis">{q.name}</span>
           {q.missions.active > 0 ? <span className="n acc">{q.missions.active} live</span> : <span className="n">{q.members.length + (q.manager_id ? 1 : 0)}</span>}
@@ -213,14 +213,14 @@ function LivePanel() {
       <div className="pane-h sub-h"><span className="label">Needs attention</span>{attention > 0 && <span className="badge acc">{attention}</span>}</div>
       <div style={{ flex: "none", maxHeight: "38%", overflow: "auto" }}>
         {(approvals.data || []).map((a) => (
-          <button key={a.id} className="m-row" onClick={() => a.task_id && go("workspace", a.workspace_id, { m: a.task_id })}>
+          <button key={a.id} className="m-row" onClick={() => a.task_id && go("board", a.workspace_id, { m: a.task_id })}>
             <ShieldCheck size={14} className="acc" style={{ flex: "none" }} />
             <span className="col gap2 grow"><span className="ellipsis sm">{a.title}</span><span className="muted xs">{a.kind === "over_budget" ? "预算用完" : "等你审批"} · {name(a.requested_by)} · {ago(a.at)}</span></span>
             <ChevronRight size={14} className="muted" />
           </button>
         ))}
         {recentFails.map((m) => (
-          <button key={m.id} className="m-row" onClick={() => go("workspace", m.workspace_id, { m: m.id })}>
+          <button key={m.id} className="m-row" onClick={() => go("board", m.workspace_id, { m: m.id })}>
             <Activity size={14} className="bad" style={{ flex: "none" }} />
             <span className="col gap2 grow"><span className="ellipsis sm">{m.name}</span><span className="bad xs ellipsis">{m.error || "failed"}</span></span>
             <ChevronRight size={14} className="muted" />
@@ -238,7 +238,7 @@ function LivePanel() {
       <div className="pane-h sub-h"><span className="label">Running missions</span><span className="mono muted xs">{missions.data?.length || 0}</span></div>
       <div style={{ flex: "none", maxHeight: "28%", overflow: "auto" }}>
         {(missions.data || []).map((m) => (
-          <button key={m.id} className="m-row" onClick={() => go("workspace", m.workspace_id, { m: m.id })}>
+          <button key={m.id} className="m-row" onClick={() => go("board", m.workspace_id, { m: m.id })}>
             <span className="col gap4 grow">
               <span className="ellipsis sm strong">{m.name}</span>
               <span className="row gap6 xs muted"><span>{m.stage}</span><span>·</span><span>{name(m.owner)}</span></span>

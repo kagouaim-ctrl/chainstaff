@@ -5,6 +5,7 @@ import { BrandMark } from "./components/TerminalHeader";
 import { TerminalShell } from "./components/TerminalShell";
 import { Loading, Toasts } from "./components/ui";
 import { api, onAuthChange, queryClient, setToken, token } from "./lib/api";
+import { startAtStream, stopAtStream, useAtMeta } from "./lib/at";
 import { useMeta } from "./lib/queries";
 import { startStream, stopStream } from "./lib/stream";
 import { errText, usePref, useRoute } from "./lib/util";
@@ -12,16 +13,23 @@ import "./styles.css";
 
 // Each page is its own chunk, so the first paint only loads the shell and the current page.
 const PAGES = {
-  terminal: lazy(() => import("./pages/Terminal")),
+  chat: lazy(() => import("./pages/Chat")),
   agents: lazy(() => import("./pages/Agents")),
-  squads: lazy(() => import("./pages/Squads")),
-  workspace: lazy(() => import("./pages/Workspace")),
-  tasks: lazy(() => import("./pages/Tasks")),
-  onchain: lazy(() => import("./pages/OnChain")),
-  skills: lazy(() => import("./pages/Skills")),
-  activity: lazy(() => import("./pages/Activity")),
-  settings: lazy(() => import("./pages/Settings")),
+  missions: lazy(() => import("./pages/Missions")),
+  workspace: lazy(() => import("./pages/WorkspaceAt")),
+  activity: lazy(() => import("./pages/ActivityAt")),
+  settings: lazy(() => import("./pages/SettingsAt")),
+  usage: lazy(() => import("./pages/Usage")),
   more: lazy(() => import("./pages/More")),
+  // Earlier workflow, still on its real backend; linked from Settings → Legacy, not from the navigation.
+  terminal: lazy(() => import("./pages/Terminal")),
+  team: lazy(() => import("./pages/Team")),
+  board: lazy(() => import("./pages/Board")),
+  tasks: lazy(() => import("./pages/Tasks")),
+  squads: lazy(() => import("./pages/Squads")),
+  skills: lazy(() => import("./pages/Skills")),
+  onchain: lazy(() => import("./pages/OnChain")),
+  log: lazy(() => import("./pages/Log")),
 } as const;
 
 function useAuthed() {
@@ -70,6 +78,7 @@ function Login() {
 function Terminal() {
   const route = useRoute();
   const meta = useMeta();
+  const at = useAtMeta();
   const [density] = usePref("density", "compact");
   useEffect(() => {
     document.documentElement.dataset.density = density;
@@ -78,7 +87,11 @@ function Terminal() {
     if (meta.data) startStream(meta.data.last_message_id);
     return stopStream;
   }, [meta.data?.last_message_id === undefined]); // start once, when the cursor is known
-  const Page = PAGES[route.page as keyof typeof PAGES] || PAGES.terminal;
+  useEffect(() => {
+    if (at.data) startAtStream(at.data.last_activity_id);
+    return stopAtStream;
+  }, [at.data?.last_activity_id === undefined]);
+  const Page = PAGES[route.page as keyof typeof PAGES] || PAGES.chat;
   return (
     <TerminalShell route={route}>
       <Suspense fallback={<div className="page"><Loading rows={6} /></div>}>

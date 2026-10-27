@@ -31,8 +31,14 @@ class ChainService:
         self.processor = ChainProcessor(self.rpc, self.events, self.hub, chain_id=chain.chain_id, network=chain.network,
                                         confirmations=chain.confirmations, on_event=self._trigger)
         self.listener = ChainListener(self.processor, self.rpc, chain.ws_urls, poll_s=poll_s, stall_s=stall_s, connect=connect)
+        self.autonomy = None  # agent.autonomy.service.Autonomy: bsc_events watchers' monitors route there
         if wf is not None:
             wf.events = self.events
+
+    def attach_autonomy(self, at) -> None:
+        self.autonomy = at
+        at.watchers.chain = self
+        self.processor.on_block = at.watchers.chain_heartbeat
 
     def start(self) -> None:
         self.listener.start()
@@ -73,6 +79,8 @@ class ChainService:
                 raise ValueError
         except (TypeError, ValueError):
             raise ValueError("最小数量应该是非负整数（链上原始单位）") from None
+        if trigger and trigger.get("watcher_id"):
+            return  # owned by an autonomy watcher, which checked its own workspace
         if trigger:
             if self.wf is None:
                 raise ValueError("没有工作台，不能设置自动任务")
@@ -84,6 +92,10 @@ class ChainService:
 
     def _trigger(self, ev: dict, mon: dict, phase: str) -> None:
         trig = mon.get("trigger") or {}
+        if trig.get("watcher_id"):
+            if self.autonomy is not None:
+                self.autonomy.events.chain_event(ev, mon, phase)
+            return
         if self.wf is None or not trig.get("workspace_id") or trig.get("on", CONFIRMED) != phase:
             return
         d = ev["data"]
