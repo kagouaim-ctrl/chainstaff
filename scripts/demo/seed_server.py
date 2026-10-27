@@ -101,5 +101,44 @@ def miner():
         node.push_head()
 threading.Thread(target=miner, daemon=True).start()
 
-app = create_app(emp, "t" * 24, chain, workforce=wf, chain_service=svc)
+# Autonomous workers (/api/at): the tests' scripted provider (tests/support/autonomy_brain.py) answers instead of a model,
+# on a local copy of examples/buggy-service. One error log runs the whole hand-off and leaves a patch waiting for approval.
+from autonomy_kit import ScriptedProvider, git_repo
+from agent.autonomy.service import Autonomy
+from agent.autonomy.worker import Worker
+repos = tmp / "repos"; repos.mkdir()
+repo = git_repo(repos / "pricing-service", ROOT / "examples" / "buggy-service")
+at = Autonomy(wf, env={"KAGOU_LOCAL_REPO_ROOTS": str(repos)}, providers={"anthropic": ScriptedProvider()}, data_dir=tmp, network_isolation=False)
+worker = Worker(at, worker_id="wkr-demo")
+worker.db.heartbeat(worker.id, running=[])
+aws = at.create_workspace({"name": "BSC Treasury", "description": "国库钱包、代币合约和定价服务", "resources": {
+    "repos": [{"name": "pricing-service", "provider": "local", "path": str(repo), "branch": "main", "test_command": "python -m unittest -q"}],
+    "tokens": [{"address": B.TOKEN, "symbol": "USDT", "network": "bsc-testnet"}], "wallets": [{"address": B.WALLET, "label": "Treasury", "network": "bsc-testnet"}]}}, "owner")
+def worker_(tpl, name, shape, color, **kw):
+    return at.create_agent({"template": tpl, "name": name, "workspace_ids": [aws["id"]], "activate": True, "appearance": {"shape": shape, "color": color}, **kw}, "owner")
+worker_("bug_hunter", "Chain Monitor", "pulse", "coral")
+worker_("investigator", "Contract Analyst", "shield", "azure")
+worker_("fix_agent", "Fix Engineer", "grid", "emerald")
+worker_("token_watcher", "Wallet Monitor", "orbit", "gold")
+worker_("research_agent", "Chain Researcher", "node", "slate")
+# The goal workflow's employees above are workers too: on demand, with their job written down.
+for a, resp, shape, color in ((mgr, "把用户的目标拆成步骤，分派给合适的员工，并汇总结果。", "hex", "gold"),
+                              (wallet, "按需分析钱包：余额、代币持仓和交易记录，只陈述链上事实。", "orbit", "azure"),
+                              (contract, "按需检查代币合约的权限：owner、增发、暂停和时间锁。", "shield", "emerald"),
+                              (risk, "综合其他员工的结果，给出有依据的风险结论。", "prism", "coral"),
+                              (reporter, "把分析结果整理成报告。", "grid", "slate")):
+    at.update_agent(a["id"], {"responsibility": resp, "work_mode": "on_demand", "appearance": {"shape": shape, "color": color}}, "owner")
+    at.activate(a["id"], "owner")
+at.create_agent({"name": "Airdrop Checker", "appearance": {"shape": "spark", "color": "amber"}}, "owner")  # a draft, not activated
+w = next(x for x in at.db.watchers(workspace_id=aws["id"], kind="app_logs")) if at.db.watchers(workspace_id=aws["id"], kind="app_logs") else \
+    at.db.watcher(at.watchers.create({"workspace_id": aws["id"], "kind": "app_logs", "config": {"service": "pricing"}}, "owner")[0]["id"])
+at.watchers.ingest_log(w, {"level": "error", "message": "ZeroDivisionError: division by zero",
+                           "stack": 'Traceback\n  File "pricing.py", line 14, in average_price\nZeroDivisionError'})
+worker.drain(60)
+def beat():
+    while True:
+        worker.db.heartbeat(worker.id, running=[]); time.sleep(5)
+threading.Thread(target=beat, daemon=True).start()
+
+app = create_app(emp, "t" * 24, chain, workforce=wf, chain_service=svc, autonomy=at)
 uvicorn.run(app, host="127.0.0.1", port=8766, log_level="warning")

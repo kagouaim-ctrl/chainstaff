@@ -1,56 +1,146 @@
 import { useQuery } from "@tanstack/react-query";
-import { Bell, ChevronDown, LogOut, Search, ShieldCheck, SquareArrowOutUpRight } from "lucide-react";
+import {
+  Activity, BarChart3, Blocks, Boxes, ChevronDown, Code2, History, LogOut, Menu, Search, Settings, SlidersHorizontal, SquareArrowOutUpRight, Users,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, post, setToken } from "../lib/api";
-import { refreshAt, useAtAgents, useAtApprovals, useAtMissions, useAtNotifications, useAtOverview } from "../lib/at";
+import { api, setToken } from "../lib/api";
+import { useAtAgents, useAtMissions } from "../lib/at";
 import { DEMO } from "../lib/demo";
-import { useApprovals, useChain, useMeta } from "../lib/queries";
+import { useChain, useMeta } from "../lib/queries";
+import { setSideOpen, toggleOps, useShell } from "../lib/shell";
 import { useStreamState } from "../lib/stream";
-import { ago, go, num, short, type Route } from "../lib/util";
+import { go, num, short, type Route } from "../lib/util";
+import { useOpsBadge } from "./LiveOps";
 
-// The whole product: create an agent, give it a job, let it work. Older pages (Squads, the goal pipeline, the
-// skill catalogue, the BSC live view) stay reachable from Settings and their own links, not from the main navigation.
+// Five places you go every day. Everything used less often sits under More; nothing there is a placeholder.
 export const NAV: [string, string][] = [
   ["overview", "Overview"],
-  ["agents", "Agents"],
+  ["agents", "Workers"],
   ["missions", "Missions"],
+  ["onchain", "On-Chain"],
   ["workspace", "Workspace"],
-  ["activity", "Activity"],
-  ["settings", "Settings"],
 ];
+
+/** Every entry under More opens a page that exists and works today. */
+export const MORE: { group: string; items: [string, string, string, typeof Boxes, Record<string, string>?][] }[] = [
+  { group: "Build", items: [
+    ["skills", "Skills", "Web3 skills workers can use", Blocks],
+    ["squads", "Squads", "Teams of workers that run missions together", Users],
+  ] },
+  { group: "Insights", items: [
+    ["settings", "Analytics", "Model usage and cost by worker and mission", BarChart3, { s: "billing" }],
+    ["activity", "Activity History", "Every wake-up, hand-off and result", History],
+  ] },
+  { group: "System", items: [
+    ["settings", "Settings", "Models, API keys, notifications", Settings],
+    ["settings", "Developer Tools", "Tool library and tool permissions", Code2, { s: "tools" }],
+    ["settings", "Advanced Configuration", "Runtime, workers, sandbox and limits", SlidersHorizontal, { s: "runtime" }],
+  ] },
+];
+const UNDER_MORE = new Set(["skills", "squads", "activity", "settings", "more", "terminal", "team", "board", "tasks", "log"]);
+export const navCurrent = (page: string) => (UNDER_MORE.has(page) ? "more" : page);
 
 export function BrandMark({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true">
-      <rect width="20" height="20" rx="4" fill="#F0B90B" />
+      <rect width="20" height="20" rx="6" fill="#F0B90B" />
       <path d="M5.5 4.5h2.4v4.3l4-4.3h3l-4.6 4.9 4.9 6.1h-3l-3.6-4.6-0.7 0.7v3.9H5.5z" fill="#0B0E11" />
     </svg>
   );
 }
 
 export function TerminalHeader({ route }: { route: Route }) {
+  const current = navCurrent(route.page);
   return (
     <header className="head">
+      <button className="btn ghost icon m-only-flex" onClick={() => setSideOpen(true)} aria-label="Open sidebar"><Menu size={18} /></button>
       <a className="brand" href="#/overview" aria-label="KAGOU">
-        <BrandMark />
+        <BrandMark size={26} />
         <span>KAGOU</span>
       </a>
+      <NavMenu current={current} />
       <nav className="nav" aria-label="主导航">
         {NAV.map(([id, label]) => (
-          <a key={id} href={`#/${id}`} aria-current={route.page === id ? "page" : undefined}>
+          <a key={id} href={`#/${id}`} aria-current={current === id ? "page" : undefined}>
             {label}
           </a>
         ))}
+        <MoreMenu current={current === "more"} />
       </nav>
       <div className="head-right">
-        <DemoPill />
         <GlobalSearch />
+        <DemoPill />
         <NetworkPill />
-        <RunningPill />
-        <Notifications />
+        <OpsButton />
         <AccountMenu />
       </div>
     </header>
+  );
+}
+
+function MoreMenu({ current }: { current: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useOutside(ref, open, () => setOpen(false));
+  return (
+    <div className="rel nav-more" ref={ref}>
+      <button className="nav-btn" aria-current={current ? "page" : undefined} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(!open)}>
+        More <ChevronDown size={13} className={`chev ${open ? "up" : ""}`} />
+      </button>
+      {open && (
+        <div className="menu more-menu" role="menu" onClick={() => setOpen(false)}>
+          {MORE.map((g) => (
+            <div key={g.group} className="more-group">
+              <span className="label">{g.group}</span>
+              {g.items.map(([page, label, sub, Icon, params]) => (
+                <button key={label} role="menuitem" onClick={() => go(page, undefined, params)}>
+                  <span className="more-ic"><Icon size={16} /></span>
+                  <span className="col gap2"><span className="more-l">{label}</span><span className="more-s">{sub}</span></span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Below 1180px the five links fold into one menu so the header never crowds. */
+function NavMenu({ current }: { current: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useOutside(ref, open, () => setOpen(false));
+  const label = NAV.find(([id]) => id === current)?.[1] || "More";
+  return (
+    <div className="rel nav-fold" ref={ref}>
+      <button className="nav-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {label} <ChevronDown size={13} className={`chev ${open ? "up" : ""}`} />
+      </button>
+      {open && (
+        <div className="menu" style={{ left: 0, right: "auto", top: 44, minWidth: 220 }} onClick={() => setOpen(false)}>
+          {NAV.map(([id, l]) => <a key={id} href={`#/${id}`} aria-current={current === id ? "page" : undefined}>{l}</a>)}
+          <div className="pop-sep" />
+          {MORE.flatMap((g) => g.items).map(([page, l, , Icon, params]) => (
+            <button key={l} onClick={() => go(page, undefined, params)}><Icon size={14} /> {l}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Opens Live Operations. The badge counts approvals waiting on you and unread alerts. */
+function OpsButton() {
+  const { total, pending } = useOpsBadge();
+  const { ops } = useShell();
+  return (
+    <button className={`btn ghost ops-btn rel ${ops ? "on" : ""}`} onClick={toggleOps} aria-expanded={!!ops}
+      aria-label={`Live operations${total ? `, ${total} new` : ""}`} title={pending ? `${pending} 个审批等你处理` : "Live operations"}>
+      <Activity size={16} />
+      <span className="hide-l">Activity</span>
+      {total > 0 && <span className="count-dot">{total > 99 ? "99+" : total}</span>}
+    </button>
   );
 }
 
@@ -119,8 +209,8 @@ function NetworkPill() {
   return (
     <button className="pill d-only" onClick={() => go("onchain")} title={rpc?.error || (rpc?.ok ? `RPC ${rpc.latency_ms}ms` : "没有配置链（CHAINSTAFF_CHAIN）")}>
       <span className={`ind ${tone}`} />
-      <span>{chain.data?.network || "No chain"}</span>
-      {rpc?.ok && <span className="mono muted hide-xl">#{num(rpc.block)}</span>}
+      <span className="hide-l">{chain.data?.network || "No chain"}</span>
+      {rpc?.ok && <span className="num muted hide-xl">#{num(rpc.block)}</span>}
       <span className="sep" />
       {DEMO ? (
         <span className="muted" title="静态演示，没有实时连接">Snapshot</span>
@@ -131,88 +221,6 @@ function NetworkPill() {
         </>
       )}
     </button>
-  );
-}
-
-function RunningPill() {
-  const o = useAtOverview();
-  const busy = o.data?.agents.filter((a) => a.state === "running" || a.state === "investigating").length || 0;
-  const watching = o.data?.agents.filter((a) => a.state === "watching").length || 0;
-  return (
-    <button className={`pill d-only ${busy ? "acc" : ""}`} onClick={() => go("agents")} title={`${busy} 个 Agent 正在工作，${watching} 个在监控`}>
-      <span className={`ind ${busy ? "info live" : ""}`} />
-      <span className="mono">{busy}</span>
-      <span className="hide-l">working</span>
-      <span className="muted mono hide-xl">· {watching} watching</span>
-    </button>
-  );
-}
-
-function Notifications() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useOutside(ref, open, () => setOpen(false));
-  const approvals = useAtApprovals("pending");
-  const legacy = useApprovals("pending");
-  const notes = useAtNotifications();
-  const pending = approvals.data || [];
-  const unread = notes.data?.unread || 0;
-  const badge = pending.length + unread + (legacy.data?.length || 0);
-  const toggle = async () => {
-    setOpen(!open);
-    if (!open && unread && !DEMO) {
-      await post("/api/at/notifications/read", {}).catch(() => undefined);
-      refreshAt();
-    }
-  };
-  return (
-    <div className="rel" ref={ref}>
-      <button className="btn ghost icon rel" onClick={toggle} aria-label={`通知，${pending.length} 个待审批`} aria-expanded={open}>
-        <Bell size={15} />
-        {badge > 0 && <span className="count-dot">{badge > 99 ? "99+" : badge}</span>}
-      </button>
-      {open && (
-        <div className="pop" style={{ width: 380 }}>
-          <div className="pop-h">
-            <span className="label grow">Needs you · <span className="mono">{pending.length + (legacy.data?.length || 0)}</span></span>
-            <a className="btn ghost xs" href="#/activity?human=1" onClick={() => setOpen(false)}>All</a>
-          </div>
-          <div className="pop-b">
-            {pending.map((a) => (
-              <button key={a.id} className="pop-item" onClick={() => (setOpen(false), a.task_id && go("missions", undefined, { task: a.task_id }))}>
-                <ShieldCheck size={14} className="acc" style={{ flex: "none" }} />
-                <span className="col gap2 grow">
-                  <span className="ellipsis">{a.title}</span>
-                  <span className="muted xs">{a.agent_name || "—"} · {ago(a.at)}</span>
-                </span>
-              </button>
-            ))}
-            {(legacy.data || []).map((a) => (
-              <button key={`l${a.id}`} className="pop-item" onClick={() => (setOpen(false), a.task_id && go("tasks", a.task_id))}>
-                <ShieldCheck size={14} className="acc" style={{ flex: "none" }} />
-                <span className="col gap2 grow">
-                  <span className="ellipsis">{a.title}</span>
-                  <span className="muted xs">旧流程的审批 · {ago(a.at)}</span>
-                </span>
-              </button>
-            ))}
-            {!pending.length && !legacy.data?.length && <div className="pop-empty">没有等你处理的事项</div>}
-            <div className="pop-h sep"><span className="label">Notifications</span></div>
-            {(notes.data?.items || []).slice(0, 30).map((n) => (
-              <button key={n.id} className="pop-item" onClick={() => (setOpen(false), n.task_id ? go("missions", undefined, { task: n.task_id }) : go("activity"))}>
-                <span className={`ind ${n.severity === "high" || n.severity === "critical" ? "bad" : n.severity === "medium" ? "warn" : ""}`} />
-                <span className="col gap2 grow" style={{ minWidth: 0 }}>
-                  <span className={`ellipsis sm ${n.read_at ? "muted" : ""}`}>{n.title}</span>
-                  {n.body && <span className="muted xs ellipsis">{n.body}</span>}
-                </span>
-                <span className="muted mono xs">{ago(n.at)}</span>
-              </button>
-            ))}
-            {!notes.data?.items.length && <div className="pop-empty">还没有通知</div>}
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -241,7 +249,7 @@ function GlobalSearch() {
     if (!s) return [];
     const out: Hit[] = [];
     agents.data?.forEach((a) => (a.name + " " + a.role + " " + a.id + " " + a.responsibility).toLowerCase().includes(s) &&
-      out.push({ kind: "Agent", label: a.name, sub: a.id, go: () => go("agents", a.id) }));
+      out.push({ kind: "Worker", label: a.name, sub: a.id, go: () => go("agents", a.id) }));
     missions.data?.forEach((m) => (m.name + " " + m.id + " " + m.goal).toLowerCase().includes(s) &&
       out.push({ kind: "Mission", label: m.name, sub: m.id, go: () => go("missions", m.id) }));
     if (/^0x[0-9a-f]{64}$/i.test(s)) out.push({ kind: "Tx", label: short(s, 10), sub: "BSC live data", go: () => go("onchain", undefined, { q: s }) });
@@ -263,7 +271,7 @@ function GlobalSearch() {
       <input
         ref={input}
         className="input"
-        placeholder="Agent、Mission、任务 ID、地址"
+        placeholder="Search workers, missions, addresses"
         value={q}
         onChange={(e) => (setQ(e.target.value), setOpen(true))}
         onFocus={() => setOpen(true)}

@@ -3,6 +3,7 @@ import json, re, sys
 src, dst = sys.argv[1], sys.argv[2]
 s = open(src).read()
 s = re.sub(r'ws://127\.0\.0\.1:\d+', 'wss://demo-node（示例节点）', s)
+s = re.sub(r'/tmp/tmp\w+/repos/', '~/kagou/repos/', s)  # the seeded workspace's local repo copy
 s = s.replace('"http://a"', '"https://demo-rpc（示例节点）"')
 for bad in ("127.0.0.1", "/tmp/", "/home/", "tttttttttttt", "IndexError", "pop from empty"):
     assert bad not in s, bad

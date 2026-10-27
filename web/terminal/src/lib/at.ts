@@ -35,6 +35,17 @@ export interface AtAgentRow {
   model_ready: boolean;
   spent_usd: string;
   budget_usd: string;
+  /** Avatar shape and colour picked in the console; empty for agents created before it existed. */
+  appearance?: Appearance;
+}
+
+export const AVATAR_SHAPES = ["hex", "orbit", "prism", "grid", "pulse", "shield", "node", "spark"] as const;
+export const AVATAR_COLORS = ["gold", "amber", "emerald", "azure", "coral", "slate"] as const;
+export type AvatarShape = (typeof AVATAR_SHAPES)[number];
+export type AvatarColor = (typeof AVATAR_COLORS)[number];
+export interface Appearance {
+  shape?: AvatarShape;
+  color?: AvatarColor;
 }
 
 export interface AtTask {
@@ -383,6 +394,11 @@ export const WATCHER_LABEL: Record<string, string> = {
   bsc_events: "BSC events", github_webhook: "GitHub webhook", ci_failure: "CI failures", app_logs: "Application errors", api_health: "API health",
 };
 export const OPEN_TASK: TaskStatusAt[] = ["queued", "running", "waiting", "waiting_approval", "unassigned"];
+/** Open tasks of a mission; an active mission with any is "running" (the same rule as the server's overview). */
+export const openTasksOf = (m: AtMission) => OPEN_TASK.reduce((n, k) => n + (m.task_counts?.[k] || 0), 0);
+export const isRunning = (m: AtMission) => m.status === "active" && openTasksOf(m) > 0;
+/** Busy on something right now. A worker "waiting" with no task is simply idle until something wakes it. */
+export const isWorking = (a: AtAgentRow) => ["running", "investigating", "queued"].includes(a.state) || (a.state === "waiting" && !!a.current_task);
 
 // ---------------------------------------------------------------- queries
 

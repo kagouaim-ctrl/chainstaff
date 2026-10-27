@@ -5,7 +5,7 @@ import { DataTable, type Column } from "../components/DataTable";
 import { Dialog, EmptyState, ErrorState, Loading, Seg, Tabs } from "../components/ui";
 import { post, put } from "../lib/api";
 import {
-  MISSION_ST, MISSION_TYPE_LABEL, refreshAt, useAtAgents, useAtMeta, useAtMission, useAtMissions, useAtTasks, useAtWorkspaces,
+  isRunning, MISSION_ST, MISSION_TYPE_LABEL, openTasksOf, refreshAt, useAtAgents, useAtMeta, useAtMission, useAtMissions, useAtTasks, useAtWorkspaces,
   type AtMission, type AtTask, type Severity,
 } from "../lib/at";
 import { DEMO } from "../lib/demo";
@@ -29,11 +29,15 @@ function MissionState({ s }: { s: string }) {
 
 function MissionList({ route }: { route: Route }) {
   const tab = (route.params.get("tab") as "missions" | "tasks") || "missions";
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(!!route.params.get("new") && !DEMO);
+  const closeForm = () => (setCreating(false), route.params.get("new") && setParams(route, { new: null }));
   return (
     <div className="page">
       <div className="toolbar">
-        <h1>Missions</h1>
+        <div className="col gap4">
+          <h1>Missions</h1>
+          <span className="sub">Goals your workers pursue: one-time, continuous, event-driven or scheduled.</span>
+        </div>
         <div className="grow" />
         <button className="btn primary" disabled={DEMO} onClick={() => setCreating(true)}><Plus size={13} /> New mission</button>
       </div>
@@ -41,7 +45,7 @@ function MissionList({ route }: { route: Route }) {
         <Tabs value={tab} onChange={(v) => setParams(route, { tab: v === "missions" ? null : v, kind: null, status: null })} options={[["missions", "Missions"], ["tasks", "Tasks"]]} />
       </div>
       {tab === "missions" ? <MissionTable route={route} /> : <TaskTable route={route} />}
-      {creating && <MissionForm onClose={() => setCreating(false)} />}
+      {creating && <MissionForm onClose={closeForm} />}
     </div>
   );
 }
@@ -49,15 +53,17 @@ function MissionList({ route }: { route: Route }) {
 function MissionTable({ route }: { route: Route }) {
   const status = route.params.get("status") || "active,paused";
   const ws = route.params.get("ws") || "";
-  const q = useAtMissions({ status, workspace_id: ws });
+  const type = route.params.get("type") || "";
+  const running = status === "running"; // active missions with open tasks, as Overview counts them
+  const q = useAtMissions({ status: running ? "active" : status, workspace_id: ws });
   const wss = useAtWorkspaces();
   const [s, setS] = useState("");
-  const rows = useMemo(() => (q.data || []).filter((m) => !s || `${m.name} ${m.goal} ${m.id}`.toLowerCase().includes(s.toLowerCase())), [q.data, s]);
+  const rows = useMemo(() => (q.data || []).filter((m) => (!running || isRunning(m)) && (!type || m.type === type) && (!s || `${m.name} ${m.goal} ${m.id}`.toLowerCase().includes(s.toLowerCase()))), [q.data, s, type, running]);
   const cols: Column<AtMission>[] = [
     { id: "name", header: "Mission", sort: (m) => m.name, cell: (m) => <span className="row gap6"><Target size={13} className="muted" /><b>{m.name}</b>{m.responsibility_of && <span className="tag">standing</span>}</span> },
     { id: "type", header: "Type", sort: (m) => m.type, cell: (m) => <span className="muted">{MISSION_TYPE_LABEL[m.type]}</span> },
     { id: "goal", header: "Goal", cell: (m) => <span className="muted ellipsis" title={m.goal} style={{ maxWidth: 320, display: "inline-block" }}>{m.goal}</span> },
-    { id: "agents", header: "Agents", cell: (m) => (m.agents || []).map((a) => a.name).join(", ") || "—" },
+    { id: "agents", header: "Workers", cell: (m) => (m.agents || []).map((a) => a.name).join(", ") || "—" },
     { id: "ws", header: "Workspace", cell: (m) => wss.data?.find((w) => w.id === m.workspace_id)?.name || m.workspace_id },
     { id: "state", header: "State", sort: (m) => m.status, cell: (m) => <MissionState s={m.status} /> },
     { id: "open", header: "Open tasks", align: "r", sort: (m) => openOf(m), cell: (m) => <span className="mono">{openOf(m)}</span> },
@@ -70,7 +76,10 @@ function MissionTable({ route }: { route: Route }) {
       <div className="filterbar wrap">
         <div className="search" style={{ width: 260 }}><Search size={14} /><input className="input" placeholder="搜索 Mission" value={s} onChange={(e) => setS(e.target.value)} /></div>
         <Seg value={status} onChange={(v) => setParams(route, { status: v === "active,paused" ? null : v })}
-          options={[["active,paused", "Active"], ["completed,failed,stopped", "Finished"], ["", "All"]]} />
+          options={[["active,paused", "Open"], ["running", "Running"], ["completed,failed,stopped", "History"], ["", "All"]]} />
+        <select className="input sm" value={type} onChange={(e) => setParams(route, { type: e.target.value || null })} aria-label="类型">
+          <option value="">All types</option>{Object.entries(MISSION_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
         <select className="input sm" value={ws} onChange={(e) => setParams(route, { ws: e.target.value || null })} aria-label="工作区">
           <option value="">All workspaces</option>{(wss.data || []).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
@@ -83,7 +92,7 @@ function MissionTable({ route }: { route: Route }) {
   );
 }
 
-const openOf = (m: AtMission) => ["queued", "running", "waiting", "waiting_approval", "unassigned"].reduce((n, k) => n + (m.task_counts?.[k] || 0), 0);
+const openOf = openTasksOf;
 
 export function TaskTable({ route, mission }: { route: Route; mission?: string }) {
   const status = route.params.get("status") || "";

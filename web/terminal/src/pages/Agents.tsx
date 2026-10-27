@@ -1,21 +1,24 @@
-import { Archive, ArrowLeft, Bot, Pause, Play, Plus, Search, Send, Trash2, Zap } from "lucide-react";
+import { Archive, ArrowLeft, Bot, LayoutGrid, List, Pause, Play, Plus, Search, Send, Trash2, Users, Zap } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ActivityRow, AgentState, ApprovalCard, TaskDialog, TaskState } from "../components/AtBits";
 import { DataTable, type Column } from "../components/DataTable";
+import { WorkerCard } from "../components/WorkerCard";
+import { COLOR_HEX, resolveAppearance, SHAPE_LABEL, ShapeMark, WorkerAvatar } from "../components/WorkerAvatar";
 import { Dialog, EmptyState, ErrorState, Loading, Seg, Tabs } from "../components/ui";
 import { del, post, put } from "../lib/api";
 import {
-  MISSION_ST, MISSION_TYPE_LABEL, MODE_LABEL, refreshAt, useAtActivity, useAtAgent, useAtAgents, useAtMemory, useAtMeta, useAtWorkspaces,
-  type AgentDetailAt, type AtAgentRow, type AtMeta, type AtTask, type WorkMode,
+  AVATAR_COLORS, AVATAR_SHAPES, isWorking, MISSION_ST, MISSION_TYPE_LABEL, MODE_LABEL, refreshAt, useAtActivity, useAtAgent, useAtAgents, useAtMemory, useAtMeta, useAtWorkspaces,
+  type AgentDetailAt, type Appearance, type AtAgentRow, type AtMeta, type AtTask, type WorkMode,
 } from "../lib/at";
 import { DEMO } from "../lib/demo";
-import { ago, errText, fmtTime, go, setParams, toast, usePref, type Route } from "../lib/util";
+import { openCreateWorker } from "../lib/shell";
+import { ago, errText, fmtTime, go, setParams, toast, useIsMobile, usePref, type Route } from "../lib/util";
 import { AgentWizard } from "./AgentWizard";
 
 type Filter = "all" | "working" | "watching" | "attention" | "paused";
 const IN: Record<Filter, (a: AtAgentRow) => boolean> = {
   all: () => true,
-  working: (a) => ["running", "investigating", "queued", "waiting"].includes(a.state),
+  working: isWorking,
   watching: (a) => a.state === "watching",
   attention: (a) => ["error", "offline", "waiting_approval"].includes(a.state) || !a.model_ready,
   paused: (a) => a.status === "paused",
@@ -29,6 +32,9 @@ export default function Agents({ route }: { route: Route }) {
 
 function AgentList({ route }: { route: Route }) {
   const [archived, setArchived] = usePref<boolean>("at-agents-archived", false);
+  const [viewPref, setView] = usePref<"card" | "table">("workers-view", "card");
+  const mobile = useIsMobile();
+  const view = mobile ? "card" : viewPref;
   const q = useAtAgents(archived);
   const [s, setS] = useState("");
   const filter = (route.params.get("f") as Filter) || "all";
@@ -51,13 +57,13 @@ function AgentList({ route }: { route: Route }) {
     }
   };
   const cols: Column<AtAgentRow>[] = [
-    { id: "name", header: "Name", sort: (a) => a.name, cell: (a) => <span className="row gap6"><Bot size={13} className="muted" /><b>{a.name}</b>{!a.activated && a.status !== "archived" && <span className="tag acc">not activated</span>}</span> },
+    { id: "name", header: "Worker", sort: (a) => a.name, cell: (a) => <span className="row gap8"><WorkerAvatar id={a.id} appearance={a.appearance} size={26} dim={a.status === "paused"} /><b>{a.name}</b>{!a.activated && a.status !== "archived" && <span className="badge acc">Not activated</span>}</span> },
     { id: "resp", header: "Responsibility", cell: (a) => <span className="muted ellipsis" title={a.responsibility} style={{ maxWidth: 340, display: "inline-block" }}>{a.responsibility || "—"}</span> },
     { id: "ws", header: "Workspace", cell: (a) => (a.workspaces.length ? a.workspaces.map((w) => w.name).join(", ") : <span className="muted">—</span>) },
     { id: "mode", header: "Mode", sort: (a) => a.work_mode, cell: (a) => <span className="muted">{MODE_LABEL[a.work_mode]}</span>, defaultHidden: true },
     { id: "state", header: "Status", sort: (a) => a.state, cell: (a) => <AgentState state={a.state} detail={a.state_detail} /> },
-    { id: "work", header: "Current Work", cell: (a) => <span className="ellipsis" title={a.current_task?.objective || a.state_detail} style={{ maxWidth: 300, display: "inline-block" }}>{a.current_task?.objective || <span className="muted">{a.state_detail}</span>}</span> },
-    { id: "wake", header: "Last Wake-up", sort: (a) => a.last_wake_at || "", cell: (a) => <span className="mono muted" title={fmtTime(a.last_wake_at)}>{a.last_wake_at ? ago(a.last_wake_at) : "never"}</span> },
+    { id: "work", header: "Current Mission", cell: (a) => <span className="ellipsis" title={a.current_task?.objective || a.state_detail} style={{ maxWidth: 300, display: "inline-block" }}>{a.current_task?.objective || <span className="muted">{a.state_detail}</span>}</span> },
+    { id: "wake", header: "Last Active", sort: (a) => a.last_activity_at || a.last_wake_at || "", cell: (a) => { const t = a.last_activity_at || a.last_wake_at; return <span className="num muted" title={fmtTime(t)}>{t ? ago(t) : "never"}</span>; } },
     { id: "model", header: "Model", cell: (a) => <span className={a.model_ready ? "muted mono" : "bad mono"} title={a.model_ready ? "" : "服务器没有这个模型服务的 API Key"}>{a.model || a.provider}</span>, defaultHidden: true },
     { id: "act", header: "Actions", hideable: false, align: "r", cell: (a) => (
       <span className="row gap2" style={{ justifyContent: "flex-end" }} onClick={(e) => e.stopPropagation()}>
@@ -71,34 +77,42 @@ function AgentList({ route }: { route: Route }) {
     ) },
   ];
   const all = q.data || [];
+  const empty = all.length ? <EmptyState small title="No worker matches these filters" /> : (
+    <EmptyState title="Create your first worker" icon={<Bot size={20} />}>
+      <span className="muted">Name it and pick a look. Give it a job and a workspace when you are ready.</span>
+      {!DEMO && <button className="btn primary" onClick={openCreateWorker}><Plus size={14} /> New Worker</button>}
+    </EmptyState>
+  );
   return (
     <div className="page">
       <div className="toolbar">
-        <h1>Agents</h1>
-        <span className="count">{all.length}</span>
+        <div className="col gap4">
+          <h1>Workers <span className="count">{all.length}</span></h1>
+          <span className="sub">On-chain intelligence units that watch, investigate and report.</span>
+        </div>
         <div className="grow" />
-        <button className="btn primary" disabled={DEMO} onClick={() => go("agents", undefined, { new: "1" })}><Plus size={13} /> Create agent</button>
+        <a className="btn tertiary" href="#/squads" title="Teams of workers that run missions together"><Users size={14} /> Squads</a>
+        <button className="btn primary" disabled={DEMO} onClick={openCreateWorker}><Plus size={14} /> New Worker</button>
       </div>
       <div className="filterbar wrap">
         <div className="search" style={{ width: 280 }}>
           <Search size={14} />
-          <input className="input" placeholder="搜索名称、职责、工作区" value={s} onChange={(e) => setS(e.target.value)} aria-label="筛选 Agent" />
+          <input className="input" placeholder="Search name, responsibility, workspace" value={s} onChange={(e) => setS(e.target.value)} aria-label="筛选 Worker" />
         </div>
         <Seg<Filter> value={filter} onChange={(v) => setParams(route, { f: v === "all" ? null : v })}
           options={[["all", `All ${all.length}`], ["working", `Working ${all.filter(IN.working).length}`], ["watching", `Watching ${all.filter(IN.watching).length}`],
             ["attention", `Needs attention ${all.filter(IN.attention).length}`], ["paused", `Paused ${all.filter(IN.paused).length}`]]} />
         <div className="grow" />
         <label className="check xs"><input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> Show archived</label>
+        <div className="seg d-only" role="group" aria-label="View">
+          <button aria-pressed={view === "card"} onClick={() => setView("card")} title="Card view"><LayoutGrid size={13} /> Cards</button>
+          <button aria-pressed={view === "table"} onClick={() => setView("table")} title="Table view"><List size={13} /> Table</button>
+        </div>
       </div>
-      {q.isLoading ? <Loading rows={8} /> : q.error ? <ErrorState error={q.error} retry={() => q.refetch()} /> : (
-        <DataTable id="at-agents" rows={rows} columns={cols} rowKey={(a) => a.id} onRowClick={(a) => go("agents", a.id)}
-          empty={all.length ? <EmptyState small title="没有符合筛选的 Agent" /> : (
-            <EmptyState title="Create your first agent" icon={<Bot size={18} />}>
-              <span className="muted sm">Create an agent. Give it a job. Let it work.</span>
-              {!DEMO && <button className="btn primary sm" onClick={() => go("agents", undefined, { new: "1" })}><Plus size={12} /> Create agent</button>}
-            </EmptyState>
-          )} />
-      )}
+      {q.isLoading ? <div className="wk-grid page-grid">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="wk-card sk"><i className="skeleton" /><i className="skeleton" /><i className="skeleton" /></div>)}</div>
+        : q.error ? <ErrorState error={q.error} retry={() => q.refetch()} />
+        : view === "card" ? (rows.length ? <div className="wk-grid page-grid">{rows.map((a) => <WorkerCard key={a.id} a={a} />)}</div> : <div className="page-grid">{empty}</div>)
+        : <DataTable id="at-agents" rows={rows} columns={cols} rowKey={(a) => a.id} onRowClick={(a) => go("agents", a.id)} empty={empty} />}
     </div>
   );
 }
@@ -132,10 +146,15 @@ function AgentDetailPage({ id, route }: { id: string; route: Route }) {
   return (
     <div className="page">
       <div className="toolbar">
-        <button className="btn ghost icon" onClick={() => go("agents")} aria-label="返回"><ArrowLeft size={15} /></button>
-        <h1>{a.name}</h1>
-        <AgentState state={a.state} detail={a.state_detail} />
-        <span className="muted sm">{MODE_LABEL[a.work_mode]}</span>
+        <button className="btn ghost icon" onClick={() => go("agents")} aria-label="返回"><ArrowLeft size={16} /></button>
+        <WorkerAvatar id={a.id} appearance={a.appearance} size={48} dim={a.status === "paused"} />
+        <div className="col gap4" style={{ minWidth: 0 }}>
+          <h1 className="ellipsis">{a.name}</h1>
+          <span className="row gap8 wrap">
+            {a.activated || a.status === "archived" ? <AgentState state={a.state} detail={a.state_detail} /> : <span className="badge acc">Not activated</span>}
+            <span className="muted xs">{MODE_LABEL[a.work_mode]}</span>
+          </span>
+        </div>
         <div className="grow" />
         {a.status !== "archived" && <button className="btn" disabled={DEMO || !a.autonomous} onClick={() => setGive(true)}><Send size={13} /> Give a task</button>}
         {a.status !== "archived" && !a.activated && <button className="btn primary" disabled={busy || DEMO} onClick={() => act("activate")}><Zap size={13} /> Activate</button>}
@@ -143,6 +162,16 @@ function AgentDetailPage({ id, route }: { id: string; route: Route }) {
         {a.status === "paused" && <button className="btn primary" disabled={busy || DEMO} onClick={() => act("resume")}><Play size={13} /> Resume</button>}
         {a.status !== "archived" && <button className="btn ghost" disabled={busy || DEMO} onClick={() => act("archive")}><Archive size={13} /> Archive</button>}
       </div>
+      {!a.activated && a.status !== "archived" && (
+        <div className="banner setup">
+          <Zap size={15} className="acc" />
+          <span className="grow">
+            <b>Finish setting up {a.name}.</b> {!a.responsibility.trim() ? "Write its responsibility" : "Responsibility is set"}
+            {a.work_mode !== "on_demand" ? (a.workspaces.length ? ", workspace is bound" : ", bind a workspace") : ""}, then Activate. Model, skills and permissions have safe defaults.
+          </span>
+          {tab !== "settings" && <button className="btn sm" onClick={() => setParams(route, { tab: "settings" })}>Open settings</button>}
+        </div>
+      )}
       {!a.model_ready && a.status !== "archived" && (
         <div className="banner warn">服务器没有配置 {a.provider} 的 API Key：这个 Agent 被唤醒时会执行失败并通知你。<a className="link" href="#/settings?s=models">AI Models</a></div>
       )}
@@ -385,6 +414,7 @@ function AgentSettings({ a, meta }: { a: AgentDetailAt; meta: AtMeta }) {
     workspace_ids: a.workspaces.map((w) => w.id), wake_on: g.wake_on, budget_usd: String(a.budget_usd || "0"), model: a.model || "", provider: a.provider || "anthropic",
     max_task_budget_usd: String(g.approval_rules?.max_task_budget_usd ?? ""), min_severity: g.notify_rules?.min_severity || "medium",
     on_failure: g.notify_rules?.on_failure ?? true, on_completion: g.notify_rules?.on_completion ?? false, system_prompt: a.system_prompt,
+    appearance: resolveAppearance(a.id, a.appearance) as Appearance,
   });
   const [busy, setBusy] = useState(false);
   const save = async () => {
@@ -394,6 +424,7 @@ function AgentSettings({ a, meta }: { a: AgentDetailAt; meta: AtMeta }) {
         name: f.name, responsibility: f.responsibility, work_mode: f.work_mode, schedule_cron: f.schedule_cron || null, workspace_ids: f.workspace_ids,
         wake_on: f.wake_on, budget_usd: f.budget_usd || "0", provider: f.provider, model: f.model, system_prompt: f.system_prompt,
         approval_rules: { max_task_budget_usd: f.max_task_budget_usd || null }, notify_rules: { min_severity: f.min_severity, on_failure: f.on_failure, on_completion: f.on_completion },
+        appearance: f.appearance,
       });
       toast("已保存");
       refreshAt();
@@ -405,8 +436,26 @@ function AgentSettings({ a, meta }: { a: AgentDetailAt; meta: AtMeta }) {
   };
   return (
     <div className="section col gap12" style={{ maxWidth: 820 }}>
-      <label className="field"><span>Name</span><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
-      <label className="field"><span>Responsibility</span><textarea className="input" rows={4} value={f.responsibility} onChange={(e) => setF({ ...f, responsibility: e.target.value })} /></label>
+      <div className="row gap16 wrap">
+        <WorkerAvatar id={a.id} appearance={f.appearance} size={64} />
+        <div className="col gap8 grow">
+          <label className="field"><span>Name</span><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+          <div className="row gap6 wrap" role="radiogroup" aria-label="Avatar">
+            {AVATAR_SHAPES.map((x) => (
+              <button key={x} type="button" role="radio" aria-checked={f.appearance.shape === x} className="cw-shape sm" title={SHAPE_LABEL[x]}
+                style={{ color: f.appearance.shape === x ? COLOR_HEX[f.appearance.color || "gold"] : undefined }} onClick={() => setF({ ...f, appearance: { ...f.appearance, shape: x } })}>
+                <ShapeMark shape={x} size={18} />
+              </button>
+            ))}
+            <span className="sep-v" />
+            {AVATAR_COLORS.map((c) => (
+              <button key={c} type="button" role="radio" aria-checked={f.appearance.color === c} aria-label={c} className="cw-color sm" style={{ background: COLOR_HEX[c] }}
+                onClick={() => setF({ ...f, appearance: { ...f.appearance, color: c } })} />
+            ))}
+          </div>
+        </div>
+      </div>
+      <label className="field"><span>Responsibility</span><textarea className="input" rows={4} placeholder="What is this worker in charge of? e.g. 持续监控国库钱包的大额转出，发现异常时调查并通知我。" value={f.responsibility} onChange={(e) => setF({ ...f, responsibility: e.target.value })} /></label>
       <WorkspacePicker value={f.workspace_ids} onChange={(v) => setF({ ...f, workspace_ids: v })} options={(ws.data || []).map((w) => ({ id: w.id, name: w.name }))} />
       <ModePicker meta={meta} mode={f.work_mode} cron={f.schedule_cron} wake={f.wake_on} onChange={(p) => setF({ ...f, ...p })} />
       <div className="grid2 stack-m">

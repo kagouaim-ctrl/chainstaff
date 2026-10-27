@@ -286,3 +286,20 @@ def test_write_rate_limit(tmp_path):
         assert codes == [200, 200, 429]
     finally:
         k.close()
+
+
+def test_quick_create_name_and_appearance(api):
+    """The console's New Worker dialog saves a draft with a name and an avatar; the rest is set later and activation still checks it."""
+    c, k = api
+    a = ok(c.post("/api/at/agents", headers=H, json={"name": "Wallet Monitor", "appearance": {"shape": "orbit", "color": "emerald"}}))
+    assert a["responsibility"] == "" and not a["activated_at"] and a["appearance"] == {"shape": "orbit", "color": "emerald"}
+    row = next(r for r in ok(c.get("/api/at/agents", headers=H)) if r["id"] == a["id"])
+    assert row["appearance"] == {"shape": "orbit", "color": "emerald"}
+    assert "职责" in c.post(f"/api/at/agents/{a['id']}/activate", headers=H).json()["detail"]
+    assert "职责" in c.post("/api/at/agents", headers=H, json={"name": "Now", "activate": True}).json()["detail"]
+    assert c.post("/api/at/agents", headers=H, json={"name": "X", "appearance": {"shape": "cat"}}).status_code == 400
+    assert c.post("/api/at/agents", headers=H, json={"name": "X", "appearance": {"color": "pink"}}).status_code == 400
+    assert c.post("/api/at/agents", headers=H, json={"name": "X", "appearance": "gold"}).status_code == 400
+    a = ok(c.put(f"/api/at/agents/{a['id']}", headers=H, json={"appearance": {"shape": "hex", "color": "gold"}}))
+    assert a["appearance"] == {"shape": "hex", "color": "gold"}
+    assert k.wf.create_agent({"name": "Old"}, "user") and all(isinstance(r["appearance"], dict) for r in ok(c.get("/api/at/agents", headers=H)))
