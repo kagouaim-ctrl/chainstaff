@@ -1,4 +1,4 @@
-import { Boxes, Eye, Pencil } from "lucide-react";
+import { Boxes, MessageSquare, Settings } from "lucide-react";
 import type { AtAgentRow } from "../lib/at";
 import { ago, fmtTime, go } from "../lib/util";
 import { AgentState } from "./AtBits";
@@ -25,7 +25,7 @@ export function WorkerCard({ a, onTask }: { a: AtAgentRow; onTask?: (id: string)
         {draft ? <span className="badge acc">Not activated</span> : <AgentState state={a.state} detail={a.state_detail} />}
       </div>
       <div className="wk-meta">
-        <span className="wk-k">Current mission</span>
+        <span className="wk-k">Current task</span>
         {a.current_task ? (
           <button className="wk-task ellipsis" title={a.current_task.objective} onClick={(e) => (e.stopPropagation(), onTask ? onTask(a.current_task!.id) : go("missions", undefined, { task: a.current_task!.id }))}>
             {a.current_task.objective}
@@ -35,9 +35,9 @@ export function WorkerCard({ a, onTask }: { a: AtAgentRow; onTask?: (id: string)
         <span className="wk-v muted" title={fmtTime(last)}>{last ? `${ago(last)} ago`.replace("now ago", "just now") : "Never"}</span>
       </div>
       <div className="wk-actions" onClick={(e) => e.stopPropagation()}>
-        <button className="btn sm" disabled={!ws} title={ws ? `Open ${ws.name}` : "No workspace yet"} onClick={() => ws && go("workspace", ws.id)}><Boxes size={13} /> Open Workspace</button>
-        <button className="btn ghost sm icon" title="View details" aria-label="View details" onClick={() => go("agents", a.id)}><Eye size={14} /></button>
-        <button className="btn ghost sm icon" title="Edit" aria-label="Edit" onClick={() => go("agents", a.id, { tab: "settings" })}><Pencil size={13} /></button>
+        <button className="btn sm" onClick={() => go("agents", a.id)}><MessageSquare size={13} /> Chat</button>
+        <button className="btn ghost sm icon" disabled={!ws} title={ws ? `Workspace: ${ws.name}` : "No workspace yet"} aria-label="Workspace" onClick={() => ws && go("workspace", ws.id)}><Boxes size={14} /></button>
+        <button className="btn ghost sm icon" title="Settings" aria-label="Settings" onClick={() => go("agents", a.id, { tab: "overview" })}><Settings size={14} /></button>
       </div>
     </article>
   );

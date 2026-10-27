@@ -241,7 +241,7 @@ export function System() {
       <div className="row"><span className="dim">Table density</span><Seg value={density} onChange={setDensity} options={[["compact", "Compact"], ["detailed", "Detailed"]]} /></div>
       <div className="label">Session</div>
       <div className="row wrap">
-        <button className="btn" onClick={() => (setToken(""), go("overview"))}><LogOut size={13} /> 退出（清除这个标签页的访问令牌）</button>
+        <button className="btn" onClick={() => (setToken(""), go("chat"))}><LogOut size={13} /> 退出（清除这个标签页的访问令牌）</button>
         {!DEMO && <a className="btn ghost" href="/">Classic console</a>}
       </div>
       <div className="note">当前是单用户模式：一个访问令牌对应一个所有者。多用户登录、钱包签名登录、按用户隔离工作区和角色权限还没有实现。</div>

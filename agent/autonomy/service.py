@@ -20,6 +20,7 @@ from agent.workforce.engine import WorkforceError
 from . import constants as C
 from .activity import Activity
 from .agents import TEMPLATE_BY_ID, AgentError, clean_autonomy
+from .chats import Chats
 from .db import AutonomyDB, iso, now_dt, parse
 from .events import Events
 from .github import GitHub, GitHubError
@@ -59,6 +60,7 @@ class Autonomy:
         self.providers = providers if providers is not None else dict(wf.runtime.providers)
         self.default_model = wf.planner.model
         self.runner = AgentRunner(self)
+        self.chats = Chats(self)
 
     # ------------------------------------------------------------------ helpers
 

@@ -13,12 +13,13 @@ import "./styles.css";
 
 // Each page is its own chunk, so the first paint only loads the shell and the current page.
 const PAGES = {
-  overview: lazy(() => import("./pages/Overview")),
+  chat: lazy(() => import("./pages/Chat")),
   agents: lazy(() => import("./pages/Agents")),
   missions: lazy(() => import("./pages/Missions")),
   workspace: lazy(() => import("./pages/WorkspaceAt")),
   activity: lazy(() => import("./pages/ActivityAt")),
   settings: lazy(() => import("./pages/SettingsAt")),
+  usage: lazy(() => import("./pages/Usage")),
   more: lazy(() => import("./pages/More")),
   // Earlier workflow, still on its real backend; linked from Settings → Legacy, not from the navigation.
   terminal: lazy(() => import("./pages/Terminal")),
@@ -90,7 +91,7 @@ function Terminal() {
     if (at.data) startAtStream(at.data.last_activity_id);
     return stopAtStream;
   }, [at.data?.last_activity_id === undefined]);
-  const Page = PAGES[route.page as keyof typeof PAGES] || PAGES.overview;
+  const Page = PAGES[route.page as keyof typeof PAGES] || PAGES.chat;
   return (
     <TerminalShell route={route}>
       <Suspense fallback={<div className="page"><Loading rows={6} /></div>}>
