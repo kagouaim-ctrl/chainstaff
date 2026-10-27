@@ -6,7 +6,8 @@ import { DEMO } from "../lib/demo";
 import { useApprovals } from "../lib/queries";
 import { closeOps, openOps, type OpsTab } from "../lib/shell";
 import { ago, fmtTime, go } from "../lib/util";
-import { ApprovalCard, Sev } from "./AtBits";
+import { ApprovalMessage } from "./Approval";
+import { Sev } from "./AtBits";
 import { EmptyState, Loading } from "./ui";
 
 /** What the header's Activity button counts: approvals waiting on a human plus unread notifications. */
@@ -128,7 +129,7 @@ function ApprovalsTab() {
   if (!a.length && !l.length) return <EmptyState small icon={<ShieldCheck size={18} />} title="Nothing waiting for you">Patches and Draft PRs that need a human decision appear here.</EmptyState>;
   return (
     <div className="ops-list gap8">
-      {a.map((x) => <ApprovalCard key={x.id} a={x} />)}
+      {a.map((x) => <ApprovalMessage key={x.id} a={x} />)}
       {l.map((x) => (
         <button key={`l${x.id}`} className="ops-item" onClick={() => (x.task_id && go("tasks", x.task_id), closeOpsIfFloating())}>
           <span className="ops-item-h"><ShieldCheck size={13} className="acc" /><span className="ops-who">Earlier workflow</span><span className="ops-when">{ago(x.at)}</span></span>

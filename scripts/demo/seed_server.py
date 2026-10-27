@@ -134,10 +134,15 @@ w = next(x for x in at.db.watchers(workspace_id=aws["id"], kind="app_logs")) if 
     at.db.watcher(at.watchers.create({"workspace_id": aws["id"], "kind": "app_logs", "config": {"service": "pricing"}}, "owner")[0]["id"])
 at.watchers.ingest_log(w, {"level": "error", "message": "ZeroDivisionError: division by zero",
                            "stack": 'Traceback\n  File "pricing.py", line 14, in average_price\nZeroDivisionError'})
+# Two chats, as a person would start them: one routed by KAGOU, one with a chosen agent. Each message is a real task.
+monitor = next(a for a in at.db.agents() if a["name"] == "Wallet Monitor")
+at.chats.create({"text": "看一下国库钱包最近的 USDT 转账，有没有异常？", "kind": "analyze"}, "owner")
+at.chats.create({"text": "总结一下 USDT 最近的大额资金流向", "agent_id": monitor["id"], "kind": "analyze"}, "owner")
 worker.drain(60)
 def beat():
+    # Keeps the worker alive and runs whatever is queued (new chat messages included) with the scripted model.
     while True:
-        worker.db.heartbeat(worker.id, running=[]); time.sleep(5)
+        worker.db.heartbeat(worker.id, running=[]); worker.drain(10); time.sleep(2)
 threading.Thread(target=beat, daemon=True).start()
 
 app = create_app(emp, "t" * 24, chain, workforce=wf, chain_service=svc, autonomy=at)

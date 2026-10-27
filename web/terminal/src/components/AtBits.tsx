@@ -1,9 +1,10 @@
-import { ArrowRight, Check, ExternalLink, GitPullRequest, ShieldCheck, User, X } from "lucide-react";
+import { ArrowRight, User } from "lucide-react";
+import { ApprovalMessage, DiffView } from "./Approval";
 import { useState } from "react";
 import { post } from "../lib/api";
 import {
-  OPEN_TASK, SEV_TONE, STATE, TASK_ST, refreshAt, useAtAgents, useAtArtifact, useAtTask,
-  type AgentState as AgentStateT, type AtActivity, type AtApproval, type AtRun, type AtStep, type Severity, type TaskStatusAt,
+  OPEN_TASK, SEV_TONE, STATE, TASK_ST, refreshAt, useAtAgents, useAtTask,
+  type AgentState as AgentStateT, type AtActivity, type AtRun, type AtStep, type Severity, type TaskStatusAt,
 } from "../lib/at";
 import { DEMO } from "../lib/demo";
 import { ago, duration, errText, fmtTime, go, toast } from "../lib/util";
@@ -60,66 +61,6 @@ export function ActivityRow({ a, onTask, compact }: { a: AtActivity; onTask?: (i
   );
 }
 
-export function ApprovalCard({ a }: { a: AtApproval }) {
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [diff, setDiff] = useState(false);
-  const decide = async (approve: boolean) => {
-    setBusy(true);
-    try {
-      const r = await post<{ applied_commit?: string; note?: string }>(`/api/at/approvals/${a.id}`, { approve, note });
-      toast(approve ? (r.applied_commit ? `补丁已应用：${r.applied_commit.slice(0, 10)}` : r.note || "已通过") : "已驳回");
-      refreshAt();
-    } catch (e) {
-      toast(errText(e), true);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="approval">
-      <div className="approval-h"><ShieldCheck size={14} className="acc" /> <span className="grow">{a.title}</span></div>
-      <div className="approval-b sm">
-        <div className="row wrap gap6">
-          <span className="muted">{a.agent_name || a.agent_id}</span>
-          {a.detail.repo && <span className="tag">{a.detail.repo}</span>}
-          {a.detail.stat && <span className="mono xs muted">{a.detail.stat}</span>}
-          <span className={a.detail.tests_passed ? "ok" : a.detail.tests_passed === false ? "bad" : "muted"}>
-            {a.detail.tests_passed ? "tests passed" : a.detail.tests_passed === false ? "tests failed" : "tests not run"}
-          </span>
-          {a.detail.pr_url && <a className="link" href={a.detail.pr_url} target="_blank" rel="noreferrer"><GitPullRequest size={12} /> Draft PR <ExternalLink size={10} /></a>}
-          <span className="muted xs">{ago(a.at)}</span>
-        </div>
-        {a.artifact_id && <button className="plain-btn link xs" onClick={() => setDiff(!diff)}>{diff ? "Hide diff" : "Show diff"}</button>}
-        {diff && a.artifact_id && <Diff id={a.artifact_id} />}
-      </div>
-      {a.status === "pending" && (
-        <div className="approval-f">
-          <input className="input sm" placeholder="备注（可选）" value={note} onChange={(e) => setNote(e.target.value)} />
-          <span className="muted xs grow">
-            {a.detail.provider === "local" ? "通过后 KAGOU 把补丁提交到本地仓库，然后由发现问题的 Agent 验证。" : a.detail.pr_url ? "通过只记录你的审核；合并请在 GitHub 上操作。" : "通过只记录你的审核。"}
-          </span>
-          <button className="btn sm" disabled={busy || DEMO} onClick={() => decide(false)}><X size={12} /> Reject</button>
-          <button className="btn sm primary" disabled={busy || DEMO} onClick={() => decide(true)}><Check size={12} /> Approve</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Diff({ id }: { id: string }) {
-  const q = useAtArtifact(id);
-  if (q.isLoading) return <Loading rows={3} />;
-  if (q.error) return <ErrorState error={q.error} />;
-  return (
-    <pre className="code diff">
-      {q.data!.content.split("\n").map((l, i) => (
-        <span key={i} className={l.startsWith("+") && !l.startsWith("+++") ? "ok" : l.startsWith("-") && !l.startsWith("---") ? "bad" : l.startsWith("@@") ? "info" : ""}>{l}{"\n"}</span>
-      ))}
-    </pre>
-  );
-}
-
 /** Everything about one task: the hand-off chain it belongs to, its runs step by step, its evidence, result, patch and approval. */
 export function TaskDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const q = useAtTask(id);
@@ -164,7 +105,7 @@ export function TaskDialog({ id, onClose }: { id: string; onClose: () => void })
             {d!.task.result?.summary && <div className="note">{d!.task.result.summary}</div>}
             {d!.task.error && <div className="note bad">{d!.task.error}</div>}
           </div>
-          {d!.approvals.filter((a) => a.status === "pending").map((a) => <ApprovalCard key={a.id} a={a} />)}
+          {d!.approvals.map((a) => <ApprovalMessage key={a.id} a={{ ...a, agent_name: a.agent_name || (a.agent_id ? d!.names[a.agent_id] : undefined) }} compact={a.status !== "pending"} />)}
           <Tabs value={tab} onChange={setTab} options={[["chain", "Hand-off chain", d!.tree.length], ["run", "Runs", d!.runs.length], ["evidence", "Evidence & result"], ["activity", "Activity", d!.activity.length]]} />
           {tab === "chain" && (
             <div className="tree">
@@ -191,7 +132,7 @@ export function TaskDialog({ id, onClose }: { id: string; onClose: () => void })
                 <div key={x.id} className="col gap6">
                   <div className="label">Patch {x.id} · {x.status}{x.meta.pr_url ? "" : x.meta.pr_error ? ` · ${x.meta.pr_error}` : ""}</div>
                   {x.meta.pr_url && <a className="link sm" href={x.meta.pr_url} target="_blank" rel="noreferrer">{x.meta.pr_url}</a>}
-                  <Diff id={x.id} />
+                  <DiffView text={x.content} />
                 </div>
               ))}
             </div>
@@ -235,7 +176,7 @@ function Steps({ steps, runs }: { steps: AtStep[]; runs: AtRun[] }) {
   );
 }
 
-function AssignBox({ id }: { id: string }) {
+export function AssignBox({ id }: { id: string }) {
   const [agent, setAgent] = useState("");
   const [busy, setBusy] = useState(false);
   const agents = useAtTaskAgents();

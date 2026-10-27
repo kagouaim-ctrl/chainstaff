@@ -1,4 +1,4 @@
-import { Bot, LayoutGrid, Link2, MoreHorizontal, RefreshCw, Target, WifiOff } from "lucide-react";
+import { RefreshCw, WifiOff } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { queryClient } from "../lib/api";
 import { useAtApprovals } from "../lib/at";
@@ -7,16 +7,8 @@ import { closeOps, setSideOpen, useShell } from "../lib/shell";
 import { useMedia, usePref, type Route } from "../lib/util";
 import { CreateWorker } from "./CreateWorker";
 import { LiveOps } from "./LiveOps";
-import { Sidebar } from "./Sidebar";
+import { NAV, Sidebar } from "./Sidebar";
 import { navCurrent, TerminalHeader } from "./TerminalHeader";
-
-const MOBILE: [string, string, typeof Bot][] = [
-  ["overview", "Overview", LayoutGrid],
-  ["agents", "Workers", Bot],
-  ["missions", "Missions", Target],
-  ["onchain", "On-Chain", Link2],
-  ["more", "More", MoreHorizontal],
-];
 
 /**
  * Header across the top, the sidebar on the left (an icon rail when collapsed, a drawer on phones), the page in
@@ -36,7 +28,7 @@ export function TerminalShell({ route, children }: { route: Route; children: Rea
   useEffect(() => setSideOpen(false), [route.page, route.id]);
   return (
     <div className="app" data-side={collapsed ? "collapsed" : "open"} data-ops={opsCol ? "pinned" : undefined} data-drawer={shell.sideOpen ? "open" : undefined}>
-      <TerminalHeader route={route} />
+      <TerminalHeader />
       <ConnectionBanner />
       <Sidebar route={route} collapsed={collapsed} onCollapse={setCollapsed} />
       {shell.sideOpen && <div className="scrim side-scrim" onClick={() => setSideOpen(false)} />}
@@ -50,11 +42,11 @@ export function TerminalShell({ route, children }: { route: Route; children: Rea
         </>
       )}
       <nav className="mnav" aria-label="底部导航">
-        {MOBILE.map(([id, label, Icon]) => (
+        {NAV.map(([id, label, Icon]) => (
           <a key={id} href={`#/${id}`} aria-current={current === id ? "page" : undefined}>
             <Icon size={20} strokeWidth={1.8} />
             {label}
-            {id === "missions" && pending > 0 && <span className="count-dot">{pending}</span>}
+            {id === "chat" && pending > 0 && <span className="count-dot">{pending}</span>}
           </a>
         ))}
       </nav>

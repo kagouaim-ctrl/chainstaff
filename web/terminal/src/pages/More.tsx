@@ -1,12 +1,12 @@
-import { Boxes, ChevronRight, LogOut, SquareArrowOutUpRight } from "lucide-react";
+import { ChevronRight, LogOut, SquareArrowOutUpRight } from "lucide-react";
 import { MORE } from "../components/TerminalHeader";
 import { setToken } from "../lib/api";
 import { DEMO } from "../lib/demo";
 import { go } from "../lib/util";
 
-/** Everything the header's More menu holds, plus Workspace, as one list for phones. */
+/** Everything used less often than chat, agents, missions and on-chain work, on one page. */
 export default function More() {
-  const groups = [{ group: "Work", items: [["workspace", "Workspace", "Repositories, contracts, tokens, wallets, watchers", Boxes]] as typeof MORE[number]["items"] }, ...MORE];
+  const groups = MORE;
   return (
     <div className="page">
       <div className="toolbar"><h1>More</h1></div>

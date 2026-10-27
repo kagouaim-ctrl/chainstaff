@@ -1,44 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity, BarChart3, Blocks, Boxes, ChevronDown, Code2, History, LogOut, Menu, Search, Settings, SlidersHorizontal, SquareArrowOutUpRight, Users,
-} from "lucide-react";
+import { Activity, BarChart3, Blocks, Boxes, CircleUser, History, LogOut, Menu, Search, Settings, SlidersHorizontal, SquareArrowOutUpRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, setToken } from "../lib/api";
 import { useAtAgents, useAtMissions } from "../lib/at";
+import { useChats } from "../lib/chat";
 import { DEMO } from "../lib/demo";
 import { useChain, useMeta } from "../lib/queries";
 import { setSideOpen, toggleOps, useShell } from "../lib/shell";
 import { useStreamState } from "../lib/stream";
-import { go, num, short, type Route } from "../lib/util";
+import { go, num, short } from "../lib/util";
 import { useOpsBadge } from "./LiveOps";
 
-// Five places you go every day. Everything used less often sits under More; nothing there is a placeholder.
-export const NAV: [string, string][] = [
-  ["overview", "Overview"],
-  ["agents", "Workers"],
-  ["missions", "Missions"],
-  ["onchain", "On-Chain"],
-  ["workspace", "Workspace"],
-];
-
-/** Every entry under More opens a page that exists and works today. */
+/** Everything used less often than chatting, agents, missions and on-chain work. Every entry opens a working page. */
 export const MORE: { group: string; items: [string, string, string, typeof Boxes, Record<string, string>?][] }[] = [
-  { group: "Build", items: [
-    ["skills", "Skills", "Web3 skills workers can use", Blocks],
-    ["squads", "Squads", "Teams of workers that run missions together", Users],
-  ] },
-  { group: "Insights", items: [
-    ["settings", "Analytics", "Model usage and cost by worker and mission", BarChart3, { s: "billing" }],
+  { group: "Work", items: [
+    ["workspace", "Workspaces", "Repositories, contracts, tokens, wallets and watchers agents can use", Boxes],
     ["activity", "Activity History", "Every wake-up, hand-off and result", History],
   ] },
-  { group: "System", items: [
+  { group: "Account", items: [
+    ["usage", "Usage & Billing", "Model spend today and this month, by agent and by model, and budgets", BarChart3],
     ["settings", "Settings", "Models, API keys, notifications", Settings],
-    ["settings", "Developer Tools", "Tool library and tool permissions", Code2, { s: "tools" }],
-    ["settings", "Advanced Configuration", "Runtime, workers, sandbox and limits", SlidersHorizontal, { s: "runtime" }],
+    ["settings", "Skills & Tools", "Web3 skills and the tools agents can call", Blocks, { s: "tools" }],
+    ["settings", "Advanced", "Runtime, workers, sandbox and limits", SlidersHorizontal, { s: "runtime" }],
   ] },
 ];
-const UNDER_MORE = new Set(["skills", "squads", "activity", "settings", "more", "terminal", "team", "board", "tasks", "log"]);
-export const navCurrent = (page: string) => (UNDER_MORE.has(page) ? "more" : page);
+const UNDER_MORE = new Set(["skills", "squads", "activity", "settings", "more", "terminal", "team", "board", "tasks", "log", "workspace", "usage"]);
+export const navCurrent = (page: string) => (page === "overview" ? "chat" : UNDER_MORE.has(page) ? "more" : page);
 
 export function BrandMark({ size = 20 }: { size?: number }) {
   return (
@@ -49,84 +36,23 @@ export function BrandMark({ size = 20 }: { size?: number }) {
   );
 }
 
-export function TerminalHeader({ route }: { route: Route }) {
-  const current = navCurrent(route.page);
+/** Brand, search and the few facts worth seeing on every page. Navigation lives in the sidebar. */
+export function TerminalHeader() {
   return (
     <header className="head">
       <button className="btn ghost icon m-only-flex" onClick={() => setSideOpen(true)} aria-label="Open sidebar"><Menu size={18} /></button>
-      <a className="brand" href="#/overview" aria-label="KAGOU">
+      <a className="brand" href="#/chat" aria-label="KAGOU">
         <BrandMark size={26} />
         <span>KAGOU</span>
       </a>
-      <NavMenu current={current} />
-      <nav className="nav" aria-label="主导航">
-        {NAV.map(([id, label]) => (
-          <a key={id} href={`#/${id}`} aria-current={current === id ? "page" : undefined}>
-            {label}
-          </a>
-        ))}
-        <MoreMenu current={current === "more"} />
-      </nav>
+      <GlobalSearch />
       <div className="head-right">
-        <GlobalSearch />
         <DemoPill />
         <NetworkPill />
         <OpsButton />
         <AccountMenu />
       </div>
     </header>
-  );
-}
-
-function MoreMenu({ current }: { current: boolean }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useOutside(ref, open, () => setOpen(false));
-  return (
-    <div className="rel nav-more" ref={ref}>
-      <button className="nav-btn" aria-current={current ? "page" : undefined} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(!open)}>
-        More <ChevronDown size={13} className={`chev ${open ? "up" : ""}`} />
-      </button>
-      {open && (
-        <div className="menu more-menu" role="menu" onClick={() => setOpen(false)}>
-          {MORE.map((g) => (
-            <div key={g.group} className="more-group">
-              <span className="label">{g.group}</span>
-              {g.items.map(([page, label, sub, Icon, params]) => (
-                <button key={label} role="menuitem" onClick={() => go(page, undefined, params)}>
-                  <span className="more-ic"><Icon size={16} /></span>
-                  <span className="col gap2"><span className="more-l">{label}</span><span className="more-s">{sub}</span></span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Below 1180px the five links fold into one menu so the header never crowds. */
-function NavMenu({ current }: { current: string }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useOutside(ref, open, () => setOpen(false));
-  const label = NAV.find(([id]) => id === current)?.[1] || "More";
-  return (
-    <div className="rel nav-fold" ref={ref}>
-      <button className="nav-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {label} <ChevronDown size={13} className={`chev ${open ? "up" : ""}`} />
-      </button>
-      {open && (
-        <div className="menu" style={{ left: 0, right: "auto", top: 44, minWidth: 220 }} onClick={() => setOpen(false)}>
-          {NAV.map(([id, l]) => <a key={id} href={`#/${id}`} aria-current={current === id ? "page" : undefined}>{l}</a>)}
-          <div className="pop-sep" />
-          {MORE.flatMap((g) => g.items).map(([page, l, , Icon, params]) => (
-            <button key={l} onClick={() => go(page, undefined, params)}><Icon size={14} /> {l}</button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -190,9 +116,12 @@ function AccountMenu() {
   if (DEMO) return null;
   return (
     <div className="rel" ref={ref}>
-      <button className="btn ghost icon" aria-label="账户" aria-expanded={open} onClick={() => setOpen(!open)}><ChevronDown size={14} /></button>
+      <button className="btn ghost icon acct" aria-label="账户" aria-expanded={open} onClick={() => setOpen(!open)}><CircleUser size={18} /></button>
       {open && (
         <div className="menu" onClick={() => setOpen(false)}>
+          <a href="#/usage"><BarChart3 size={13} /> Usage & Billing</a>
+          <a href="#/settings"><Settings size={13} /> Settings</a>
+          <div className="pop-sep" />
           <a href="/"><SquareArrowOutUpRight size={13} /> Classic console</a>
           <button onClick={() => setToken("")}><LogOut size={13} /> Sign out</button>
         </div>
@@ -233,6 +162,7 @@ function GlobalSearch() {
   const input = useRef<HTMLInputElement>(null);
   const agents = useAtAgents();
   const missions = useAtMissions();
+  const chats = useChats();
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
       const typing = /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName);
@@ -248,8 +178,10 @@ function GlobalSearch() {
     const s = q.trim().toLowerCase();
     if (!s) return [];
     const out: Hit[] = [];
+    chats.data?.forEach((c) => (c.title + " " + (c.agent_name || "")).toLowerCase().includes(s) &&
+      out.push({ kind: "Chat", label: c.title, sub: c.agent_name || "KAGOU", go: () => go("chat", c.id) }));
     agents.data?.forEach((a) => (a.name + " " + a.role + " " + a.id + " " + a.responsibility).toLowerCase().includes(s) &&
-      out.push({ kind: "Worker", label: a.name, sub: a.id, go: () => go("agents", a.id) }));
+      out.push({ kind: "Agent", label: a.name, sub: a.id, go: () => go("agents", a.id) }));
     missions.data?.forEach((m) => (m.name + " " + m.id + " " + m.goal).toLowerCase().includes(s) &&
       out.push({ kind: "Mission", label: m.name, sub: m.id, go: () => go("missions", m.id) }));
     if (/^0x[0-9a-f]{64}$/i.test(s)) out.push({ kind: "Tx", label: short(s, 10), sub: "BSC live data", go: () => go("onchain", undefined, { q: s }) });
@@ -257,7 +189,7 @@ function GlobalSearch() {
     if (/^job_/.test(s)) out.push({ kind: "Task", label: s, sub: "Agent task", go: () => go("missions", undefined, { task: s }) });
     if (/^tsk_/.test(s)) out.push({ kind: "Task", label: s, sub: "Legacy goal", go: () => go("tasks", s) });
     return out.slice(0, 12);
-  }, [q, agents.data, missions.data]);
+  }, [q, agents.data, missions.data, chats.data]);
   useEffect(() => setI(0), [q]);
   const pick = (h?: Hit) => {
     if (!h) return;
@@ -271,7 +203,7 @@ function GlobalSearch() {
       <input
         ref={input}
         className="input"
-        placeholder="Search workers, missions, addresses"
+        placeholder="搜索会话、Agent、任务或地址"
         value={q}
         onChange={(e) => (setQ(e.target.value), setOpen(true))}
         onFocus={() => setOpen(true)}

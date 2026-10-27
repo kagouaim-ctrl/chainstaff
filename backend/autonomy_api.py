@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 
 from agent.autonomy import constants as C
 from agent.autonomy.agents import TEMPLATES, AgentError
+from agent.autonomy.chats import ChatError
 from agent.autonomy.events import EventError
 from agent.autonomy.github import verify_signature
 from agent.autonomy.missions import MissionError
@@ -28,7 +29,7 @@ from agent.workforce.engine import WorkforceError
 
 from backend.workforce_api import RateLimit
 
-ERRORS = (AutonomyError, AgentError, TaskError, MissionError, WatcherError, EventError, WorkforceError, ValueError)
+ERRORS = (ChatError, AutonomyError, AgentError, TaskError, MissionError, WatcherError, EventError, WorkforceError, ValueError)
 RANGES = {"1h": timedelta(hours=1), "24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
 
 
@@ -90,6 +91,28 @@ def mount_autonomy(app: FastAPI, at: Autonomy, auth: Callable, owner: str, write
         since = _since(range) or datetime.now(timezone.utc) - timedelta(days=1)
         return {"totals": db.usage_totals(since), "by_agent": db.cost_by("agent_id", since), "by_mission": db.cost_by("mission_id", since),
                 "calls": db.model_calls(since, limit=200), "gateway": at.runtime_health()["gateway"]}
+
+    # ---- chats: what a person asked, and the task each message became ----
+
+    @app.get("/api/at/chats", dependencies=A)
+    def chats(agent_id: str = "", limit: int = 100) -> list[dict]:
+        return at.chats.list(agent_id=agent_id or None, limit=max(1, min(limit, 500)))
+
+    @app.post("/api/at/chats", dependencies=W)
+    def create_chat(body: dict = Body(...)) -> dict:
+        return run(at.chats.create, body, owner)
+
+    @app.get("/api/at/chats/{cid}", dependencies=A)
+    def chat(cid: str) -> dict:
+        return run(at.chats.get, cid)
+
+    @app.post("/api/at/chats/{cid}/messages", dependencies=W)
+    def chat_send(cid: str, body: dict = Body(...)) -> dict:
+        return run(at.chats.send, cid, body, owner)
+
+    @app.put("/api/at/chats/{cid}", dependencies=W)
+    def chat_update(cid: str, body: dict = Body(...)) -> dict:
+        return run(at.chats.update, cid, body, owner)
 
     # ---- agents ----
 

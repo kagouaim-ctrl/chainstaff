@@ -1,85 +1,48 @@
-import { CalendarClock, ChevronDown, History, LayoutGrid, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Zap } from "lucide-react";
+import { Bot, ChevronDown, Link2, MessageSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, SquarePen, Target } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { isRunning, isWorking, STATE, useAtAgents, useAtMissions, type AtAgentRow } from "../lib/at";
+import { useChats } from "../lib/chat";
 import { DEMO } from "../lib/demo";
 import { openCreateWorker, setSideOpen } from "../lib/shell";
 import { go, usePref, type Route } from "../lib/util";
+import { navCurrent } from "./TerminalHeader";
 import { WorkerAvatar } from "./WorkerAvatar";
 
-const SHOWN = 6; // workers listed before "Show all"
+const SHOWN = 6; // chats / agents listed before "Show all"
 const rank = (a: AtAgentRow) => (isWorking(a) || a.state === "waiting_approval" ? 0 : a.state === "watching" ? 1 : a.state === "error" || a.state === "offline" ? 2 : 3);
 
+export const NAV: [string, string, typeof Bot][] = [
+  ["chat", "Chat", MessageSquare],
+  ["agents", "Agents", Bot],
+  ["missions", "Missions", Target],
+  ["onchain", "On-Chain", Link2],
+  ["more", "More", MoreHorizontal],
+];
+
 /**
- * The left sidebar: where you are, your workers, your missions, settings. Filters (working, watching, paused…)
- * live on the Workers page, not here. Collapses to an icon rail on desktop; on phones it is a drawer.
+ * The left sidebar: start a chat, the four places you go, your recent chats and your agents. Clicking an agent
+ * opens a conversation with it. Collapses to an icon rail on desktop; on phones it is a drawer.
  */
 export function Sidebar({ route, collapsed, onCollapse }: { route: Route; collapsed: boolean; onCollapse: (v: boolean) => void }) {
-  const agents = useAtAgents();
   const missions = useAtMissions({ status: "active,paused" });
-  const [q, setQ] = useState("");
-  const [all, setAll] = useState(false);
-  const [closed, setClosed] = usePref<Record<string, boolean>>("side-closed", {});
-  const toggle = (k: string) => setClosed((c) => ({ ...c, [k]: !c[k] }));
-  const list = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return [...(agents.data || [])]
-      .filter((a) => !t || `${a.name} ${a.responsibility}`.toLowerCase().includes(t))
-      .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
-  }, [agents.data, q]);
-  const total = agents.data?.length || 0;
-  const shown = all || q ? list : list.slice(0, SHOWN);
-  const ms = missions.data || [];
-  const running = ms.filter(isRunning).length;
-  const scheduled = ms.filter((m) => m.type === "scheduled").length;
-  const mstatus = route.page === "missions" && !route.id ? route.params.get("status") : null;
-  const mtype = route.page === "missions" && !route.id ? route.params.get("type") : null;
+  const running = (missions.data || []).filter(isRunning).length;
+  const current = navCurrent(route.page);
   const nav = (fn: () => void) => () => (fn(), setSideOpen(false));
   return (
     <aside className={`side ${collapsed ? "collapsed" : ""}`} aria-label="Sidebar">
       <div className="side-scroll">
-        <Group label="Workspace" collapsed={collapsed}>
-          <Item icon={<LayoutGrid size={17} />} label="Overview" current={route.page === "overview"} collapsed={collapsed} onClick={nav(() => go("overview"))} />
-        </Group>
-
-        <Group label="My Workers" count={total} collapsed={collapsed} closed={!!closed.workers} onToggle={() => toggle("workers")}>
-          {!collapsed && total > SHOWN && (
-            <div className="side-search">
-              <Search size={13} />
-              <input className="input sm" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search workers" aria-label="Search workers" />
-            </div>
-          )}
-          {agents.isLoading && !collapsed && <div className="side-sk"><i className="skeleton" /><i className="skeleton" /><i className="skeleton" /></div>}
-          {shown.map((a) => {
-            const [label, tone, live] = STATE[a.state] || [a.state, ""];
-            return (
-              <button key={a.id} className="side-item worker" aria-current={route.page === "agents" && route.id === a.id ? "true" : undefined}
-                onClick={nav(() => go("agents", a.id))} title={collapsed ? `${a.name} · ${label}` : a.state_detail}>
-                <span className="side-av">
-                  <WorkerAvatar id={a.id} appearance={a.appearance} size={collapsed ? 30 : 24} dim={a.status === "paused"} />
-                  <i className={`side-dot ${tone} ${live ? "live" : ""}`} aria-label={label} />
-                </span>
-                {!collapsed && <span className="side-label ellipsis">{a.name}</span>}
-              </button>
-            );
-          })}
-          {!collapsed && q && !list.length && <div className="side-empty">No worker matches “{q}”</div>}
-          {!collapsed && !q && total > SHOWN && (
-            <button className="side-item subtle" onClick={() => (all ? setAll(false) : go("agents"))}>
-              <span className="side-ic" />
-              <span className="side-label">{all ? "Show less" : `View all ${total}`}</span>
-            </button>
-          )}
-          <Item icon={<Plus size={17} />} label="New Worker" collapsed={collapsed} subtle disabled={DEMO} title={DEMO ? "演示版不能创建" : undefined} onClick={openCreateWorker} />
-        </Group>
-
-        <Group label="Missions" collapsed={collapsed} closed={!!closed.missions} onToggle={() => toggle("missions")}>
-          <Item icon={<Zap size={17} />} label="Running" n={running} collapsed={collapsed} current={mstatus === "running" && !mtype}
-            onClick={nav(() => go("missions", undefined, { status: "running" }))} />
-          <Item icon={<CalendarClock size={17} />} label="Scheduled" n={scheduled} collapsed={collapsed} current={mtype === "scheduled"}
-            onClick={nav(() => go("missions", undefined, { type: "scheduled", status: "active,paused" }))} />
-          <Item icon={<History size={17} />} label="History" collapsed={collapsed} current={mstatus === "completed,failed,stopped"}
-            onClick={nav(() => go("missions", undefined, { status: "completed,failed,stopped" }))} />
-        </Group>
+        <button className="side-new" onClick={nav(() => go("chat"))} title="新对话">
+          <SquarePen size={16} />
+          {!collapsed && <span>新对话</span>}
+        </button>
+        <nav className="side-items" aria-label="主导航">
+          {NAV.map(([id, label, Icon]) => (
+            <Item key={id} icon={<Icon size={17} />} label={label} collapsed={collapsed} current={current === id && !(id === "chat" && route.id)}
+              n={id === "missions" ? running : undefined} onClick={nav(() => go(id))} />
+          ))}
+        </nav>
+        {!collapsed && <RecentChats route={route} />}
+        <AgentList route={route} collapsed={collapsed} />
       </div>
       <div className="side-foot">
         <Item icon={<Settings size={17} />} label="Settings" current={route.page === "settings"} collapsed={collapsed} onClick={nav(() => go("settings"))} />
@@ -91,16 +54,96 @@ export function Sidebar({ route, collapsed, onCollapse }: { route: Route; collap
   );
 }
 
-function Group({ label, count, collapsed, closed, onToggle, children }: { label: string; count?: number; collapsed: boolean; closed?: boolean; onToggle?: () => void; children: ReactNode }) {
+function RecentChats({ route }: { route: Route }) {
+  const q = useChats();
+  const [all, setAll] = useState(false);
+  const [s, setS] = useState("");
+  const [closed, setClosed] = usePref<boolean>("side-chats-closed", false);
+  const rows = (q.data || []).filter((c) => !s.trim() || `${c.title} ${c.agent_name || ""}`.toLowerCase().includes(s.trim().toLowerCase()));
+  const total = q.data?.length || 0;
+  const shown = all || s ? rows : rows.slice(0, SHOWN);
+  if (q.error || (!q.isLoading && !total)) return null; // nothing to list yet (or the server has no chats API): the "新对话" button is enough
+  return (
+    <Group label="Recent" count={total} closed={closed} onToggle={() => setClosed(!closed)}>
+      {total > SHOWN && <SideSearch value={s} onChange={setS} placeholder="Search chats" />}
+      {shown.map((c) => (
+        <button key={c.id} className="side-item chat-item" aria-current={route.page === "chat" && route.id === c.id ? "true" : undefined}
+          onClick={() => (go("chat", c.id), setSideOpen(false))} title={c.title}>
+          <span className="side-label">{c.title}</span>
+          {(c.last_status === "running" || c.last_status === "queued" || c.last_status === "waiting") && <i className="ind info live" aria-label="进行中" />}
+          {c.last_status === "waiting_approval" && <i className="ind warn" aria-label="等待确认" />}
+        </button>
+      ))}
+      {s && !rows.length && <div className="side-empty">没有匹配的会话</div>}
+      {!s && total > SHOWN && <ShowAll all={all} total={total} onClick={() => setAll(!all)} />}
+    </Group>
+  );
+}
+
+function AgentList({ route, collapsed }: { route: Route; collapsed: boolean }) {
+  const agents = useAtAgents();
+  const [q, setQ] = useState("");
+  const [all, setAll] = useState(false);
+  const [closed, setClosed] = usePref<boolean>("side-agents-closed", false);
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return [...(agents.data || [])]
+      .filter((a) => !t || `${a.name} ${a.responsibility}`.toLowerCase().includes(t))
+      .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  }, [agents.data, q]);
+  const total = agents.data?.length || 0;
+  const shown = all || q ? list : list.slice(0, SHOWN);
+  return (
+    <Group label="Agents" count={total} collapsed={collapsed} closed={closed} onToggle={() => setClosed(!closed)}>
+      {!collapsed && total > SHOWN && <SideSearch value={q} onChange={setQ} placeholder="Search agents" />}
+      {agents.isLoading && !collapsed && <div className="side-sk"><i className="skeleton" /><i className="skeleton" /><i className="skeleton" /></div>}
+      {shown.map((a) => {
+        const [label, tone, live] = STATE[a.state] || [a.state, ""];
+        return (
+          <button key={a.id} className="side-item worker" aria-current={route.page === "agents" && route.id === a.id ? "true" : undefined}
+            onClick={() => (go("agents", a.id), setSideOpen(false))} title={collapsed ? `${a.name} · ${label}` : `${label}${a.state_detail ? ` · ${a.state_detail}` : ""}`}>
+            <span className="side-av">
+              <WorkerAvatar id={a.id} appearance={a.appearance} size={collapsed ? 30 : 22} dim={a.status === "paused"} />
+              <i className={`side-dot ${tone} ${live ? "live" : ""}`} aria-label={label} />
+            </span>
+            {!collapsed && <span className="side-label ellipsis">{a.name}</span>}
+          </button>
+        );
+      })}
+      {!collapsed && q && !list.length && <div className="side-empty">没有匹配的 Agent</div>}
+      {!collapsed && !q && total > SHOWN && <ShowAll all={all} total={total} onClick={() => setAll(!all)} />}
+      <Item icon={<Plus size={16} />} label="New Agent" collapsed={collapsed} subtle disabled={DEMO} title={DEMO ? "演示版不能创建" : undefined} onClick={openCreateWorker} />
+    </Group>
+  );
+}
+
+function SideSearch({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <div className="side-search">
+      <Search size={13} />
+      <input className="input sm" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder} />
+    </div>
+  );
+}
+
+function ShowAll({ all, total, onClick }: { all: boolean; total: number; onClick: () => void }) {
+  return (
+    <button className="side-item subtle" onClick={onClick}>
+      <span className="side-label">{all ? "Show less" : `Show all ${total}`}</span>
+    </button>
+  );
+}
+
+function Group({ label, count, collapsed, closed, onToggle, children }: { label: string; count?: number; collapsed?: boolean; closed?: boolean; onToggle?: () => void; children: ReactNode }) {
   return (
     <section className="side-group">
-      {collapsed ? <div className="side-rule" /> : onToggle ? (
+      {collapsed ? <div className="side-rule" /> : (
         <button className="side-h" onClick={onToggle} aria-expanded={!closed}>
           <span>{label}</span>
           {count !== undefined && <span className="side-n">{count}</span>}
           <ChevronDown size={13} className={`side-chev ${closed ? "closed" : ""}`} />
         </button>
-      ) : <div className="side-h static"><span>{label}</span></div>}
+      )}
       {(!closed || collapsed) && <div className="side-items">{children}</div>}
     </section>
   );

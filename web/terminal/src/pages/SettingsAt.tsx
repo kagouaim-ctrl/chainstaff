@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Check, X } from "lucide-react";
-import { Fragment, lazy, Suspense, useState } from "react";
-import { EmptyState, ErrorState, Loading, Seg } from "../components/ui";
+import { Fragment, lazy, Suspense, useEffect } from "react";
+import { EmptyState, ErrorState, Loading } from "../components/ui";
 import { api, post } from "../lib/api";
-import { refreshAt, useAtAgents, useAtMeta, useAtMissions, useAtNotifications, useAtRuntime, useAtUsage } from "../lib/at";
+import { refreshAt, useAtAgents, useAtMeta, useAtNotifications, useAtRuntime } from "../lib/at";
 import { DEMO } from "../lib/demo";
 import { useSystem } from "../lib/queries";
-import { ago, fmtTime, setParams, type Route } from "../lib/util";
+import { ago, fmtTime, go, setParams, type Route } from "../lib/util";
 import { MemoryAdmin, Schedules, System } from "./SettingsLegacy";
 
 const Skills = lazy(() => import("./Skills"));
@@ -18,13 +18,15 @@ const SECTIONS: [string, string][] = [
   ["permissions", "Tool Permissions"],
   ["notifications", "Notifications"],
   ["runtime", "Runtime"],
-  ["billing", "Billing"],
   ["audit", "Audit Logs"],
   ["legacy", "Legacy"],
 ];
 
 export default function Settings({ route }: { route: Route }) {
   const s = route.params.get("s") || "models";
+  useEffect(() => {
+    if (s === "billing") go("usage"); // Billing moved to its own page
+  }, [s]);
   return (
     <div className="term two-pane">
       <aside className="pane rail" aria-label="Settings">
@@ -41,7 +43,6 @@ export default function Settings({ route }: { route: Route }) {
         {s === "permissions" && <Permissions />}
         {s === "notifications" && <Notifications />}
         {s === "runtime" && <Runtime />}
-        {s === "billing" && <Billing />}
         {s === "audit" && <Audit />}
         {s === "legacy" && <Legacy />}
       </section>
@@ -55,14 +56,9 @@ const Yes = ({ ok, on, off }: { ok: boolean; on: string; off: string }) => (
 
 function Models() {
   const rt = useAtRuntime();
-  const [range, setRange] = useState("24h");
-  const u = useAtUsage(range);
-  const agents = useAtAgents(true);
-  const missions = useAtMissions({ status: "" });
   if (rt.isLoading) return <Loading />;
   if (rt.error) return <ErrorState error={rt.error} />;
   const r = rt.data!;
-  const name = (id: string | null) => agents.data?.find((a) => a.id === id)?.name || missions.data?.find((m) => m.id === id)?.name || id || "—";
   return (
     <div className="section col gap16" style={{ maxWidth: 1100 }}>
       <div className="col gap8">
@@ -72,57 +68,11 @@ function Models() {
           <dd>{r.models.providers.length ? r.models.providers.map((p) => <span key={p.provider} className="badge ok" style={{ marginRight: 6 }}><Check size={11} />{p.provider} · {p.label} · {p.model}</span>)
             : <span className="badge warn"><X size={11} />没有配置任何模型：设置 ANTHROPIC_API_KEY（Claude），或 AI_PROVIDER + AI_API_KEY + AI_MODEL（Qwen、Gemini、本地模型）</span>}</dd>
           <dt>Default model</dt><dd className="mono">{r.models.default_model}</dd>
-          <dt>Spend</dt><dd className="mono">today ${Number(r.gateway.spent_today_usd).toFixed(4)}{r.gateway.daily_budget_usd ? ` / $${r.gateway.daily_budget_usd}` : ""} · month ${Number(r.gateway.spent_month_usd).toFixed(4)}{r.gateway.monthly_budget_usd ? ` / $${r.gateway.monthly_budget_usd}` : ""}</dd>
           <dt>Limits</dt><dd className="mono">{r.gateway.max_concurrent} concurrent calls · {String(r.limits.max_model_calls)} model calls and {String(r.limits.max_tool_calls)} tool calls per run · task budget ${String(r.limits.default_task_budget)}</dd>
         </dl>
         <small className="muted">模型由服务器环境变量配置，不在浏览器里保存密钥。每个 Agent 在自己的设置里选择 Provider 和模型；没有配置的 Provider 会让该 Agent 执行失败并通知你，不会假装成功。</small>
       </div>
-      <div className="row gap6"><div className="label grow">Usage (autonomous runs)</div><Seg value={range} onChange={setRange} options={[["1h", "1h"], ["24h", "24h"], ["7d", "7d"], ["30d", "30d"]]} /></div>
-      {u.isLoading ? <Loading /> : u.error ? <ErrorState error={u.error} /> : (
-        <>
-          <div className="metrics">
-            <div><span className="label">Runs</span><span className="v">{u.data!.totals.runs}</span></div>
-            <div><span className="label">Model calls</span><span className="v">{u.data!.totals.model_calls}</span></div>
-            <div><span className="label">Tool calls</span><span className="v">{u.data!.totals.tool_calls}</span></div>
-            <div><span className="label">Tokens</span><span className="v">{u.data!.totals.tokens_in + u.data!.totals.tokens_out}</span></div>
-            <div><span className="label">Cost</span><span className="v">${Number(u.data!.totals.cost_usd).toFixed(4)}</span></div>
-            <div><span className="label">Avg latency</span><span className="v">{u.data!.totals.model_latency_avg_s ?? "—"}s</span></div>
-            <div><span className="label">Model failures</span><span className="v">{u.data!.totals.model_failures}</span></div>
-            <div><span className="label">Failed runs</span><span className="v">{u.data!.totals.failed_runs}</span></div>
-          </div>
-          <div className="grid2 stack-m">
-            <CostTable title="By agent" rows={u.data!.by_agent} name={name} />
-            <CostTable title="By mission" rows={u.data!.by_mission} name={name} />
-          </div>
-          <div className="label">Recent model calls</div>
-          {u.data!.calls.length ? (
-            <div className="table-wrap boxed">
-              <table className="dt">
-                <thead><tr><th>When</th><th>Agent</th><th>Task</th><th>Model</th><th>Tokens</th><th>Latency</th><th>Cost</th><th>OK</th></tr></thead>
-                <tbody>{u.data!.calls.slice(0, 50).map((c) => (
-                  <tr key={c.id}><td className="mono muted">{ago(c.at)}</td><td>{name(c.agent_id)}</td><td className="mono muted">{c.task_id}</td><td className="mono">{c.provider}/{c.name}</td>
-                    <td className="mono">{c.tokens_in}+{c.tokens_out}</td><td className="mono">{c.secs ?? "—"}s</td><td className="mono">${Number(c.cost_usd).toFixed(5)}</td><td className={c.ok ? "ok" : "bad"}>{c.ok ? "ok" : "failed"}</td></tr>
-                ))}</tbody>
-              </table>
-            </div>
-          ) : <span className="muted sm">这段时间没有模型调用。</span>}
-        </>
-      )}
-    </div>
-  );
-}
-
-function CostTable({ title, rows, name }: { title: string; rows: { id: string | null; runs: number; cost_usd: number; tokens: number }[]; name: (id: string | null) => string }) {
-  return (
-    <div className="col gap6">
-      <div className="label">{title}</div>
-      {rows.length ? (
-        <div className="table-wrap boxed">
-          <table className="dt"><thead><tr><th>{title.replace("By ", "")}</th><th>Runs</th><th>Tokens</th><th>Cost</th></tr></thead>
-            <tbody>{rows.map((r) => <tr key={r.id || "-"}><td>{name(r.id)}</td><td className="mono">{r.runs}</td><td className="mono">{r.tokens}</td><td className="mono">${r.cost_usd.toFixed(4)}</td></tr>)}</tbody>
-          </table>
-        </div>
-      ) : <span className="muted sm">—</span>}
+      <a className="btn sm" href="#/usage" style={{ alignSelf: "flex-start" }}>查看花费：Usage & Billing</a>
     </div>
   );
 }
@@ -251,24 +201,6 @@ function Runtime() {
         <div className="label">How work survives restarts</div>
         <div className="note">任务、事件、交接和检查点都在数据库里。Worker 每 {String(r.limits.heartbeat_s)} 秒心跳并续租；一个 Worker 停止续租 {String(r.limits.lease_s)} 秒后，它的任务回到队列，从最后一个检查点继续（最多 {String(r.limits.max_attempts)} 次）。没有任务时 Worker 不调用模型。</div>
       </div>
-    </div>
-  );
-}
-
-function Billing() {
-  const rt = useAtRuntime();
-  const u = useAtUsage("30d");
-  return (
-    <div className="section col gap12" style={{ maxWidth: 900 }}>
-      <div className="note">KAGOU 现在没有付费套餐或账单系统。这里显示的是模型花费（按 Agent 运行记录和模型网关计算）和你设置的预算上限。</div>
-      {rt.data && (
-        <dl className="kv">
-          <dt>Today</dt><dd className="mono">${Number(rt.data.gateway.spent_today_usd).toFixed(4)}{rt.data.gateway.daily_budget_usd ? ` of $${rt.data.gateway.daily_budget_usd} (AI_DAILY_BUDGET_USD)` : " · no daily cap (AI_DAILY_BUDGET_USD)"}</dd>
-          <dt>This month</dt><dd className="mono">${Number(rt.data.gateway.spent_month_usd).toFixed(4)}{rt.data.gateway.monthly_budget_usd ? ` of $${rt.data.gateway.monthly_budget_usd} (AI_MONTHLY_BUDGET_USD)` : " · no monthly cap (AI_MONTHLY_BUDGET_USD)"}</dd>
-          <dt>Autonomous runs, 30d</dt><dd className="mono">{u.data ? `$${Number(u.data.totals.cost_usd).toFixed(4)} · ${u.data.totals.runs} runs · ${u.data.totals.model_calls} model calls` : "…"}</dd>
-          <dt>Caps</dt><dd>Global (gateway), per agent (agent budget), per mission (mission budget), per task (task budget). The first one reached stops the run and notifies you.</dd>
-        </dl>
-      )}
     </div>
   );
 }

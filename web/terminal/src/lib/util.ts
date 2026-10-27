@@ -8,14 +8,15 @@ export interface Route {
   params: URLSearchParams;
 }
 
-// Old links keep working: the first terminal's roster opens Agents. "workers" is the name the navigation uses.
-const LEGACY: Record<string, string> = { workforce: "agents", workers: "agents" };
+// Old links keep working: the first terminal's roster and "workers" open Agents; the old Overview opens the chat
+// workspace, which replaced it as the home page.
+const LEGACY: Record<string, string> = { workforce: "agents", workers: "agents", overview: "chat" };
 
 function parse(): Route {
   const h = location.hash.replace(/^#\/?/, "");
   const [path, qs] = h.split("?");
   const [page, id] = path.split("/");
-  return { page: LEGACY[page] || page || "overview", id: id ? decodeURIComponent(id) : undefined, params: new URLSearchParams(qs || "") };
+  return { page: LEGACY[page] || page || "chat", id: id ? decodeURIComponent(id) : undefined, params: new URLSearchParams(qs || "") };
 }
 
 export function useRoute(): Route {
