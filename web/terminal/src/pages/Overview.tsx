@@ -3,7 +3,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { ApprovalCard, Sev, TaskDialog } from "../components/AtBits";
 import { WorkerCard } from "../components/WorkerCard";
 import { EmptyState, ErrorState } from "../components/ui";
-import { useAtActivity, useAtApprovals, useAtLive, useAtOverview, useAtRuntime, type AtActivity } from "../lib/at";
+import { isWorking, useAtActivity, useAtApprovals, useAtLive, useAtOverview, useAtRuntime, type AtActivity } from "../lib/at";
 import { DEMO } from "../lib/demo";
 import { openCreateWorker } from "../lib/shell";
 import { ago, fmtTime, go, setParams, usd, type Route } from "../lib/util";
@@ -21,7 +21,7 @@ export default function Overview({ route }: { route: Route }) {
   const d = o.data;
   const agents = d?.agents || [];
   const active = agents.filter((a) => a.activated && a.status === "active");
-  const working = agents.filter((a) => ["running", "investigating", "queued", "waiting"].includes(a.state)).length;
+  const working = agents.filter(isWorking).length;
   const watching = agents.filter((a) => a.state === "watching").length;
   const k = d?.kpis;
   const g = rt.data?.gateway;

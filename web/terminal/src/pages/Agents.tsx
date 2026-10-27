@@ -7,7 +7,7 @@ import { COLOR_HEX, resolveAppearance, SHAPE_LABEL, ShapeMark, WorkerAvatar } fr
 import { Dialog, EmptyState, ErrorState, Loading, Seg, Tabs } from "../components/ui";
 import { del, post, put } from "../lib/api";
 import {
-  AVATAR_COLORS, AVATAR_SHAPES, MISSION_ST, MISSION_TYPE_LABEL, MODE_LABEL, refreshAt, useAtActivity, useAtAgent, useAtAgents, useAtMemory, useAtMeta, useAtWorkspaces,
+  AVATAR_COLORS, AVATAR_SHAPES, isWorking, MISSION_ST, MISSION_TYPE_LABEL, MODE_LABEL, refreshAt, useAtActivity, useAtAgent, useAtAgents, useAtMemory, useAtMeta, useAtWorkspaces,
   type AgentDetailAt, type Appearance, type AtAgentRow, type AtMeta, type AtTask, type WorkMode,
 } from "../lib/at";
 import { DEMO } from "../lib/demo";
@@ -18,7 +18,7 @@ import { AgentWizard } from "./AgentWizard";
 type Filter = "all" | "working" | "watching" | "attention" | "paused";
 const IN: Record<Filter, (a: AtAgentRow) => boolean> = {
   all: () => true,
-  working: (a) => ["running", "investigating", "queued", "waiting"].includes(a.state),
+  working: isWorking,
   watching: (a) => a.state === "watching",
   attention: (a) => ["error", "offline", "waiting_approval"].includes(a.state) || !a.model_ready,
   paused: (a) => a.status === "paused",

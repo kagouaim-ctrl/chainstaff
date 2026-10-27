@@ -397,6 +397,8 @@ export const OPEN_TASK: TaskStatusAt[] = ["queued", "running", "waiting", "waiti
 /** Open tasks of a mission; an active mission with any is "running" (the same rule as the server's overview). */
 export const openTasksOf = (m: AtMission) => OPEN_TASK.reduce((n, k) => n + (m.task_counts?.[k] || 0), 0);
 export const isRunning = (m: AtMission) => m.status === "active" && openTasksOf(m) > 0;
+/** Busy on something right now. A worker "waiting" with no task is simply idle until something wakes it. */
+export const isWorking = (a: AtAgentRow) => ["running", "investigating", "queued"].includes(a.state) || (a.state === "waiting" && !!a.current_task);
 
 // ---------------------------------------------------------------- queries
 

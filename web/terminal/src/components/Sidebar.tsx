@@ -1,14 +1,13 @@
 import { CalendarClock, ChevronDown, History, LayoutGrid, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Zap } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { isRunning, STATE, useAtAgents, useAtMissions, type AtAgentRow } from "../lib/at";
+import { isRunning, isWorking, STATE, useAtAgents, useAtMissions, type AtAgentRow } from "../lib/at";
 import { DEMO } from "../lib/demo";
 import { openCreateWorker, setSideOpen } from "../lib/shell";
 import { go, usePref, type Route } from "../lib/util";
 import { WorkerAvatar } from "./WorkerAvatar";
 
 const SHOWN = 6; // workers listed before "Show all"
-const BUSY = new Set(["running", "investigating", "queued", "waiting", "waiting_approval"]);
-const rank = (a: AtAgentRow) => (BUSY.has(a.state) ? 0 : a.state === "watching" ? 1 : a.state === "error" || a.state === "offline" ? 2 : 3);
+const rank = (a: AtAgentRow) => (isWorking(a) || a.state === "waiting_approval" ? 0 : a.state === "watching" ? 1 : a.state === "error" || a.state === "offline" ? 2 : 3);
 
 /**
  * The left sidebar: where you are, your workers, your missions, settings. Filters (working, watching, paused…)
