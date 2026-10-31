@@ -1,0 +1,50 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource/noto-sans-sc/400.css';
+@import '@fontsource/noto-sans-sc/500.css';
+@import '@fontsource/noto-sans-sc/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 设计 Token：深色为默认（MVP 只做深色，颜色全部走变量，以后加浅色只需新增一组变量） */
+:root {
+  --c-bg: #0b0d10;
+  --c-panel: #14171c;
+  --c-raised: #1a1e24;
+  --c-line: #232830;
+  --c-fg: #e9ebee;
+  --c-sub: #7c8591;
+  --c-up: #22c38e;     /* 涨：绿（国际习惯） */
+  --c-down: #f25c6a;   /* 跌：红 */
+  --c-agent: #6e8bff;  /* Agent 强调色 */
+  --c-paper: #f5b544;  /* 模拟盘标识 */
+  --c-live: #38bdf8;   /* 实盘标识（锁定中） */
+  --c-warn: #f59e0b;
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-bg text-fg font-sans antialiased;
+  font-size: 14px;
+}
+.num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+:focus-visible { outline: 2px solid var(--c-agent); outline-offset: 2px; border-radius: 6px; }
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* 状态变化动效：新事件进入、订单状态推进 */
+@keyframes enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.anim-enter { animation: enter 240ms ease-out; }
+@keyframes drawer { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.anim-drawer { animation: drawer 200ms ease-out; }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.anim-pulse { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-enter, .anim-drawer, .anim-pulse { animation: none !important; }
+  * { transition: none !important; scroll-behavior: auto !important; }
+}
