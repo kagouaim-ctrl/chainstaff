@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router-dom'
+import { createBrowserRouter, createHashRouter, RouterProvider, type RouteObject } from 'react-router-dom'
 import { Layout } from './Layout'
 import { Overview } from '@/pages/Overview'
 import { Discover } from '@/pages/Discover'
@@ -31,6 +31,7 @@ export const routes: RouteObject[] = [
 export const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } })
 
 export function App() {
-  const router = createBrowserRouter(routes)
+  // 官网是纯静态托管，深链接没有回退规则，所以挂在子路径时用 hash 路由（BASE 不是 / 时自动启用）
+  const router = import.meta.env.BASE_URL === '/' ? createBrowserRouter(routes) : createHashRouter(routes)
   return <QueryClientProvider client={queryClient}><RouterProvider router={router} /></QueryClientProvider>
 }
