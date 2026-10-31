@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTokens, now } from '@/api/hooks'
+import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTokens, useTrades, now } from '@/api/hooks'
 import { useApp, useToast } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { DataState, Panel, Tabs, TokenAvatar, Pct, Tag, KV, DemoTag, Segmented, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert } from '@/components/icons'
 import { CandleChart } from '@/features/charts'
 import { TokenChat } from '@/features/TokenChat'
+import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
 import { DecisionChain } from '@/features/DecisionChain'
 import { VerdictTag, securityFlags, VERDICT } from '@/features/tokenBits'
@@ -15,7 +16,7 @@ import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
 import type { Token } from '@/domain/types'
 
-type TabKey = 'chat' | 'holders' | 'activity' | 'research'
+type TabKey = 'chat' | 'thesis' | 'holders' | 'trades' | 'research'
 
 export function TokenPage() {
   const { address = '' } = useParams()
@@ -25,7 +26,7 @@ export function TokenPage() {
     if (loc.hash === '#trade') setTimeout(() => document.getElementById('trade')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300)
   }, [loc.hash, q.data])
   return (
-    <DataState q={q} rows={6} empty={<span>没有找到代币 <span className="font-mono">{shortAddr(address)}</span>。<Link to="/discover" className="text-agent">返回发现</Link></span>}>
+    <DataState q={q} rows={6} empty={<span>没有找到代币 <span className="font-mono">{shortAddr(address)}</span>。<Link to="/" className="text-agent">返回发现</Link></span>}>
       {(t) => t && <TokenView t={t} />}
     </DataState>
   )
@@ -76,17 +77,19 @@ function TokenView({ t }: { t: Token }) {
 
         <section className="rounded-card border border-line bg-panel">
           <Tabs label="代币信息" value={tab} onChange={setTab} options={[
-            { value: 'chat', label: '代币群聊' }, { value: 'holders', label: '持有者' }, { value: 'activity', label: 'Agent 活动' }, { value: 'research', label: '研究与决策' },
+            { value: 'chat', label: '群聊' }, { value: 'thesis', label: '观点' }, { value: 'holders', label: '持有者' }, { value: 'trades', label: '交易' }, { value: 'research', label: 'Agent 研究' },
           ]} />
           {tab === 'chat' && <TokenChat token={t} />}
+          {tab === 'thesis' && <Theses token={t} />}
           {tab === 'holders' && <Holders t={t} />}
-          {tab === 'activity' && <Activity t={t} />}
-          {tab === 'research' && <Research t={t} />}
+          {tab === 'trades' && <Trades t={t} />}
+          {tab === 'research' && <><Research t={t} /><Activity t={t} /></>}
         </section>
       </div>
 
       <div className="space-y-4">
         <TradePanel token={t} />
+        <MyPosition t={t} />
         <SecurityBlock t={t} />
         <BuySell t={t} />
       </div>
@@ -124,12 +127,15 @@ function SideList({ current }: { current: string }) {
   const pos = usePositions()
   const nav = useNavigate()
   const { watch } = useApp()
-  const [k, setK] = useState<'hot' | 'held' | 'watch'>('held')
-  const list = (tokens.data ?? []).filter((t) => k === 'hot' ? true : k === 'held' ? pos.data?.some((p) => p.token.address === t.address) : (watch[t.address] ?? t.watch)).slice(0, 14)
+  const [k, setK] = useState<'hot' | 'held' | 'watch' | 'gain'>('held')
+  const list = (tokens.data ?? [])
+    .filter((t) => k === 'hot' || k === 'gain' ? true : k === 'held' ? pos.data?.some((p) => p.token.address === t.address) : (watch[t.address] ?? t.watch))
+    .sort((a, b) => k === 'gain' ? b.stats['24h'].change - a.stats['24h'].change : k === 'hot' ? b.stats['24h'].volume - a.stats['24h'].volume : 0)
+    .slice(0, 16)
   return (
     <aside className="hidden rounded-card border border-line bg-panel xl:block" aria-label="代币列表">
       <div className="border-b border-line p-2">
-        <Segmented label="列表" size="sm" value={k} onChange={setK} options={[{ value: 'held', label: '持仓' }, { value: 'watch', label: '自选' }, { value: 'hot', label: '热门' }]} />
+        <Segmented label="列表" size="sm" value={k} onChange={setK} options={[{ value: 'held', label: '持仓' }, { value: 'watch', label: '自选' }, { value: 'hot', label: '热门' }, { value: 'gain', label: '涨幅' }]} />
       </div>
       <ul className="max-h-[calc(100vh-180px)] overflow-y-auto py-1">
         {list.length === 0 && <li className="p-4 text-center text-xs text-sub">空</li>}
@@ -193,35 +199,93 @@ function BuySell({ t }: { t: Token }) {
 
 function Holders({ t }: { t: Token }) {
   const q = useHolders(t.address)
+  const [agentOnly, setAgentOnly] = useState(false)
+  const [thesisOnly, setThesisOnly] = useState(false)
   return (
     <DataState q={q} isEmpty={(d) => d.length === 0}>
+      {(all) => {
+        const rows = all.filter((h) => (!agentOnly || h.kind === 'agent') && (!thesisOnly || h.hasThesis))
+        return (
+          <div>
+            <div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
+              <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看 Agent</label>
+              <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={thesisOnly} onChange={(e) => setThesisOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看有观点的</label>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px] text-[13px]">
+                <thead className="text-xs text-sub"><tr className="border-y border-line">
+                  <th className="px-4 py-2 text-left font-normal">持有者</th>
+                  <th className="px-2 py-2 text-right font-normal">持仓</th><th className="px-2 py-2 text-right font-normal">占比</th>
+                  <th className="px-2 py-2 text-right font-normal">盈亏</th><th className="px-4 py-2 text-right font-normal">持有时长</th>
+                </tr></thead>
+                <tbody>
+                  {rows.map((h) => (
+                    <tr key={h.rank} className="border-b border-line last:border-0">
+                      <td className="px-4 py-2.5">
+                        {h.kind === 'agent'
+                          ? <span className="flex items-center gap-1.5"><span className="num w-5 text-xs text-sub">{h.rank}</span><span className="font-medium">{h.agentName}</span><span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span><span className="text-xs text-sub">{h.ownerName}</span>{h.hasThesis && <span className="text-[11px] text-sub">· 有观点</span>}</span>
+                          : <span className="flex items-center gap-1.5"><span className="num w-5 text-xs text-sub">{h.rank}</span><span className="font-mono text-xs text-sub">{shortAddr(h.label, 5, 5)}</span></span>}
+                      </td>
+                      <td className="num px-2 py-2.5 text-right">{usd(h.amountUsd)}</td>
+                      <td className="num px-2 py-2.5 text-right">{h.pct.toFixed(2)}%</td>
+                      <td className="px-2 py-2.5 text-right"><Pct v={h.pnlPct} digits={1} /></td>
+                      <td className="num px-4 py-2.5 text-right text-sub">{duration(h.heldMinutes * 60000)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      }}
+    </DataState>
+  )
+}
+
+function Trades({ t }: { t: Token }) {
+  const q = useTrades(t.address)
+  return (
+    <DataState q={q} isEmpty={(d) => d.length === 0} empty="还没有成交。">
       {(rows) => (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] text-[13px]">
+          <table className="w-full min-w-[560px] text-[13px]">
             <thead className="text-xs text-sub"><tr className="border-b border-line">
-              <th className="px-4 py-2 text-left font-normal">#</th><th className="px-2 py-2 text-left font-normal">持有者</th>
-              <th className="px-2 py-2 text-right font-normal">持仓金额</th><th className="px-2 py-2 text-right font-normal">占比</th>
-              <th className="px-2 py-2 text-right font-normal">盈亏</th><th className="px-4 py-2 text-right font-normal">持有时长</th>
+              <th className="px-4 py-2 text-left font-normal">时间</th><th className="px-2 py-2 text-left font-normal">方向</th>
+              <th className="px-2 py-2 text-left font-normal">交易者</th><th className="px-2 py-2 text-right font-normal">金额</th><th className="px-4 py-2 text-right font-normal">价格</th>
             </tr></thead>
             <tbody>
-              {rows.map((h) => (
-                <tr key={h.rank} className="border-b border-line last:border-0">
-                  <td className="num px-4 py-2.5 text-sub">{h.rank}</td>
-                  <td className="px-2 py-2.5">
-                    {h.kind === 'agent' ? <span className="flex items-center gap-1.5"><span className="font-medium">{h.agentName}</span><span className="text-xs text-sub">{h.ownerName} 的主 Agent</span></span> : <span className="font-mono text-xs text-sub">{shortAddr(h.label, 5, 5)}</span>}
-                  </td>
-                  <td className="num px-2 py-2.5 text-right">{usd(h.amountUsd)}</td>
-                  <td className="num px-2 py-2.5 text-right">{h.pct.toFixed(2)}%</td>
-                  <td className="px-2 py-2.5 text-right"><Pct v={h.pnlPct} digits={1} /></td>
-                  <td className="num px-4 py-2.5 text-right text-sub">{duration(h.heldMinutes * 60000)}</td>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-line last:border-0">
+                  <td className="num px-4 py-2 text-xs text-sub">{relTime(r.at, now())}</td>
+                  <td className={cx('px-2 py-2', r.side === 'BUY' ? 'text-up' : 'text-down')}>{r.side === 'BUY' ? '买' : '卖'}</td>
+                  <td className="px-2 py-2">{r.kind === 'agent' ? <span>{r.who} <span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span> <span className="text-xs text-sub">{r.owner}</span></span> : <span className="font-mono text-xs text-sub">{shortAddr(r.who, 4, 4)}</span>}</td>
+                  <td className={cx('num px-2 py-2 text-right', r.side === 'BUY' ? 'text-up' : 'text-down')}>{usd(r.usd)}</td>
+                  <td className="num px-4 py-2 text-right">{price(r.price)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="px-4 py-2 text-[11px] text-sub">主 Agent 买入后公开持仓金额。演示数据中的主 Agent 和钱包均为虚构。</p>
         </div>
       )}
     </DataState>
+  )
+}
+
+function MyPosition({ t }: { t: Token }) {
+  const pos = usePositions()
+  const p = pos.data?.find((x) => x.token.address === t.address)
+  return (
+    <Panel demo title="我的持仓">
+      {p ? (
+        <>
+          <div className="flex items-baseline justify-between"><span className="num text-xl font-semibold">{usd(p.valueUsd)}</span><Pct v={(p.unrealizedUsd / p.costBasisUsd) * 100} digits={1} /></div>
+          <KV k="数量" v={p.amount.toLocaleString()} className="mt-1" />
+          <KV k="成本" v={usd(p.costBasisUsd)} />
+          <KV k="止盈 / 止损" v={<span><span className="text-up">+{p.takeProfit}%</span> / <span className="text-down">{p.stopLoss}%</span></span>} />
+          <KV k="谁买的" v="阿狗一号（Agent）" />
+        </>
+      ) : <p className="text-[13px] text-sub">还没有持仓。</p>}
+    </Panel>
   )
 }
 

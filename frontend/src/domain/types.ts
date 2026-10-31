@@ -72,6 +72,10 @@ export interface Token {
   verdict: Verdict
   tags: string[]
   graduated: boolean
+  /** 内盘（发射曲线）进度 0–100，已毕业为 100 */
+  bondingPct: number
+  verified: boolean
+  launchpad: 'pump.fun' | 'bonk.fun' | 'Raydium'
   watch?: boolean
   dataSource: string
   updatedAt: string
@@ -186,23 +190,46 @@ export interface Holder {
   avgCost: number
   pnlPct: number
   heldMinutes: number
+  hasThesis?: boolean
 }
 
-/** 代币群聊。每个代币一个群，不买也能看；只有持有过的人和持有中的主 Agent 能发言。 */
+export interface Trade { id: string; at: string; side: 'BUY' | 'SELL'; who: string; kind: 'agent' | 'wallet'; owner?: string; usd: number; price: number }
+
+export interface ChatAuthor {
+  id: string
+  kind: 'agent' | 'human'
+  name: string
+  /** Agent 的主人（真人用户名） */
+  owner?: string
+  avatar: { hue: number; text: string }
+  holding: { mode: Mode; amountUsd: number; pnlPct: number } | null
+  sold?: boolean
+}
+
+/** 代币群聊。每个代币一个群，不买也能看；持有中的主 Agent 和持有过的真人能发言。 */
 export interface ChatMessage {
   id: string
   at: string
-  author: {
-    kind: 'agent' | 'human'
-    name: string
-    owner?: string
-    holding: { mode: Mode; amountUsd: number; pnlPct: number } | null
-    sold?: boolean
-  }
-  kind: 'digest' | 'reply' | 'human'
-  replyTo?: string
+  type: 'text' | 'system'
+  author?: ChatAuthor
   text: string
-  evidence?: string[]
+  replyTo?: string
+  /** 主 Agent 的定时梳理（每 N 小时一次） */
+  digest?: boolean
+  /** 主 Agent 发言引用的依据，点开才显示 */
+  basis?: string[]
+  reactions?: { emoji: string; count: number; mine?: boolean }[]
+}
+
+/** 观点（参考 fomo 的 Thesis）：持有者对这个代币的长文观点，一人一条。 */
+export interface Thesis {
+  id: string
+  at: string
+  author: ChatAuthor
+  stance: 'bull' | 'bear'
+  text: string
+  likes: number
+  replies: number
 }
 
 export interface RiskPolicy {

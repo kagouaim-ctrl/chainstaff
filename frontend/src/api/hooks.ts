@@ -6,6 +6,8 @@ export const useToken = (a: string) => useQuery({ queryKey: ['token', a], queryF
 export const useCandles = (a: string) => useQuery({ queryKey: ['candles', a], queryFn: () => source().candles(a) })
 export const useHolders = (a: string) => useQuery({ queryKey: ['holders', a], queryFn: () => source().holders(a) })
 export const useChat = (a: string) => useQuery({ queryKey: ['chat', a], queryFn: () => source().chat(a) })
+export const useTheses = (a: string) => useQuery({ queryKey: ['theses', a], queryFn: () => source().theses(a) })
+export const useTrades = (a: string) => useQuery({ queryKey: ['trades', a], queryFn: () => source().trades(a) })
 export const useMainAgent = () => useQuery({ queryKey: ['mainAgent'], queryFn: () => source().mainAgent() })
 export const useAgents = () => useQuery({ queryKey: ['agents'], queryFn: () => source().agents() })
 export const usePipeline = () => useQuery({ queryKey: ['pipeline'], queryFn: () => source().pipeline() })

@@ -32,7 +32,7 @@ export function TradePanel({ token }: { token: Token }) {
   if (token.liquidityUsd < (st.data?.policy.minLiquidityUsd ?? 0)) issues.push('流动性低于下限')
   if (side === 'SELL' && !holding) issues.push('没有持仓，不能卖出')
   if (impactPct * 100 > slip) issues.push('预计价格冲击超过滑点上限')
-  const presets = side === 'BUY' ? [5, 10, 20] : null
+  const presets = side === 'BUY' ? [...new Set([5, 10, 20, Math.floor(maxTrade)])] : null
 
   return (
     <div id="trade" className="rounded-card border border-line bg-panel">
@@ -52,10 +52,11 @@ export function TradePanel({ token }: { token: Token }) {
         <div className="flex gap-1.5">
           {(presets ?? [25, 50, 100]).map((p) => (
             <button key={p} onClick={() => setAmount(String(p))} className={cx('num flex-1 rounded-lg border py-1.5 text-xs', amount === String(p) ? 'border-fg/20 bg-raised' : 'border-line text-sub hover:text-fg')}>
-              {side === 'BUY' ? `$${p}` : `${p}%`}
+              {side === 'BUY' ? (p === Math.floor(maxTrade) ? '上限' : `$${p}`) : `${p}%`}
             </button>
           ))}
         </div>
+        <div className="flex justify-between text-xs text-sub"><span>可用余额</span><span className="num text-fg">{usd(pf.data?.cashUsd ?? 0)}</span></div>
         <label className="flex items-center justify-between text-xs text-sub">
           最大滑点
           <select value={slip} onChange={(e) => setSlip(Number(e.target.value))} className="rounded-md border border-line bg-bg px-2 py-1 text-fg">
@@ -74,7 +75,7 @@ export function TradePanel({ token }: { token: Token }) {
             {issues.map((i) => <li key={i}>风控预检：{i}</li>)}
           </ul>
         )}
-        <Button variant={side === 'BUY' ? 'up' : 'down'} className="h-11 w-full text-sm"
+        <Button variant={side === 'BUY' ? 'primary' : 'down'} className="h-12 w-full rounded-full text-[15px] font-semibold"
           onClick={() => toast('后端未接入：没有创建订单。接入后，这笔指令会先交给风控审批，批准后才由执行服务模拟成交。')}>
           {side === 'BUY' ? '模拟买入' : '模拟卖出'} {token.symbol}
         </Button>

@@ -3,19 +3,20 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // 与 src/index.css 的 CSS 变量保持一致；这里用十六进制，透明度写法（如 bg-up/10）才能生效
       colors: {
-        bg: 'var(--c-bg)',
-        panel: 'var(--c-panel)',
-        raised: 'var(--c-raised)',
-        line: 'var(--c-line)',
-        fg: 'var(--c-fg)',
-        sub: 'var(--c-sub)',
-        up: 'var(--c-up)',
-        down: 'var(--c-down)',
-        agent: 'var(--c-agent)',
-        paper: 'var(--c-paper)',
-        live: 'var(--c-live)',
-        warn: 'var(--c-warn)',
+        bg: '#0b0d10',
+        panel: '#14171c',
+        raised: '#1a1e24',
+        line: '#232830',
+        fg: '#e9ebee',
+        sub: '#7c8591',
+        up: '#22c38e',
+        down: '#f25c6a',
+        agent: '#6e8bff',
+        paper: '#f5b544',
+        live: '#38bdf8',
+        warn: '#f59e0b',
       },
       fontFamily: {
         sans: ['"Geist Variable"', '"Noto Sans SC"', 'system-ui', 'sans-serif'],

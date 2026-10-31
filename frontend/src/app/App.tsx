@@ -14,7 +14,8 @@ import { NotFound } from '@/pages/NotFound'
 export const routes: RouteObject[] = [
   {
     path: '/', element: <Layout />, children: [
-      { index: true, element: <Overview /> },
+      { index: true, element: <Discover /> },
+      { path: 'overview', element: <Overview /> },
       { path: 'discover', element: <Discover /> },
       { path: 'token/:address', element: <TokenPage /> },
       { path: 'agents', element: <Agents /> },

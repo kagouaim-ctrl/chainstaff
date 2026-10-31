@@ -10,7 +10,7 @@ mkdirSync(OUT, { recursive: true })
 
 const ZAPP = process.env.TOKEN ?? ''
 const pages = [
-  ['overview', '/'], ['discover', '/discover'], ['agents', '/agents'], ['activity', '/activity'],
+  ['discover', '/'], ['overview', '/overview'], ['agents', '/agents'], ['activity', '/activity'],
   ['portfolio', '/portfolio'], ['orders', '/orders'], ['strategy', '/strategy'],
   ['order-drawer', '/orders?order=ord_7f3a'], ['agent-drawer', '/agents?agent=risk'],
 ]
