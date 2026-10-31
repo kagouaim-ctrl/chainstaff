@@ -8,12 +8,10 @@ import { IClose } from './icons'
 export const cx = clsx
 
 /** 演示标签：任何使用演示数据的模块都必须显示。 */
-export function DemoTag({ className }: { className?: string }) {
-  return (
-    <span title="演示数据：后端未接入，不代表真实行情或交易" className={cx('inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium leading-none border border-dashed border-sub/60 text-sub', className)}>
-      演示
-    </span>
-  )
+export function DemoTag(props: { className?: string }) {
+  void props
+  // 照 fomo 不在每个面板挂标签；演示标识统一放在顶部横幅和底部状态栏（铁律 8）
+  return null
 }
 
 const MODE_STYLE: Record<Mode, string> = {
@@ -51,13 +49,18 @@ export function Pct({ v, className, digits }: { v: number | null | undefined; cl
   return <span className={cx('num', c, className)}>{fmtPct(v, digits)}</span>
 }
 
+/** 带 ▲▼ 的涨跌幅（照 fomo）。 */
+export function Chg({ v, className }: { v: number; className?: string }) {
+  return <span className={cx('num whitespace-nowrap', v > 0 ? 'text-up' : v < 0 ? 'text-down' : 'text-sub', className)}>{v > 0 ? '▲' : v < 0 ? '▼' : ''}{Math.abs(v).toFixed(2)}%</span>
+}
+
 export function Signed({ v, children, className }: { v: number; children: ReactNode; className?: string }) {
   return <span className={cx('num', v > 0 ? 'text-up' : v < 0 ? 'text-down' : 'text-sub', className)}>{children}</span>
 }
 
 export function TokenAvatar({ symbol, hue, size = 32 }: { symbol: string; hue: number; size?: number }) {
   return (
-    <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white/90"
+    <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full font-medium text-white/90"
       style={{ width: size, height: size, fontSize: size * 0.38, background: `hsl(${hue} 45% 32%)`, boxShadow: `inset 0 0 0 1px hsl(${hue} 50% 45% / .5)` }}>
       {symbol.slice(0, 2)}
     </span>
@@ -68,10 +71,10 @@ export function Panel({ title, right, children, className, demo, bodyClass, id }
   title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; demo?: boolean; bodyClass?: string; id?: string
 }) {
   return (
-    <section id={id} className={cx('min-w-0 rounded-card border border-line bg-panel', className)}>
+    <section id={id} className={cx('min-w-0 rounded-xl border border-line', className)}>
       {(title || right) && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">{title}{demo && <DemoTag />}</h2>
+        <header className="flex items-center justify-between gap-3 px-4 pt-4">
+          <h2 className="flex items-center gap-2 text-[16px] font-medium">{title}{demo && <DemoTag />}</h2>
           <div className="flex items-center gap-2">{right}</div>
         </header>
       )}
@@ -84,10 +87,10 @@ export function Segmented<T extends string>({ value, options, onChange, label, s
   value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void; label: string; size?: 'sm' | 'md'
 }) {
   return (
-    <div role="tablist" aria-label={label} className="inline-flex rounded-lg border border-line bg-bg p-0.5">
+    <div role="tablist" aria-label={label} className="inline-flex gap-1">
       {options.map((o) => (
         <button key={o.value} role="tab" aria-selected={value === o.value} onClick={() => onChange(o.value)}
-          className={cx('rounded-md font-medium transition-colors', size === 'sm' ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-[13px]',
+          className={cx('whitespace-nowrap rounded-lg', size === 'sm' ? 'h-7 px-2 text-[12px]' : 'h-9 px-3 text-[14px]',
             value === o.value ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
           {o.label}
         </button>
@@ -98,11 +101,11 @@ export function Segmented<T extends string>({ value, options, onChange, label, s
 
 export function Tabs<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="tablist" aria-label={label} className="scrollbar-none flex gap-5 overflow-x-auto border-b border-line px-4">
+    <div role="tablist" aria-label={label} className="scrollbar-none flex gap-6 overflow-x-auto border-b border-line px-4">
       {options.map((o) => (
         <button key={o.value} role="tab" aria-selected={value === o.value} onClick={() => onChange(o.value)}
-          className={cx('relative -mb-px whitespace-nowrap border-b-2 py-3 text-[13px] font-medium transition-colors',
-            value === o.value ? 'border-agent text-fg' : 'border-transparent text-sub hover:text-fg')}>
+          className={cx('relative -mb-px whitespace-nowrap border-b-2 py-3 text-[14px]',
+            value === o.value ? 'border-fg text-fg' : 'border-transparent text-sub hover:text-fg')}>
           {o.label}
         </button>
       ))}
@@ -116,10 +119,10 @@ export function Button({ children, variant = 'ghost', className, ...p }: React.B
     ghost: 'text-sub hover:text-fg hover:bg-raised',
     outline: 'border border-line text-fg hover:bg-raised',
     danger: 'bg-down/15 text-down border border-down/30 hover:bg-down/25',
-    up: 'bg-up text-[#06140f] hover:bg-up/90',
+    up: 'bg-up text-[#060510] hover:bg-up/90',
     down: 'bg-down text-white hover:bg-down/90',
   }[variant]
-  return <button {...p} className={cx('inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40', v, className)}>{children}</button>
+  return <button {...p} className={cx('inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[14px] font-medium disabled:cursor-not-allowed disabled:opacity-40', v, className)}>{children}</button>
 }
 
 export function Skeleton({ className }: { className?: string }) {
@@ -171,7 +174,7 @@ export function Drawer({ open, onClose, title, children, wide }: { open: boolean
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
         className={cx('anim-drawer absolute right-0 top-0 flex h-full w-full flex-col border-l border-line bg-panel shadow-2xl outline-none', wide ? 'sm:w-[720px]' : 'sm:w-[560px]')}>
         <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <div className="min-w-0 flex-1 text-base font-semibold">{title}</div>
+          <div className="min-w-0 flex-1 text-base font-medium">{title}</div>
           <Button aria-label="关闭" onClick={onClose} className="px-2"><IClose /></Button>
         </header>
         <div className="flex-1 overflow-y-auto">{children}</div>
@@ -195,7 +198,7 @@ export function Dialog({ open, onClose, title, children, footer }: { open: boole
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title}
         className="anim-enter relative w-full max-w-md rounded-t-2xl border border-line bg-panel p-5 outline-none sm:rounded-2xl">
-        <h2 className="text-base font-semibold">{title}</h2>
+        <h2 className="text-base font-medium">{title}</h2>
         <div className="mt-3 text-sm text-fg/90">{children}</div>
         <div className="mt-5 flex justify-end gap-2">{footer}</div>
       </div>
@@ -216,7 +219,7 @@ export function Stat({ label, value, sub, className }: { label: ReactNode; value
   return (
     <div className={cx('min-w-0', className)}>
       <div className="text-xs text-sub">{label}</div>
-      <div className="num mt-1 truncate text-xl font-semibold tracking-tight sm:text-2xl">{value}</div>
+      <div className="num mt-1 truncate text-[20px] font-medium tracking-[-0.4px] sm:text-[24px] sm:tracking-[-0.9px]">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-sub">{sub}</div>}
     </div>
   )

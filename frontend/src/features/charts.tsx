@@ -8,7 +8,7 @@ function baseChart(el: HTMLElement, height: number): IChartApi {
   return createChart(el, {
     height,
     autoSize: true,
-    layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: css('--c-sub'), fontFamily: 'Geist Variable, sans-serif', fontSize: 11 },
+    layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: css('--c-sub'), fontFamily: '"Inter Tight", sans-serif', fontSize: 11 },
     grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
     rightPriceScale: { borderColor: css('--c-line') },
     timeScale: { borderColor: css('--c-line'), timeVisible: true, secondsVisible: false },
@@ -18,11 +18,11 @@ function baseChart(el: HTMLElement, height: number): IChartApi {
 }
 
 const MARKER_STYLE: Record<ChartMarker['kind'], { color: string; shape: SeriesMarker<Time>['shape']; position: SeriesMarker<Time>['position'] }> = {
-  discovered: { color: '#6E8BFF', shape: 'circle', position: 'belowBar' },
-  no_trade: { color: '#7C8591', shape: 'square', position: 'aboveBar' },
-  risk_rejected: { color: '#F25C6A', shape: 'square', position: 'aboveBar' },
-  buy: { color: '#22C38E', shape: 'arrowUp', position: 'belowBar' },
-  sell: { color: '#F25C6A', shape: 'arrowDown', position: 'aboveBar' },
+  discovered: { color: '#516AF6', shape: 'circle', position: 'belowBar' },
+  no_trade: { color: '#9899A3', shape: 'square', position: 'aboveBar' },
+  risk_rejected: { color: '#FF622E', shape: 'square', position: 'aboveBar' },
+  buy: { color: '#21C95E', shape: 'arrowUp', position: 'belowBar' },
+  sell: { color: '#FF622E', shape: 'arrowDown', position: 'aboveBar' },
 }
 
 /** K 线 + Agent 决策点（发现、NO_TRADE、风控否决、买卖）。 */
@@ -38,7 +38,7 @@ export function CandleChart({ candles, markers, height = 360 }: { candles: Candl
     s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close })))
     const v = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } })
     chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
-    v.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(34,195,142,0.25)' : 'rgba(242,92,106,0.25)' })))
+    v.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(33,201,94,0.25)' : 'rgba(255,98,46,0.25)' })))
     s.setMarkers(markers.map((m) => ({ time: m.time as UTCTimestamp, text: m.label, ...MARKER_STYLE[m.kind] })))
     chart.timeScale().fitContent()
     return () => chart.remove()

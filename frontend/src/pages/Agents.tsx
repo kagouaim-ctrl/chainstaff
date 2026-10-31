@@ -17,7 +17,7 @@ export function Agents() {
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-agent/15 text-agent"><IBot width={22} height={22} /></span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-semibold">{m.name}</h1>
+                <h1 className="text-lg font-medium">{m.name}</h1>
                 <span className="text-xs text-sub">你的主 Agent · 交易 + 总策划</span>
                 <ModeTag mode={m.mode} /><DemoTag />
               </div>

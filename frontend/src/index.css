@@ -1,4 +1,6 @@
-@import '@fontsource-variable/geist';
+@import '@fontsource/inter-tight/400.css';
+@import '@fontsource/inter-tight/500.css';
+@import '@fontsource/inter-tight/700.css';
 @import '@fontsource/noto-sans-sc/400.css';
 @import '@fontsource/noto-sans-sc/500.css';
 @import '@fontsource/noto-sans-sc/700.css';
@@ -9,17 +11,18 @@
 
 /* 设计 Token：深色为默认（MVP 只做深色，颜色全部走变量，以后加浅色只需新增一组变量） */
 :root {
-  --c-bg: #0b0d10;
-  --c-panel: #14171c;
-  --c-raised: #1a1e24;
-  --c-line: #232830;
-  --c-fg: #e9ebee;
-  --c-sub: #7c8591;
-  --c-up: #22c38e;     /* 涨：绿（国际习惯） */
-  --c-down: #f25c6a;   /* 跌：红 */
-  --c-agent: #6e8bff;  /* Agent 强调色 */
-  --c-paper: #f5b544;  /* 模拟盘标识 */
-  --c-live: #38bdf8;   /* 实盘标识（锁定中） */
+  --c-bg: #060510;
+  --c-panel: #12111A;
+  --c-raised: #161522;
+  --c-line: rgba(203,208,235,0.1);
+  --c-fg: #F7F7F7;
+  --c-sub: #9899A3;
+  --c-mute: #474B52;
+  --c-up: #21C95E;
+  --c-down: #FF622E;
+  --c-agent: #516AF6;
+  --c-paper: #f5b544;
+  --c-live: #38bdf8;
   --c-warn: #f59e0b;
   color-scheme: dark;
 }
@@ -28,7 +31,9 @@ html, body, #root { height: 100%; }
 body {
   @apply bg-bg text-fg font-sans antialiased;
   font-size: 14px;
+  font-weight: 500;
 }
+button, a { transition: color .15s, background-color .15s, border-color .15s; }
 .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 
 :focus-visible { outline: 2px solid var(--c-agent); outline-offset: 2px; border-radius: 6px; }

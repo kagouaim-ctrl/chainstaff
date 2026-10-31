@@ -29,7 +29,7 @@ export function Overview() {
                 <Stat label="交易成本" value={usd(p.costsUsd)} sub="网络费 + 滑点 + 平台手续费" />
                 <div className="col-span-2 md:col-span-1">
                   <div className="text-xs text-sub">风险状态 · 今日亏损</div>
-                  <div className="num mt-1 text-xl font-semibold sm:text-2xl">{usd(p.todayLossUsd)} <span className="text-sm font-normal text-sub">/ {usd(p.todayLossLimitUsd)}</span></div>
+                  <div className="num mt-1 text-xl font-medium sm:text-2xl">{usd(p.todayLossUsd)} <span className="text-sm font-normal text-sub">/ {usd(p.todayLossLimitUsd)}</span></div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-raised" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(used * 100)} aria-label="今日亏损已用比例">
                     <div className={cx('h-full rounded-full', used > 0.8 ? 'bg-down' : used > 0.5 ? 'bg-warn' : 'bg-up')} style={{ width: `${Math.min(100, used * 100)}%` }} />
                   </div>
@@ -66,7 +66,7 @@ function Pipeline() {
                     <span className="num text-[11px] text-sub/70">{i + 1}</span>{s.label}
                     {ROLE_MAP[s.agent].short !== s.label && <span className="text-sub/60">· {ROLE_MAP[s.agent].short}</span>}
                   </div>
-                  <div className={cx('num mt-1.5 text-2xl font-semibold', s.inFlight ? 'text-fg' : 'text-sub')}>{s.inFlight}</div>
+                  <div className={cx('num mt-1.5 text-2xl font-medium', s.inFlight ? 'text-fg' : 'text-sub')}>{s.inFlight}</div>
                   <div className="mt-1 truncate text-xs text-sub">{s.lastToken ? <><span className="text-fg/80">{s.lastToken}</span> · {s.lastAt ? relTime(s.lastAt, now()) : ''}</> : '—'}</div>
                   <div className={cx('mt-2 h-0.5 w-8 rounded', s.inFlight > 0 ? 'bg-agent' : 'bg-transparent')} />
                 </button>

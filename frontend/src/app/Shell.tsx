@@ -1,13 +1,13 @@
-import { NavLink, Link, useLocation } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useApp } from './store'
-import { useAgents, useMainAgent, usePortfolio, useOrders } from '@/api/hooks'
-import { Button, Dialog, ModeTag, cx } from '@/components/ui'
+import { usePortfolio, useOrders } from '@/api/hooks'
+import { Button, Dialog, ModeTag, Signed, cx } from '@/components/ui'
 import { IPause, IPlay, ISearch, IUser, ILock, ICompass, IGrid, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
 import { usd } from '@/lib/format'
 import { TERMINAL } from '@/domain/orderMachine'
 
-/** 一级入口（参考 fomo 网页版：左侧窄栏；手机上是底部悬浮导航）。发现是首页。 */
+/** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。 */
 export const NAV = [
   { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
   { to: '/overview', label: '总览', icon: IGrid, mobile: false },
@@ -18,28 +18,10 @@ export const NAV = [
   { to: '/strategy', label: '策略', icon: ISliders, mobile: true },
 ]
 
-export function SideRail() {
-  return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col items-center border-r border-line bg-bg py-3 md:flex" aria-label="侧边栏">
-      <Link to="/" aria-label="Meme Agent 首页" className="mb-4 flex h-9 w-9 items-center justify-center rounded-xl bg-agent text-sm font-bold text-white">M</Link>
-      <nav aria-label="主导航" className="flex flex-1 flex-col items-center gap-1">
-        {NAV.map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.end}
-            className={({ isActive }) => cx('flex w-[62px] flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors',
-              isActive ? 'bg-raised text-fg' : 'text-sub hover:bg-raised/60 hover:text-fg')}>
-            <n.icon width={20} height={20} />{n.label}
-          </NavLink>
-        ))}
-      </nav>
-      <PauseButton rail />
-    </aside>
-  )
-}
-
 export function BottomNav() {
   return (
-    <nav aria-label="主导航（手机）" className="fixed inset-x-0 bottom-3 z-30 flex justify-center px-3 md:hidden">
-      <div className="flex w-full max-w-sm items-center justify-around rounded-full border border-line bg-panel/95 px-2 py-1.5 shadow-2xl backdrop-blur">
+    <nav aria-label="主导航（手机）" className="fixed inset-x-0 bottom-3 z-30 flex justify-center px-4 md:hidden">
+      <div className="flex w-full max-w-sm items-center justify-around rounded-full border border-line bg-panel px-2 py-1.5">
         {NAV.filter((n) => n.mobile).map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end} aria-label={n.label}
             className={({ isActive }) => cx('flex flex-col items-center gap-0.5 rounded-full px-3 py-1 text-[10px]', isActive ? 'text-fg' : 'text-sub')}>
@@ -51,51 +33,70 @@ export function BottomNav() {
   )
 }
 
-const TITLES: Record<string, string> = { '/': '发现', '/overview': '总览', '/agents': 'Agent', '/activity': '实时动态', '/portfolio': '持仓', '/orders': '交易记录', '/strategy': '策略' }
-
+/** 顶栏：照 fomo，高 64、不吸顶；左边 logo + 入口，中间 384×44 搜索，右边现金 / 24 小时两个盒子和头像。 */
 export function TopBar() {
-  const agents = useAgents()
   const pf = usePortfolio()
-  const ma = useMainAgent()
-  const loc = useLocation()
   const setSearchOpen = useApp((s) => s.setSearchOpen)
-  const ok = agents.data?.filter((a) => a.status === 'running' || a.status === 'idle').length ?? 0
-  const total = agents.data?.length ?? 0
-  const degraded = agents.data?.some((a) => a.status !== 'running' && a.status !== 'idle')
-  const title = TITLES[loc.pathname] ?? (loc.pathname.startsWith('/token/') ? '代币' : '')
-
+  const eq = pf.data?.equity ?? []
+  const day = eq.length > 24 ? eq[eq.length - 1].value - eq[eq.length - 25].value : 0
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-bg/95 backdrop-blur">
-      <div className="flex h-16 items-center gap-3 px-3 sm:px-5">
-        <Link to="/" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-agent text-[13px] font-bold text-white md:hidden" aria-label="首页">M</Link>
-        <h1 className="hidden min-w-[88px] text-lg font-semibold tracking-tight sm:block">{title}</h1>
+    <header className="relative z-20 h-16 border-b border-line bg-bg">
+      <div className="flex h-16 items-center gap-4 px-4">
+        <Link to="/" className="shrink-0 text-[22px] font-bold leading-none tracking-[-0.9px]" aria-label="Meme Agent 首页">memeagent</Link>
+        <nav aria-label="主导航" className="hidden items-center gap-1 lg:flex">
+          {NAV.map((n) => (
+            <NavLink key={n.to} to={n.to} end={n.end}
+              className={({ isActive }) => cx('rounded-lg px-3 py-2 text-[14px] leading-5', isActive ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
+              {n.label}
+            </NavLink>
+          ))}
+        </nav>
 
         <button onClick={() => setSearchOpen(true)} aria-label="搜索（快捷键 /）"
-          className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-line bg-panel text-[13px] text-sub hover:text-fg sm:mx-auto sm:w-full sm:max-w-[384px] sm:shrink sm:justify-start sm:px-3">
-          <ISearch />
-          <span className="hidden truncate sm:inline">搜索代币、合约地址、Agent、订单</span>
-          <kbd className="ml-auto hidden rounded border border-line px-1.5 text-[11px] sm:inline">/</kbd>
+          className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-line bg-panel text-[14px] text-sub hover:text-fg sm:w-[384px] sm:justify-start sm:px-3 xl:mx-auto">
+          <ISearch width={18} height={18} />
+          <span className="hidden truncate font-normal sm:inline">搜索代币、合约地址、Agent、订单...</span>
+          <span className="ml-auto hidden items-center gap-1 sm:flex">
+            <kbd className="rounded-md border border-line px-1.5 py-0.5 font-sans text-[12px]">粘贴</kbd>
+            <kbd className="rounded-md border border-line px-1.5 py-0.5 font-sans text-[12px]">/</kbd>
+          </span>
         </button>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2">
           <ModeSwitchBadge />
-          <Link to="/agents" title={`${ma.data?.name ?? '主 Agent'}：${ok}/${total} 个角色正常`} className="hidden items-center gap-1.5 text-[13px] text-sub hover:text-fg lg:flex">
-            <span className={cx('h-2 w-2 rounded-full', degraded ? 'bg-warn' : 'bg-up')} />
-            <span className="num">{ok}/{total}</span>
-          </Link>
-          <Link to="/portfolio" className="hidden text-right leading-tight sm:block" title="模拟盘">
-            <div className="text-[11px] text-sub">可用</div>
-            <div className="num text-[13px] font-semibold">{pf.data ? usd(pf.data.cashUsd) : '--'}</div>
-          </Link>
-          <Link to="/portfolio" className="hidden text-right leading-tight sm:block" title="模拟盘">
-            <div className="text-[11px] text-sub">总资产</div>
-            <div className="num text-[13px] font-semibold">{pf.data ? usd(pf.data.totalUsd) : '--'}</div>
-          </Link>
           <div className="md:hidden"><PauseButton /></div>
-          <span className="hidden h-9 w-9 items-center justify-center rounded-full border border-line bg-panel text-sub sm:flex" title="DI JIAHAO" aria-label="账户"><IUser /></span>
+          <div className="hidden md:block"><PauseButton /></div>
+          <Link to="/portfolio" className="hidden h-11 items-center gap-3 rounded-lg border border-line px-3 sm:flex" title="模拟盘">
+            <span className="leading-tight">
+              <span className="num block text-[14px]">{pf.data ? usd(pf.data.cashUsd) : '--'}</span>
+              <span className="block text-[12px] font-normal text-sub">现金</span>
+            </span>
+            <span className="rounded-md bg-raised px-2 py-1 text-[12px]">充值</span>
+          </Link>
+          <Link to="/portfolio" className="hidden h-11 flex-col justify-center rounded-lg border border-line px-3 leading-tight md:flex" title="模拟盘">
+            <span className="num text-[14px]">{pf.data ? usd(pf.data.totalUsd) : '--'}</span>
+            <span className="text-[12px] font-normal"><Signed v={day}>{usd(day, { sign: true })}</Signed> <span className="text-sub">24小时</span></span>
+          </Link>
+          <span className="hidden h-9 w-9 items-center justify-center rounded-full bg-raised text-sub sm:flex" title="DI JIAHAO" aria-label="账户"><IUser /></span>
         </div>
       </div>
     </header>
+  )
+}
+
+/** 底部状态栏：照 fomo 的行情条。行情未接入时不显示假价格。 */
+export function FooterBar() {
+  return (
+    <footer className="fixed inset-x-0 bottom-0 z-20 hidden h-8 items-center gap-4 border-t border-line bg-bg px-4 text-[12px] md:flex">
+      {['BTC', 'ETH', 'SOL'].map((s) => (
+        <span key={s} className="flex items-center gap-1.5"><span className="text-sub">{s}</span><span className="text-mute">--</span></span>
+      ))}
+      <span className="text-mute">行情未接入</span>
+      <span className="ml-auto flex items-center gap-3 text-sub">
+        <span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span>
+        <span>后端未接入</span><span>·</span><span>隐私</span><span>·</span><span>条款</span><span>·</span><span>帮助</span>
+      </span>
+    </footer>
   )
 }
 
@@ -103,7 +104,7 @@ function ModeSwitchBadge() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="当前模式：模拟盘" className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-paper/40 bg-paper/10 px-2 py-1 text-[12px] font-semibold text-paper">
+      <button onClick={() => setOpen(true)} aria-label="当前模式：模拟盘" className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-paper/40 bg-paper/10 px-2 py-1 text-[12px] font-medium text-paper">
         <span className="h-1.5 w-1.5 rounded-full bg-paper" />模拟盘
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} title="当前是模拟盘"
@@ -120,7 +121,7 @@ function PauseButton({ rail }: { rail?: boolean }) {
   const orders = useOrders()
   const [open, setOpen] = useState(false)
   const inflight = orders.data?.filter((o) => !TERMINAL.includes(o.status) && o.status !== 'CREATED').length ?? 0
-  const cls = rail ? 'flex w-[62px] flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium' : 'h-9 px-2.5'
+  const cls = rail ? 'flex w-[62px] flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium' : 'h-11 px-3'
   if (paused) return <Button variant="outline" onClick={resume} aria-label="恢复交易" className={cls}><IPlay width={rail ? 20 : 16} height={rail ? 20 : 16} />{rail && '恢复'}</Button>
   return (
     <>

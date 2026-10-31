@@ -16,7 +16,7 @@ export function OrderDrawer({ id, onClose }: { id: string | null; onClose: () =>
             <div className="flex flex-wrap items-center gap-3">
               <TokenAvatar symbol={o.token.symbol} hue={o.token.hue} size={40} />
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+                <div className="flex flex-wrap items-center gap-2 text-lg font-medium">
                   <span className={o.side === 'BUY' ? 'text-up' : 'text-down'}>{o.side === 'BUY' ? '买入' : '卖出'}</span>
                   <Link to={`/token/${o.token.address}`} className="hover:underline" onClick={onClose}>{o.token.symbol}</Link>
                   <ModeTag mode={o.mode} />
@@ -44,7 +44,7 @@ export function OrderDrawer({ id, onClose }: { id: string | null; onClose: () =>
             </section>
 
             <section>
-              <h3 className="mb-2 text-sm font-semibold">费用</h3>
+              <h3 className="mb-2 text-sm font-medium">费用</h3>
               {o.fees ? (
                 <div className="rounded-lg border border-line px-3">
                   <KV k="网络费" v={usd(o.fees.networkUsd)} />
@@ -57,7 +57,7 @@ export function OrderDrawer({ id, onClose }: { id: string | null; onClose: () =>
             </section>
 
             <section>
-              <h3 className="mb-2 text-sm font-semibold">状态时间线</h3>
+              <h3 className="mb-2 text-sm font-medium">状态时间线</h3>
               <ol className="space-y-2">
                 {o.events.map((e, i) => (
                   <li key={i} className="flex items-start gap-3 text-[13px]">
@@ -70,7 +70,7 @@ export function OrderDrawer({ id, onClose }: { id: string | null; onClose: () =>
             </section>
 
             <section>
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
                 风控审批 <Tag tone={o.risk.result === 'APPROVED' ? 'up' : 'down'}>{o.risk.result}</Tag>
               </h3>
               <p className="mb-2 text-xs text-sub">审批 {o.risk.id} · {clock(o.risk.decidedAt)} · 有效期至 {clock(o.risk.validUntil)} · 参数哈希 <span className="font-mono">{o.risk.paramsHash}</span></p>
@@ -91,7 +91,7 @@ export function OrderDrawer({ id, onClose }: { id: string | null; onClose: () =>
             </section>
 
             <section>
-              <h3 className="mb-3 text-sm font-semibold">决策链</h3>
+              <h3 className="mb-3 text-sm font-medium">决策链</h3>
               <DecisionChain steps={o.decisionChain} />
             </section>
           </div>

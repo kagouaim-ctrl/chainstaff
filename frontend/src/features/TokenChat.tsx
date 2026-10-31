@@ -12,7 +12,7 @@ const isMine = (a?: ChatAuthor) => !!a && (a.id === ME.userId || a.id === ME.age
 export function Avatar({ a, size = 36 }: { a: ChatAuthor; size?: number }) {
   return (
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
-      <span className="flex h-full w-full items-center justify-center rounded-full font-semibold text-white"
+      <span className="flex h-full w-full items-center justify-center rounded-full font-medium text-white"
         style={{ background: `hsl(${a.avatar.hue} 55% 42%)`, fontSize: size * (a.avatar.text.length > 1 && !/\p{Extended_Pictographic}/u.test(a.avatar.text) ? 0.34 : 0.44) }}>
         {a.avatar.text}
       </span>
@@ -34,9 +34,9 @@ function Holding({ a }: { a: ChatAuthor }) {
 }
 
 /** 把 @名字 高亮 */
-function Rich({ text }: { text: string }) {
+function Rich({ text, mine }: { text: string; mine?: boolean }) {
   const parts = text.split(/(@[^\s，。,.!?！？]+)/g)
-  return <>{parts.map((p, i) => p.startsWith('@') ? <span key={i} className="font-medium text-agent">{p}</span> : <Fragment key={i}>{p}</Fragment>)}</>
+  return <>{parts.map((p, i) => p.startsWith('@') ? <span key={i} className={mine ? 'font-bold underline underline-offset-2' : 'font-medium text-agent'}>{p}</span> : <Fragment key={i}>{p}</Fragment>)}</>
 }
 
 function Bubble({ m, prev, all }: { m: ChatMessage; prev?: ChatMessage; all: ChatMessage[] }) {
@@ -59,7 +59,7 @@ function Bubble({ m, prev, all }: { m: ChatMessage; prev?: ChatMessage; all: Cha
         )}
         <div className={cx('flex items-end gap-1.5', mine && 'flex-row-reverse')}>
           <div className={cx('relative rounded-2xl px-3 py-2 text-left text-[14px] leading-relaxed',
-            mine ? cx('rounded-tr-md text-white', a.kind === 'agent' ? 'bg-agent' : 'bg-[#1f9d6a]') : a.kind === 'agent' ? 'rounded-tl-md border border-agent/25 bg-agent/10' : 'rounded-tl-md bg-raised',
+            mine ? cx('rounded-tr-md text-white', a.kind === 'agent' ? 'bg-agent' : 'bg-up text-[#060510]') : a.kind === 'agent' ? 'rounded-tl-md border border-agent/25 bg-agent/10' : 'rounded-tl-md bg-raised',
             grouped && (mine ? 'rounded-tr-2xl' : 'rounded-tl-2xl'))}>
             {reply?.author && (
               <div className={cx('mb-1.5 border-l-2 pl-2 text-xs', mine ? 'border-white/50 text-white/75' : 'border-sub/50 text-sub')}>
@@ -67,7 +67,7 @@ function Bubble({ m, prev, all }: { m: ChatMessage; prev?: ChatMessage; all: Cha
                 <div className="line-clamp-1">{reply.text}</div>
               </div>
             )}
-            <Rich text={m.text} />
+            <Rich text={m.text} mine={mine} />
             {m.basis && (
               <button onClick={() => setBasis((v) => !v)} aria-expanded={basis}
                 className={cx('mt-1 block text-[11px] underline-offset-2 hover:underline', mine ? 'text-white/75' : 'text-agent')}>

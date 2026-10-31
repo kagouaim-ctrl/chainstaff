@@ -28,7 +28,7 @@ export function AgentDrawer({ role, onClose }: { role: string | null; onClose: (
                 <DemoTag />
               </div>
               <section>
-                <h3 className="mb-1 text-sm font-semibold">角色说明</h3>
+                <h3 className="mb-1 text-sm font-medium">角色说明</h3>
                 <p className="text-[13px] text-fg/85">{def.duty}</p>
                 <p className="mt-1 text-xs text-sub">运行方式：{def.runMode}</p>
               </section>
@@ -41,7 +41,7 @@ export function AgentDrawer({ role, onClose }: { role: string | null; onClose: (
                 <KV k="今日模型成本" v={usd(a.modelCostTodayUsd)} />
               </section>
               <section>
-                <h3 className="mb-1 text-sm font-semibold">最近输出</h3>
+                <h3 className="mb-1 text-sm font-medium">最近输出</h3>
                 <p className="rounded-lg border border-line bg-bg p-3 text-[13px]">{a.lastOutput}</p>
                 <button className="mt-2 text-xs text-agent hover:underline" onClick={() => setShowJson((v) => !v)} aria-expanded={showJson}>
                   {showJson ? '收起' : '展开'}任务输入 / 输出 JSON
@@ -53,7 +53,7 @@ export function AgentDrawer({ role, onClose }: { role: string | null; onClose: (
                 )}
               </section>
               <section>
-                <h3 className="mb-2 text-sm font-semibold">上下游</h3>
+                <h3 className="mb-2 text-sm font-medium">上下游</h3>
                 <div className="flex flex-wrap items-center gap-2 text-[13px]">
                   <span className="text-sub">上游</span>
                   {a.upstream.length ? a.upstream.map((u) => <button key={u} onClick={() => open('agent', u)} className="rounded-md bg-raised px-2 py-0.5 hover:text-agent">{ROLE_MAP[u].short}</button>) : <span className="text-sub">无</span>}
@@ -62,7 +62,7 @@ export function AgentDrawer({ role, onClose }: { role: string | null; onClose: (
                 </div>
               </section>
               <section>
-                <h3 className="mb-2 text-sm font-semibold">运行日志与历史任务</h3>
+                <h3 className="mb-2 text-sm font-medium">运行日志与历史任务</h3>
                 {logs.length === 0 ? <p className="text-[13px] text-sub">暂无日志。</p> : (
                   <ul className="space-y-2">
                     {logs.map((e) => (

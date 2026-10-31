@@ -14,7 +14,7 @@ beforeEach(() => useApp.setState({ paused: false, pausedAt: null, searchOpen: fa
 
 const PAGES: [string, string][] = [
   ['/', '热门'], ['/overview', 'Agent 流水线'], ['/agents', '角色'], ['/activity', '实时动态'],
-  ['/portfolio', '当前持仓'], ['/orders', '交易记录'], ['/strategy', '风控参数'], [`/token/${TOKENS[4].address}`, '手动交易'],
+  ['/portfolio', '当前持仓'], ['/orders', '交易记录'], ['/strategy', '风控参数'], [`/token/${TOKENS[4].address}`, '关于 ZAPP'],
 ]
 
 describe('页面', () => {
@@ -32,7 +32,7 @@ describe('页面', () => {
     expect(screen.getAllByRole('button', { name: '紧急暂停' }).length).toBeGreaterThan(0)
   })
 
-  it('左侧窄栏放所有一级入口（参考 fomo），手机上有底部导航', () => {
+  it('顶栏放所有一级入口（照 fomo），手机上有底部导航', () => {
     renderRoute('/')
     const nav = screen.getByRole('navigation', { name: '主导航' })
     for (const l of ['发现', '总览', 'Agent', '动态', '持仓', '交易', '策略']) expect(within(nav).getByText(l)).toBeInTheDocument()
@@ -85,7 +85,7 @@ describe('代币群聊', () => {
   it('观点标签：真人和 Agent 都能写，可以筛选', async () => {
     const u = userEvent.setup()
     renderRoute(`/token/${TOKENS[4].address}`)
-    await u.click(await screen.findByRole('tab', { name: '观点' }))
+    await u.click(await screen.findByRole('tab', { name: /^观点/ }))
     expect(await screen.findAllByText('看多')).not.toHaveLength(0)
     await u.click(screen.getByRole('tab', { name: 'Agent' }))
     expect(screen.queryByText(/纯粹喜欢这个梗/)).not.toBeInTheDocument()

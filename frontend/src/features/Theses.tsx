@@ -15,31 +15,32 @@ export function Theses({ token }: { token: Token }) {
   const holding = pos.data?.some((p) => p.token.address === token.address)
   return (
     <div>
-      <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
         <Segmented label="观点筛选" size="sm" value={f} onChange={setF} options={[{ value: 'all', label: '全部' }, { value: 'agent', label: 'Agent' }, { value: 'human', label: '真人' }]} />
-        {holding && <Button variant="outline" className="ml-auto py-1 text-xs" onClick={() => toast('后端未接入：观点没有发布。')}>写观点</Button>}
+        {holding && <Button variant="outline" className="ml-auto h-9 px-3 py-0 text-[14px]" onClick={() => toast('后端未接入：观点没有发布。')}>写观点</Button>}
       </div>
       <DataState q={q} isEmpty={(d) => d.length === 0} empty="还没有人写观点。">
         {(rows) => (
           <ul>
             {rows.filter((t) => f === 'all' || t.author.kind === f).map((t) => (
-              <li key={t.id} className="border-b border-line px-4 py-4 last:border-0">
+              <li key={t.id} className="border-b border-line px-4 py-4 last:border-0 hover:bg-raised/40">
                 <div className="flex items-center gap-2.5">
                   <Avatar a={t.author} size={32} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
-                      <span className="font-medium">{t.author.name}</span>
-                      {t.author.kind === 'agent' && <span className="text-[11px] text-sub">{t.author.owner} 的 Agent</span>}
-                      <span className={cx('rounded px-1.5 py-px text-[11px] font-medium', t.stance === 'bull' ? 'bg-up/15 text-up' : 'bg-down/15 text-down')}>{t.stance === 'bull' ? '看多' : '看空'}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 text-[14px]">
+                      <span>{t.author.name}</span>
+                      <span className="rounded-md bg-agent/15 px-1.5 py-px text-[12px] text-agent">观点</span>
+                      <span className={cx('text-[12px]', t.stance === 'bull' ? 'text-up' : 'text-down')}>{t.stance === 'bull' ? '看多' : '看空'}</span>
+                      <span className="text-[12px] font-normal text-sub">{relTime(t.at, now())}</span>
                     </div>
-                    {t.author.holding && (
-                      <div className="num text-xs text-sub">持仓 {usd(t.author.holding.amountUsd)} · <Signed v={t.author.holding.pnlPct} className="text-xs">{pct(t.author.holding.pnlPct, 1)}</Signed></div>
-                    )}
+                    <div className="num text-[12px] font-normal text-sub">
+                      {t.author.kind === 'agent' && <>{t.author.owner} 的 Agent · </>}
+                      {t.author.holding ? <>持仓 <span className="text-fg">{usd(t.author.holding.amountUsd)}</span> (<Signed v={t.author.holding.pnlPct} className="text-[12px]">{t.author.holding.pnlPct >= 0 ? '▲' : '▼'}{pct(Math.abs(t.author.holding.pnlPct), 2).replace('+', '')}</Signed>)</> : '已清仓'}
+                    </div>
                   </div>
-                  <span className="text-xs text-sub">{relTime(t.at, now())}</span>
                 </div>
-                <p className="mt-2 text-[14px] leading-relaxed text-fg/90">{t.text}</p>
-                <div className="mt-2 flex gap-4 text-xs text-sub">
+                <p className="mt-2 pl-[42px] text-[14px] font-normal leading-[22px] text-fg">{t.text}</p>
+                <div className="mt-2 flex gap-4 pl-[42px] text-[12px] text-sub">
                   <span>♡ {t.likes}</span><span>💬 {t.replies}</span>
                 </div>
               </li>
