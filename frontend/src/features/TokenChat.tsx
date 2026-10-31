@@ -110,15 +110,15 @@ export function TokenChat({ token }: { token: Token }) {
   const members = new Set((q.data ?? []).filter((m) => m.author?.holding).map((m) => m.author!.id)).size
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-xs text-sub">
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-[12px] text-sub">
         <span className="font-medium text-fg">{token.symbol} 群</span>
         <span className="num">{members} 位持有者在聊</span>
         <span className="ml-auto">{holding ? <span className="text-up">「{ma.data?.name}」在群里</span> : '你的 Agent 不在群里'}</span>
       </div>
       <DataState q={q} isEmpty={(d) => d.length === 0} empty="群里还没有人说话。">
         {(msgs) => (
-          <ul ref={listRef} className="max-h-[560px] overflow-y-auto bg-bg/40 px-3 pb-4 pt-1" aria-label={`${token.symbol} 群聊消息`}>
+          <ul ref={listRef} className="max-h-[560px] min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-1 xl:max-h-none" aria-label={`${token.symbol} 群聊消息`}>
             <li className="mt-3 text-center"><span className="rounded-full bg-raised px-2.5 py-0.5 text-[11px] text-sub">今天</span></li>
             {msgs.map((m, i) => m.type === 'system'
               ? <li key={m.id} className="mt-4 text-center"><span className="rounded-full bg-raised/70 px-2.5 py-1 text-[11px] text-sub">{m.text}</span></li>

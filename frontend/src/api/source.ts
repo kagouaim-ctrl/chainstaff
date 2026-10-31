@@ -4,6 +4,7 @@
  */
 import * as D from './demo'
 import type {
+  AgentDM,
   AgentEvent, AgentInfo, AuditEntry, ChatMessage, ClosedPosition, DataSourceStatus, Holder, MainAgent,
   Order, PipelineStage, Portfolio, Position, StrategyConfig, Thesis, Token, Trade, Candle, ChartMarker,
 } from '@/domain/types'
@@ -17,6 +18,7 @@ export interface DataSource {
   candles(address: string): Promise<{ candles: Candle[]; markers: ChartMarker[] }>
   holders(address: string): Promise<Holder[]>
   chat(address: string): Promise<ChatMessage[]>
+  agentDM(): Promise<AgentDM[]>
   theses(address: string): Promise<Thesis[]>
   trades(address: string): Promise<Trade[]>
   mainAgent(): Promise<MainAgent>
@@ -42,6 +44,7 @@ export const demoSource: DataSource = {
   candles: (a) => wait(D.candles(a)),
   holders: (a) => wait(D.holders(a)),
   chat: (a) => wait(D.chat(a)),
+  agentDM: () => wait(D.AGENT_DM),
   theses: (a) => wait(D.theses(a)),
   trades: (a) => wait(D.trades(a)),
   mainAgent: () => wait(D.MAIN_AGENT),

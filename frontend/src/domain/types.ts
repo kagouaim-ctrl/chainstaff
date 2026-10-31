@@ -258,3 +258,12 @@ export interface StrategyConfig {
 export interface AuditEntry { at: string; actor: string; field: string; from: string; to: string; confirmedTwice: boolean }
 
 export interface DataSourceStatus { name: string; kind: string; state: 'connected' | 'mock' | 'not_connected'; note: string }
+
+/** 和自己主 Agent 的私聊（像普通 AI 对话）。私聊里的指令也必须经过风控，Agent 不能改风控参数。 */
+export interface AgentDM {
+  id: string
+  at: string
+  role: 'user' | 'agent'
+  text: string
+  links?: { label: string; to: string }[]
+}

@@ -1,28 +1,28 @@
-import { NavLink, Link } from 'react-router-dom'
-import { useState } from 'react'
+import { NavLink, Link, useLocation } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from './store'
-import { usePortfolio, useOrders } from '@/api/hooks'
-import { Button, Dialog, ModeTag, Signed, cx } from '@/components/ui'
-import { IPause, IPlay, ISearch, IUser, ILock, ICompass, IGrid, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
+import { usePortfolio, usePositions, useOrders } from '@/api/hooks'
+import { Button, Chg, Dialog, ModeTag, Signed, TokenAvatar, cx } from '@/components/ui'
+import { IPause, IPlay, ISearch, IUser, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
 import { usd } from '@/lib/format'
 import { TERMINAL } from '@/domain/orderMachine'
 
 /** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。 */
 export const NAV = [
   { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
-  { to: '/overview', label: '总览', icon: IGrid, mobile: false },
   { to: '/agents', label: 'Agent', icon: IBot, mobile: true },
   { to: '/activity', label: '动态', icon: IPulse, mobile: true },
-  { to: '/portfolio', label: '持仓', icon: IPie, mobile: true },
   { to: '/orders', label: '交易', icon: IList, mobile: false },
   { to: '/strategy', label: '策略', icon: ISliders, mobile: true },
 ]
+/** 总览和持仓不在导航里，从顶栏金额进入（手机上是底部导航的「资产」）。 */
+const MOBILE_EXTRA = { to: '/portfolio', label: '资产', icon: IPie, end: false, mobile: true }
 
 export function BottomNav() {
   return (
     <nav aria-label="主导航（手机）" className="fixed inset-x-0 bottom-3 z-30 flex justify-center px-4 md:hidden">
       <div className="flex w-full max-w-sm items-center justify-around rounded-full border border-line bg-panel px-2 py-1.5">
-        {NAV.filter((n) => n.mobile).map((n) => (
+        {[...NAV.filter((n) => n.mobile), MOBILE_EXTRA].map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end} aria-label={n.label}
             className={({ isActive }) => cx('flex flex-col items-center gap-0.5 rounded-full px-3 py-1 text-[10px]', isActive ? 'text-fg' : 'text-sub')}>
             <n.icon width={20} height={20} />{n.label}
@@ -35,10 +35,7 @@ export function BottomNav() {
 
 /** 顶栏：照 fomo，高 64、不吸顶；左边 logo + 入口，中间 384×44 搜索，右边现金 / 24 小时两个盒子和头像。 */
 export function TopBar() {
-  const pf = usePortfolio()
   const setSearchOpen = useApp((s) => s.setSearchOpen)
-  const eq = pf.data?.equity ?? []
-  const day = eq.length > 24 ? eq[eq.length - 1].value - eq[eq.length - 25].value : 0
   return (
     <header className="relative z-20 h-16 border-b border-line bg-bg">
       <div className="flex h-16 items-center gap-4 px-4">
@@ -66,21 +63,91 @@ export function TopBar() {
           <ModeSwitchBadge />
           <div className="md:hidden"><PauseButton /></div>
           <div className="hidden md:block"><PauseButton /></div>
-          <Link to="/portfolio" className="hidden h-11 items-center gap-3 rounded-lg border border-line px-3 sm:flex" title="模拟盘">
-            <span className="leading-tight">
-              <span className="num block text-[14px]">{pf.data ? usd(pf.data.cashUsd) : '--'}</span>
-              <span className="block text-[12px] font-normal text-sub">现金</span>
-            </span>
-            <span className="rounded-md bg-raised px-2 py-1 text-[12px]">充值</span>
-          </Link>
-          <Link to="/portfolio" className="hidden h-11 flex-col justify-center rounded-lg border border-line px-3 leading-tight md:flex" title="模拟盘">
-            <span className="num text-[14px]">{pf.data ? usd(pf.data.totalUsd) : '--'}</span>
-            <span className="text-[12px] font-normal"><Signed v={day}>{usd(day, { sign: true })}</Signed> <span className="text-sub">24小时</span></span>
-          </Link>
+          <Balance />
           <span className="hidden h-9 w-9 items-center justify-center rounded-full bg-raised text-sub sm:flex" title="DI JIAHAO" aria-label="账户"><IUser /></span>
         </div>
       </div>
     </header>
+  )
+}
+
+/** 顶栏金额：照 fomo 的现金 / 24 小时两个盒子；点开是总览和持仓。 */
+function Balance() {
+  const pf = usePortfolio()
+  const pos = usePositions()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const loc = useLocation()
+  useEffect(() => setOpen(false), [loc.pathname])
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('mousedown', onDown); window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
+  }, [open])
+  const p = pf.data
+  const eq = p?.equity ?? []
+  const day = eq.length > 24 ? eq[eq.length - 1].value - eq[eq.length - 25].value : 0
+  const used = p ? p.todayLossUsd / p.todayLossLimitUsd : 0
+  return (
+    <div ref={ref} className="relative hidden sm:block">
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="资产：总览和持仓" className="flex items-center gap-2">
+        <span className="flex h-11 items-center gap-3 rounded-lg border border-line px-3 text-left hover:bg-raised">
+          <span className="leading-tight">
+            <span className="num block text-[14px]">{p ? usd(p.cashUsd) : '--'}</span>
+            <span className="block text-[12px] font-normal text-sub">现金</span>
+          </span>
+          <span className="rounded-md bg-raised px-2 py-1 text-[12px]">充值</span>
+        </span>
+        <span className="hidden h-11 flex-col justify-center rounded-lg border border-line px-3 text-left leading-tight hover:bg-raised md:flex">
+          <span className="num text-[14px]">{p ? usd(p.totalUsd) : '--'}</span>
+          <span className="text-[12px] font-normal"><Signed v={day}>{usd(day, { sign: true })}</Signed> <span className="text-sub">24小时</span></span>
+        </span>
+      </button>
+      {open && p && (
+        <div role="dialog" aria-label="资产" className="anim-enter absolute right-0 top-[52px] z-40 w-[400px] rounded-xl border border-line bg-panel p-4">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <div className="text-[12px] font-normal text-sub">总资产 · 模拟盘</div>
+              <div className="num text-[32px] font-medium leading-9 tracking-[-1.5px]">{usd(p.totalUsd)}</div>
+            </div>
+            <Signed v={day} className="text-[14px]">{usd(day, { sign: true })} 24小时</Signed>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {([['现金', usd(p.cashUsd), 0], ['已实现', usd(p.realizedUsd, { sign: true }), p.realizedUsd], ['未实现', usd(p.unrealizedUsd, { sign: true }), p.unrealizedUsd]] as const).map(([k, v, n]) => (
+              <div key={k} className="rounded-lg border border-line px-3 py-2">
+                <div className="text-[12px] font-normal text-sub">{k}</div>
+                <Signed v={n} className={cx('text-[14px]', n === 0 && 'text-fg')}>{v}</Signed>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3">
+            <div className="flex justify-between text-[12px] font-normal text-sub"><span>今日亏损 {usd(p.todayLossUsd)} / {usd(p.todayLossLimitUsd)}</span><span>到上限当日自动暂停</span></div>
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-raised"><div className={cx('h-full rounded-full', used > 0.8 ? 'bg-down' : used > 0.5 ? 'bg-warn' : 'bg-up')} style={{ width: `${Math.min(100, used * 100)}%` }} /></div>
+          </div>
+          <div className="mt-4 flex items-center justify-between"><h3 className="text-[14px]">持仓</h3><span className="text-[12px] font-normal text-sub">{pos.data?.length ?? 0} 个</span></div>
+          <ul className="mt-1">
+            {(pos.data ?? []).map((x) => (
+              <li key={x.token.address}>
+                <Link to={`/token/${x.token.address}`} className="-mx-2 flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-raised">
+                  <TokenAvatar symbol={x.token.symbol} hue={x.token.hue} size={28} />
+                  <span className="flex-1 text-[14px]">{x.token.symbol}</span>
+                  <span className="text-right">
+                    <span className="num block text-[14px]">{usd(x.valueUsd)}</span>
+                    <Chg v={(x.unrealizedUsd / x.costBasisUsd) * 100} className="block text-[12px]" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Link to="/overview" className="flex h-9 items-center justify-center rounded-lg bg-raised text-[14px] hover:text-fg">完整总览</Link>
+            <Link to="/portfolio" className="flex h-9 items-center justify-center rounded-lg bg-raised text-[14px] hover:text-fg">全部持仓</Link>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

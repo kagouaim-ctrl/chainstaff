@@ -7,6 +7,7 @@
 import { ROLES } from '@/domain/agents'
 import { DEFAULT_POLICY } from '@/domain/risk'
 import type {
+  AgentDM,
   AgentEvent, AgentInfo, AuditEntry, Candle, ChatAuthor, ChartMarker, ChatMessage, ClosedPosition, DataSourceStatus,
   Holder, MainAgent, Order, OrderStatus, PipelineStage, Portfolio, Position, StrategyConfig, Thesis, Timeframe, Token, Trade, Verdict,
 } from '@/domain/types'
@@ -434,3 +435,13 @@ export const DATA_SOURCES: DataSourceStatus[] = [
 
 /** 平台手续费率（含 AI 模型费用）。费率未定，这里是可配置的占位值。 */
 export const PLATFORM_FEE_RATE = 0.005
+
+/** 和主 Agent 的私聊样例（固定演示数据）。 */
+export const AGENT_DM: AgentDM[] = [
+  { id: 'dm1', at: iso(40 * MIN), role: 'user', text: '今天买了什么？为什么买？' },
+  { id: 'dm2', at: iso(40 * MIN - 20_000), role: 'agent', text: `今天买了 1 笔：${TOKENS[4].symbol}，$20。\n\n理由：链上 1 小时内买家数涨了 3 倍，LP 已销毁，没有增发权限，卖出模拟通过；量化给的波动区间在我的止损范围内。风控批准后由执行服务按真实报价模拟成交，已确认。\n\n另外 ${TOKENS[13].symbol} 被风控拒了：流动性 $31,200，低于你设的 $50,000 下限。`, links: [{ label: `${TOKENS[4].symbol} 买入详情`, to: '?order=ord_7f3a' }, { label: `${TOKENS[13].symbol} 被拒原因`, to: '?order=ord_7e91' }] },
+  { id: 'dm3', at: iso(25 * MIN), role: 'user', text: '把单笔上限调到 5%，多买点' },
+  { id: 'dm4', at: iso(25 * MIN - 15_000), role: 'agent', text: '这个我改不了：风控参数只能你自己在「策略」页改，我读不到也写不了。放宽风控需要你二次确认。\n\n我的建议是先别调。单笔上限从 2% 提到 5%，一笔止损的亏损也会跟着变成原来的 2.5 倍。', links: [{ label: '打开策略页', to: '/strategy' }] },
+  { id: 'dm5', at: iso(1 * MIN), role: 'user', text: `${TOKENS[0].symbol} 怎么还没卖？` },
+  { id: 'dm6', at: iso(1 * MIN - 12_000), role: 'agent', text: `${TOKENS[0].symbol} 的卖单已经提交，还在等链上确认，所以现在还不能算卖出成功。确认之前我不会重复下单。超过 90 秒没结果，执行服务会去链上对账。`, links: [{ label: '卖单状态', to: '?order=ord_7f2c' }] },
+]

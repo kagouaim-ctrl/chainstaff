@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTokens, useTrades, useTheses, useClosed, now } from '@/api/hooks'
+import { Link, useParams, useLocation } from 'react-router-dom'
+import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTrades, useTheses, useClosed, now } from '@/api/hooks'
 import { useApp, useToast } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { DataState, Panel, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
@@ -16,7 +16,7 @@ import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
 import type { MarkerKind, Token } from '@/domain/types'
 
-type TabKey = 'chat' | 'thesis' | 'holders' | 'trades' | 'research'
+type TabKey = 'holders' | 'trades' | 'research'
 
 export function TokenPage() {
   const { address = '' } = useParams()
@@ -34,25 +34,20 @@ export function TokenPage() {
 
 
 function TokenView({ t }: { t: Token }) {
-  const [tab, setTab] = useState<TabKey>('chat')
-  const th = useTheses(t.address)
+  const [tab, setTab] = useState<TabKey>('holders')
   return (
-    <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[320px_minmax(0,1fr)_380px]">
-      <SideList current={t.address} />
+    <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[400px_minmax(0,1fr)_380px]">
+      <SocialPanel t={t} />
 
       <div className="min-w-0 border-line lg:border-r">
         <Header t={t} />
         <ChartPanel t={t} />
         <section>
           <Tabs label="代币信息" value={tab} onChange={setTab} options={[
-            { value: 'chat', label: '群聊' },
             { value: 'holders', label: <>持有者 <span className="text-sub">({compactCN(t.holders)})</span></> },
             { value: 'trades', label: '交易' },
-            { value: 'thesis', label: <>观点 <span className="text-sub">({th.data?.length ?? 0})</span></> },
             { value: 'research', label: 'Agent 研究' },
           ]} />
-          {tab === 'chat' && <TokenChat token={t} />}
-          {tab === 'thesis' && <Theses token={t} />}
           {tab === 'holders' && <Holders t={t} />}
           {tab === 'trades' && <Trades t={t} />}
           {tab === 'research' && <><Research t={t} /><Activity t={t} /></>}
@@ -148,46 +143,21 @@ function ChartPanel({ t }: { t: Token }) {
   )
 }
 
-type ListKey = 'hot' | 'held' | 'graduated' | 'watch'
-
-function SideList({ current }: { current: string }) {
-  const tokens = useTokens()
-  const pos = usePositions()
-  const nav = useNavigate()
-  const { watch } = useApp()
-  const [k, setK] = useState<ListKey>('hot')
-  const list = (tokens.data ?? [])
-    .filter((t) => k === 'hot' ? true : k === 'graduated' ? t.graduated : k === 'held' ? pos.data?.some((p) => p.token.address === t.address) : (watch[t.address] ?? t.watch))
-    .sort((a, b) => k === 'hot' ? b.stats['24h'].volume - a.stats['24h'].volume : b.mcapUsd - a.mcapUsd)
+/** 选中代币后左栏：群聊 / 观点，可以切换（替代 fomo 的代币列表）。 */
+function SocialPanel({ t }: { t: Token }) {
+  const [k, setK] = useState<'chat' | 'thesis'>('chat')
+  const th = useTheses(t.address)
   return (
-    <aside className="hidden border-r border-line xl:flex xl:h-[calc(100vh-64px-33px-32px)] xl:flex-col" aria-label="代币列表">
-      <div className="flex items-center gap-4 px-4 pt-4 text-[14px]">
-        <span className="text-fg">代币</span>
-      </div>
-      <div className="scrollbar-none flex gap-2 overflow-x-auto px-4 py-3">
-        {([['hot', '热门'], ['held', '持仓'], ['graduated', '已毕业'], ['watch', '自选']] as const).map(([v, l]) => (
-          <button key={v} onClick={() => setK(v)} aria-pressed={k === v}
-            className={cx('h-9 shrink-0 rounded-lg border px-3 text-[14px]', k === v ? 'border-transparent bg-raised text-fg' : 'border-line text-sub hover:text-fg')}>{l}</button>
+    <aside aria-label="群聊和观点" className="order-last flex flex-col border-t border-line lg:col-span-2 xl:order-none xl:col-span-1 xl:h-[calc(100vh-64px-33px-32px)] xl:border-r xl:border-t-0">
+      <div role="tablist" aria-label="群聊或观点" className="flex gap-1 border-b border-line p-2">
+        {([['chat', '群聊'], ['thesis', `观点 (${th.data?.length ?? 0})`]] as const).map(([v, l]) => (
+          <button key={v} role="tab" aria-selected={k === v} onClick={() => setK(v)}
+            className={cx('h-9 flex-1 rounded-lg text-[14px]', k === v ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>{l}</button>
         ))}
       </div>
-      <ul className="flex-1 overflow-y-auto">
-        {list.length === 0 && <li className="p-4 text-center text-[12px] text-sub">空</li>}
-        {list.map((t) => (
-          <li key={t.address}>
-            <button onClick={() => nav(`/token/${t.address}`)} className={cx('flex h-[61px] w-full items-center gap-3 px-4 text-left hover:bg-raised', t.address === current && 'bg-raised')}>
-              <TokenAvatar symbol={t.symbol} hue={t.hue} size={36} />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1 text-[14px]">{t.symbol}{t.verified && <span className="text-agent" aria-label="已认证"><ICheck width={12} height={12} /></span>}</span>
-                <span className="num block text-[12px] font-normal text-sub">市值 {usd(t.mcapUsd, { compact: true })}</span>
-              </span>
-              <span className="text-right">
-                <span className="num block text-[14px]">{price(t.priceUsd)}</span>
-                <Chg v={t.stats['24h'].change} className="block text-[12px]" />
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div className={cx('min-h-0 flex-1', k === 'thesis' && 'overflow-y-auto')}>
+        {k === 'chat' ? <TokenChat token={t} /> : <Theses token={t} />}
+      </div>
     </aside>
   )
 }

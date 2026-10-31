@@ -13,7 +13,7 @@ vi.mock('@/features/charts', () => ({ CandleChart: () => <div>chart</div>, Equit
 beforeEach(() => useApp.setState({ paused: false, pausedAt: null, searchOpen: false, watch: {} }))
 
 const PAGES: [string, string][] = [
-  ['/', '热门'], ['/overview', 'Agent 流水线'], ['/agents', '角色'], ['/activity', '实时动态'],
+  ['/', '热门'], ['/overview', 'Agent 流水线'], ['/agents', '团队角色'], ['/activity', '实时动态'],
   ['/portfolio', '当前持仓'], ['/orders', '交易记录'], ['/strategy', '风控参数'], [`/token/${TOKENS[4].address}`, '关于 ZAPP'],
 ]
 
@@ -32,11 +32,30 @@ describe('页面', () => {
     expect(screen.getAllByRole('button', { name: '紧急暂停' }).length).toBeGreaterThan(0)
   })
 
-  it('顶栏放所有一级入口（照 fomo），手机上有底部导航', () => {
+  it('顶栏放一级入口（照 fomo），总览和持仓不在导航里，手机上有底部导航', () => {
     renderRoute('/')
     const nav = screen.getByRole('navigation', { name: '主导航' })
-    for (const l of ['发现', '总览', 'Agent', '动态', '持仓', '交易', '策略']) expect(within(nav).getByText(l)).toBeInTheDocument()
+    for (const l of ['发现', 'Agent', '动态', '交易', '策略']) expect(within(nav).getByText(l)).toBeInTheDocument()
+    expect(within(nav).queryByText('总览')).not.toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: '主导航（手机）' })).toBeInTheDocument()
+  })
+
+  it('点顶栏金额展开总览和持仓', async () => {
+    const u = userEvent.setup()
+    renderRoute('/')
+    await u.click(await screen.findByRole('button', { name: '资产：总览和持仓' }))
+    const d = await screen.findByRole('dialog', { name: '资产' })
+    expect(await within(d).findByText('ZAPP')).toBeInTheDocument()
+    expect(within(d).getByRole('link', { name: '完整总览' })).toHaveAttribute('href', '/overview')
+  })
+
+  it('Agent 页是对话窗口；后端未接入时不假装发送', async () => {
+    const u = userEvent.setup()
+    renderRoute('/agents')
+    expect(await screen.findByText(/风控参数只能你自己/)).toBeInTheDocument()
+    await u.type(screen.getByLabelText('给阿狗一号发消息'), '你好')
+    await u.click(screen.getByRole('button', { name: '发送' }))
+    expect(await screen.findByText(/消息没有发送/)).toBeInTheDocument()
   })
 })
 
