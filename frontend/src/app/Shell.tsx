@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from './store'
 import { usePortfolio, usePositions, useOrders } from '@/api/hooks'
 import { Button, Chg, Dialog, ModeTag, Signed, TokenAvatar, cx } from '@/components/ui'
-import { IPause, IPlay, ISearch, IUser, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
+import { IPause, IPlay, ISearch, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
 import { usd } from '@/lib/format'
 import { TERMINAL } from '@/domain/orderMachine'
 
@@ -61,10 +61,9 @@ export function TopBar() {
 
         <div className="flex shrink-0 items-center gap-2">
           <ModeSwitchBadge />
-          <div className="md:hidden"><PauseButton /></div>
-          <div className="hidden md:block"><PauseButton /></div>
+          <PauseButton />
           <Balance />
-          <span className="hidden h-9 w-9 items-center justify-center rounded-full bg-raised text-sub sm:flex" title="DI JIAHAO" aria-label="账户"><IUser /></span>
+          <span className="hidden sm:block" title="DI JIAHAO" aria-label="账户"><TokenAvatar symbol="u_dj" hue={160} size={36} /></span>
         </div>
       </div>
     </header>
@@ -171,8 +170,8 @@ function ModeSwitchBadge() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="当前模式：模拟盘" className="flex items-center gap-1 whitespace-nowrap rounded-lg border border-paper/40 bg-paper/10 px-2 py-1 text-[12px] font-medium text-paper">
-        <span className="h-1.5 w-1.5 rounded-full bg-paper" />模拟盘
+      <button onClick={() => setOpen(true)} aria-label="当前模式：模拟盘" className="flex h-11 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-3 text-[14px] hover:bg-raised">
+        <span className="h-1.5 w-1.5 rounded-full bg-paper" />模拟<span className="hidden sm:inline">盘</span>
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} title="当前是模拟盘"
         footer={<Button variant="outline" onClick={() => setOpen(false)}>知道了</Button>}>
@@ -188,11 +187,11 @@ function PauseButton({ rail }: { rail?: boolean }) {
   const orders = useOrders()
   const [open, setOpen] = useState(false)
   const inflight = orders.data?.filter((o) => !TERMINAL.includes(o.status) && o.status !== 'CREATED').length ?? 0
-  const cls = rail ? 'flex w-[62px] flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium' : 'h-11 px-3'
-  if (paused) return <Button variant="outline" onClick={resume} aria-label="恢复交易" className={cls}><IPlay width={rail ? 20 : 16} height={rail ? 20 : 16} />{rail && '恢复'}</Button>
+  const cls = rail ? 'flex w-[62px] flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium' : 'h-11 w-11 px-0 xl:w-auto xl:px-3'
+  if (paused) return <Button variant="outline" onClick={resume} aria-label="恢复交易" title="恢复交易" className={cls}><IPlay width={16} height={16} /><span className="hidden xl:inline">恢复</span></Button>
   return (
     <>
-      <Button variant="danger" onClick={() => setOpen(true)} aria-label="紧急暂停" className={cls}><IPause width={rail ? 20 : 16} height={rail ? 20 : 16} />{rail && '暂停'}</Button>
+      <Button variant="outline" onClick={() => setOpen(true)} aria-label="紧急暂停" title="紧急暂停（1 秒内生效）" className={cx(cls, 'text-down hover:border-down/40 hover:bg-down/10')}><IPause width={16} height={16} /><span className="hidden xl:inline">暂停</span></Button>
       <Dialog open={open} onClose={() => setOpen(false)} title="确认紧急暂停？"
         footer={<>
           <Button variant="ghost" onClick={() => setOpen(false)}>取消</Button>

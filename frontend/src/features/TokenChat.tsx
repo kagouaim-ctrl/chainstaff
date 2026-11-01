@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { useChat, useClosed, useMainAgent, usePositions } from '@/api/hooks'
 import { ME } from '@/api/demo'
 import { useToast } from '@/app/store'
-import { DataState, Signed, cx } from '@/components/ui'
+import { DataState, Signed, TokenAvatar, cx } from '@/components/ui'
 import { pct, usd } from '@/lib/format'
 import type { ChatAuthor, ChatMessage, Token } from '@/domain/types'
 
@@ -12,10 +12,10 @@ const isMine = (a?: ChatAuthor) => !!a && (a.id === ME.userId || a.id === ME.age
 export function Avatar({ a, size = 36 }: { a: ChatAuthor; size?: number }) {
   return (
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
-      <span className="flex h-full w-full items-center justify-center rounded-full font-medium text-white"
-        style={{ background: `hsl(${a.avatar.hue} 55% 42%)`, fontSize: size * (a.avatar.text.length > 1 && !/\p{Extended_Pictographic}/u.test(a.avatar.text) ? 0.34 : 0.44) }}>
-        {a.avatar.text}
-      </span>
+      <TokenAvatar symbol={a.id} hue={a.avatar.hue} size={size} />
+      {/\p{Extended_Pictographic}/u.test(a.avatar.text) && (
+        <span className="absolute inset-0 flex items-center justify-center" style={{ fontSize: size * 0.5 }}>{a.avatar.text}</span>
+      )}
       {a.kind === 'agent' && (
         <span title="Agent" className="absolute -bottom-0.5 -right-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full border-2 border-panel bg-agent px-0.5 text-[8px] font-bold leading-none text-white">AI</span>
       )}

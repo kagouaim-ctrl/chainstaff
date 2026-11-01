@@ -73,11 +73,11 @@ function WatchStrip() {
     <section aria-label="自选" className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4">
       {list.length === 0 && <p className="text-xs text-sub">还没有自选。点代币左边的星标加入。</p>}
       {list.map((t) => (
-        <button key={t.address} onClick={() => nav(`/token/${t.address}`)} className="flex min-w-[180px] items-center gap-2.5 rounded-xl border border-line px-3 py-2.5 text-left hover:bg-raised">
+        <button key={t.address} onClick={() => nav(`/token/${t.address}`)} className="flex min-w-[200px] shrink-0 items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left hover:bg-raised">
           <TokenAvatar symbol={t.symbol} hue={t.hue} size={30} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1 text-[14px]">{t.symbol}<IStar filled className="text-paper" width={11} height={11} /></span>
-            <span className="num block text-[12px] font-normal text-sub">市值 {usd(t.mcapUsd, { compact: true })}</span>
+            <span className="num block whitespace-nowrap text-[12px] font-normal text-sub">市值 {usd(t.mcapUsd, { compact: true })}</span>
           </span>
           <Chg v={t.stats['24h'].change} className="text-[12px]" />
         </button>

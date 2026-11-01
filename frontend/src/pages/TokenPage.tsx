@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
 import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTrades, useTheses, useClosed, now } from '@/api/hooks'
-import { useApp, useToast } from '@/app/store'
+import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { DataState, Panel, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
@@ -35,6 +35,7 @@ export function TokenPage() {
 
 function TokenView({ t }: { t: Token }) {
   const [tab, setTab] = useState<TabKey>('holders')
+  useEffect(() => { document.title = `${t.symbol} ${price(t.priceUsd)} · memeagent` }, [t])
   return (
     <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[400px_minmax(0,1fr)_380px]">
       <SocialPanel t={t} />
@@ -66,7 +67,7 @@ function TokenView({ t }: { t: Token }) {
 
 function Header({ t }: { t: Token }) {
   const { watch, toggleWatch } = useApp()
-  const toast = useToast((s) => s.show)
+  const [copied, setCopied] = useState(false)
   const w = watch[t.address] ?? t.watch
   const s = t.stats['24h']
   const boxes: [string, React.ReactNode][] = [
@@ -82,8 +83,9 @@ function Header({ t }: { t: Token }) {
           <button onClick={() => toggleWatch(t.address)} aria-pressed={!!w} aria-label={w ? '取消自选' : '加入自选'} className={cx('flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised', w ? 'text-paper' : 'hover:text-fg')}><IStar filled={!!w} /></button>
         </div>
         <span className="text-[14px] text-sub">{age(t.ageMinutes)}</span>
-        <button className="flex items-center gap-1 text-[14px] text-sub hover:text-fg" onClick={() => { navigator.clipboard?.writeText(t.address).catch(() => {}); toast('合约地址已复制') }} aria-label="复制合约地址">
-          {shortAddr(t.address, 4, 4)}<ICopy />
+        <button className="flex items-center gap-1 rounded-md px-1 text-[14px] text-sub hover:bg-raised hover:text-fg" title={t.address}
+          onClick={() => { navigator.clipboard?.writeText(t.address).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500) }} aria-label="复制合约地址">
+          {shortAddr(t.address, 4, 4)}{copied ? <ICheck className="text-up" /> : <ICopy />}
         </button>
         <VerdictTag v={t.verdict} />
       </div>
@@ -287,8 +289,8 @@ function Holders({ t }: { t: Token }) {
                     <tr key={h.rank} className="border-b border-line last:border-0">
                       <td className="px-4 py-2.5">
                         {h.kind === 'agent'
-                          ? <span className="flex items-center gap-1.5"><span className="num w-5 text-xs text-sub">{h.rank}</span><span className="font-medium">{h.agentName}</span><span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span><span className="text-xs text-sub">{h.ownerName}</span>{h.hasThesis && <span className="text-[11px] text-sub">· 有观点</span>}</span>
-                          : <span className="flex items-center gap-1.5"><span className="num w-5 text-xs text-sub">{h.rank}</span><span className="font-mono text-xs text-sub">{shortAddr(h.label, 5, 5)}</span></span>}
+                          ? <span className="flex items-center gap-1.5"><span className="num w-5 text-xs text-sub">{h.rank}</span><TokenAvatar symbol={h.label} hue={(h.rank * 47) % 360} size={22} /><span className="font-medium">{h.agentName}</span><span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span><span className="text-xs text-sub">{h.ownerName}</span>{h.hasThesis && <span className="text-[11px] text-sub">· 有观点</span>}</span>
+                          : <span className="flex items-center gap-1.5"><span className="num w-5 text-xs text-sub">{h.rank}</span><TokenAvatar symbol={h.label} hue={(h.rank * 47) % 360} size={22} /><span className="num text-[13px] text-sub">{shortAddr(h.label, 4, 4)}</span></span>}
                       </td>
                       <td className="num px-2 py-2.5 text-right">{usd(h.amountUsd)}</td>
                       <td className="num px-2 py-2.5 text-right">{h.pct.toFixed(2)}%</td>
@@ -322,7 +324,7 @@ function Trades({ t }: { t: Token }) {
                 <tr key={r.id} className="border-b border-line last:border-0">
                   <td className="num px-4 py-2 text-xs text-sub">{relTime(r.at, now())}</td>
                   <td className={cx('px-2 py-2', r.side === 'BUY' ? 'text-up' : 'text-down')}>{r.side === 'BUY' ? '买' : '卖'}</td>
-                  <td className="px-2 py-2">{r.kind === 'agent' ? <span>{r.who} <span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span> <span className="text-xs text-sub">{r.owner}</span></span> : <span className="font-mono text-xs text-sub">{shortAddr(r.who, 4, 4)}</span>}</td>
+                  <td className="px-2 py-2"><span className="flex items-center gap-1.5"><TokenAvatar symbol={r.who} hue={r.who.length * 37 % 360} size={20} />{r.kind === 'agent' ? <>{r.who} <span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span> <span className="text-xs text-sub">{r.owner}</span></> : <span className="num text-[13px] text-sub">{shortAddr(r.who, 4, 4)}</span>}</span></td>
                   <td className={cx('num px-2 py-2 text-right', r.side === 'BUY' ? 'text-up' : 'text-down')}>{usd(r.usd)}</td>
                   <td className="num px-4 py-2 text-right">{price(r.price)}</td>
                 </tr>

@@ -23,7 +23,7 @@ export function Agents() {
 
   return (
     <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section aria-label={`和${name}对话`} className="flex h-[calc(100vh-64px-33px-32px)] min-h-[520px] flex-col border-line xl:border-r">
+      <section aria-label={`和${name}对话`} className="flex h-[calc(100dvh-64px-33px)] min-h-[520px] flex-col md:h-[calc(100dvh-64px-33px-32px)] border-line xl:border-r">
         <header className="flex items-center gap-3 border-b border-line px-4 py-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-agent text-white"><IBot width={18} height={18} /></span>
           <div className="min-w-0">
@@ -43,7 +43,7 @@ export function Agents() {
           </DataState>
         </div>
 
-        <div className="mx-auto w-full max-w-[760px] px-4 pb-4">
+        <div className="mx-auto w-full max-w-[760px] px-4 pb-24 md:pb-4">
           <div className="scrollbar-none mb-2 flex gap-2 overflow-x-auto">
             {SUGGEST.map((s) => (
               <button key={s} onClick={() => send(s)} className="h-8 shrink-0 rounded-full border border-line px-3 text-[12px] text-sub hover:text-fg">{s}</button>

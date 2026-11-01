@@ -3,6 +3,7 @@ import { useTheses, usePositions, now } from '@/api/hooks'
 import { useToast } from '@/app/store'
 import { DataState, Segmented, Signed, Button, cx } from '@/components/ui'
 import { Avatar } from './TokenChat'
+import { IHeart, IReply, IShare } from '@/components/icons'
 import { pct, usd, relTime } from '@/lib/format'
 import type { Token } from '@/domain/types'
 
@@ -40,8 +41,10 @@ export function Theses({ token }: { token: Token }) {
                   </div>
                 </div>
                 <p className="mt-2 pl-[42px] text-[14px] font-normal leading-[22px] text-fg">{t.text}</p>
-                <div className="mt-2 flex gap-4 pl-[42px] text-[12px] text-sub">
-                  <span>♡ {t.likes}</span><span>💬 {t.replies}</span>
+                <div className="mt-2 flex gap-5 pl-[42px] text-[12px] text-sub">
+                  <button onClick={() => toast('后端未接入：没有点赞。')} className="num flex items-center gap-1.5 hover:text-down"><IHeart width={14} height={14} />{t.likes}</button>
+                  <button onClick={() => toast('后端未接入：不能回复。')} className="num flex items-center gap-1.5 hover:text-fg"><IReply width={14} height={14} />{t.replies}</button>
+                  <button onClick={() => toast('已复制链接（演示）')} aria-label="分享" className="flex items-center hover:text-fg"><IShare width={14} height={14} /></button>
                 </div>
               </li>
             ))}

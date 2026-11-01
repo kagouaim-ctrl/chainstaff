@@ -9,10 +9,15 @@ function baseChart(el: HTMLElement, height: number): IChartApi {
     height,
     autoSize: true,
     layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: css('--c-sub'), fontFamily: '"Inter Tight", sans-serif', fontSize: 11 },
-    grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
-    rightPriceScale: { borderColor: css('--c-line') },
-    timeScale: { borderColor: css('--c-line'), timeVisible: true, secondsVisible: false },
-    crosshair: { mode: CrosshairMode.Normal },
+    grid: { vertLines: { color: 'rgba(203,208,235,0.04)' }, horzLines: { color: 'rgba(203,208,235,0.04)' } },
+    rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.22 } },
+    timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 7, minBarSpacing: 2 },
+    crosshair: {
+      mode: CrosshairMode.Normal,
+      vertLine: { color: 'rgba(152,153,163,0.5)', width: 1, style: 3, labelBackgroundColor: '#161522' },
+      horzLine: { color: 'rgba(152,153,163,0.5)', width: 1, style: 3, labelBackgroundColor: '#161522' },
+    },
+    handleScale: { axisPressedMouseMove: { time: true, price: true } },
     localization: { priceFormatter: (p: number) => (p >= 1 ? p.toFixed(4) : p.toPrecision(4)) },
   })
 }
@@ -32,14 +37,14 @@ export function CandleChart({ candles, markers, height = 360 }: { candles: Candl
     if (!ref.current) return
     const chart = baseChart(ref.current, height)
     const s = chart.addCandlestickSeries({
-      upColor: css('--c-up'), downColor: css('--c-down'), borderVisible: false, wickUpColor: css('--c-up'), wickDownColor: css('--c-down'),
+      upColor: css('--c-up'), downColor: css('--c-down'), borderVisible: false, priceLineStyle: 2, wickUpColor: css('--c-up'), wickDownColor: css('--c-down'),
       priceFormat: { type: 'price', precision: 10, minMove: 1e-10 },
     })
     s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close })))
     const v = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } })
     chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
     v.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(33,201,94,0.25)' : 'rgba(255,98,46,0.25)' })))
-    s.setMarkers(markers.map((m) => ({ time: m.time as UTCTimestamp, text: m.label, ...MARKER_STYLE[m.kind] })))
+    s.setMarkers([...markers].sort((a, b) => a.time - b.time).map((m) => ({ time: m.time as UTCTimestamp, text: m.label, ...MARKER_STYLE[m.kind] })))
     chart.timeScale().fitContent()
     return () => chart.remove()
   }, [candles, markers, height])

@@ -38,6 +38,16 @@ button, a { transition: color .15s, background-color .15s, border-color .15s; }
 
 :focus-visible { outline: 2px solid var(--c-agent); outline-offset: 2px; border-radius: 6px; }
 
+::selection { background: rgba(81,106,246,.35); }
+input, textarea { caret-color: var(--c-agent); }
+* { scrollbar-width: thin; scrollbar-color: rgba(203,208,235,.14) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(203,208,235,.14); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(203,208,235,.26); }
+::-webkit-scrollbar-track { background: transparent; }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--c-agent); }
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 

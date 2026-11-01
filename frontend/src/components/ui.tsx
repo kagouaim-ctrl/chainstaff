@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import type { AgentStatus, Mode } from '@/domain/types'
 import { pct as fmtPct } from '@/lib/format'
@@ -15,14 +15,14 @@ export function DemoTag(props: { className?: string }) {
 }
 
 const MODE_STYLE: Record<Mode, string> = {
-  paper: 'text-paper border-paper/40 bg-paper/10',
-  live: 'text-live border-live/40 bg-live/10',
-  backtest: 'text-sub border-line bg-raised',
+  paper: 'text-paper bg-paper/10',
+  live: 'text-live bg-live/10',
+  backtest: 'text-sub bg-raised',
 }
 export const MODE_LABEL: Record<Mode, string> = { paper: '模拟', live: '实盘', backtest: '回测' }
 
 export function ModeTag({ mode, className }: { mode: Mode; className?: string }) {
-  return <span className={cx('inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium leading-none border', MODE_STYLE[mode], className)}>{MODE_LABEL[mode]}</span>
+  return <span className={cx('inline-flex h-[18px] items-center rounded px-1 text-[11px] leading-none', MODE_STYLE[mode], className)}>{MODE_LABEL[mode]}</span>
 }
 
 type Tone = 'up' | 'down' | 'warn' | 'sub' | 'agent' | 'paper'
@@ -58,12 +58,30 @@ export function Signed({ v, children, className }: { v: number; children: ReactN
   return <span className={cx('num', v > 0 ? 'text-up' : v < 0 ? 'text-down' : 'text-sub', className)}>{children}</span>
 }
 
+const hash = (str: string) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) } return h >>> 0 }
+
+/** 代币头像：没有真实 logo 时，按符号生成固定的渐变图形（同一个代币永远一样），不用首字母。 */
 export function TokenAvatar({ symbol, hue, size = 32 }: { symbol: string; hue: number; size?: number }) {
+  const h = hash(symbol)
+  const h2 = (hue + 40 + (h % 80)) % 360
+  const h3 = (hue + 180 + ((h >> 8) % 60)) % 360
+  const x1 = 20 + ((h >> 4) % 60), y1 = 20 + ((h >> 10) % 60)
+  const x2 = 20 + ((h >> 16) % 60), y2 = 20 + ((h >> 22) % 60)
+  // 同一个头像可能在页面上出现多次（如桌面表格和手机列表），id 必须唯一，否则隐藏的那份会让可见的渐变失效
+  const id = `ta${useId().replace(/:/g, '')}`
   return (
-    <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full font-medium text-white/90"
-      style={{ width: size, height: size, fontSize: size * 0.38, background: `hsl(${hue} 45% 32%)`, boxShadow: `inset 0 0 0 1px hsl(${hue} 50% 45% / .5)` }}>
-      {symbol.slice(0, 2)}
-    </span>
+    <svg aria-hidden width={size} height={size} viewBox="0 0 100 100" className="shrink-0 rounded-full">
+      <defs>
+        <radialGradient id={`${id}-a`} cx={`${x1}%`} cy={`${y1}%`} r="75%"><stop offset="0" stopColor={`hsl(${h2} 85% 66%)`} /><stop offset="1" stopColor={`hsl(${hue} 70% 34%)`} /></radialGradient>
+        <filter id={`${id}-b`}><feGaussianBlur stdDeviation="9" /></filter>
+        <clipPath id={`${id}-c`}><circle cx="50" cy="50" r="50" /></clipPath>
+      </defs>
+      <g clipPath={`url(#${id}-c)`}>
+        <rect width="100" height="100" fill={`url(#${id}-a)`} />
+        <circle cx={x2} cy={y2} r={22 + (h % 14)} fill={`hsl(${h3} 80% 60% / .55)`} filter={`url(#${id}-b)`} />
+      </g>
+      <circle cx="50" cy="50" r="49.5" fill="none" stroke="rgba(255,255,255,.08)" />
+    </svg>
   )
 }
 
