@@ -169,3 +169,29 @@ describe('筛选与搜索', () => {
     expect(r.every((e) => e.agent === 'risk' && e.status === 'error')).toBe(true)
   })
 })
+
+describe('代币页细节', () => {
+  it('头部有风险速览，持有者有分布条', async () => {
+    renderRoute(`/token/${TOKENS[4].address}`)
+    expect(await screen.findByRole('list', { name: '风险速览' })).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: /前十持有/ })).toBeInTheDocument()
+  })
+  it('交易可以按方向筛选', async () => {
+    const u = userEvent.setup()
+    renderRoute(`/token/${TOKENS[4].address}`)
+    await u.click(await screen.findByRole('tab', { name: '交易' }))
+    const filter = await screen.findByRole('tablist', { name: '成交方向' })
+    await u.click(within(filter).getByRole('tab', { name: '卖出' }))
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every((r) => within(r).queryByText('买') === null)).toBe(true)
+  })
+  it('买入显示预计得到的数量，回车下单也不假装成功', async () => {
+    const u = userEvent.setup()
+    renderRoute(`/token/${TOKENS[4].address}`)
+    const input = (await screen.findAllByLabelText('金额'))[0]
+    await u.type(input, '10{Enter}')
+    expect(screen.getAllByText(/≈ [\d,]+ ZAPP/).length).toBeGreaterThan(0)
+    expect(await screen.findByText(/没有创建订单/)).toBeInTheDocument()
+  })
+})

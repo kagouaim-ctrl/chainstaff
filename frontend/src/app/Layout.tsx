@@ -30,7 +30,7 @@ export function Layout() {
         </main>
       </div>
       <FooterBar />
-      <BottomNav />
+      {!pathname.startsWith('/token/') && <BottomNav />}
       <SearchPalette />
       <Toast />
       <AgentDrawer role={agent} onClose={close('agent')} />

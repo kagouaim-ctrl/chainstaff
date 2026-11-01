@@ -13,8 +13,8 @@ const BUY_PRESETS = [10, 100, 500, 1000]
 const SELL_PRESETS = [25, 50, 100]
 
 /** 买卖面板（照 fomo）。手动下单同样要经过风控，执行只走唯一入口。 */
-export function TradePanel({ token }: { token: Token }) {
-  const [side, setSide] = useState<'BUY' | 'SELL'>('BUY')
+export function TradePanel({ token, initialSide = 'BUY', bare }: { token: Token; initialSide?: 'BUY' | 'SELL'; bare?: boolean }) {
+  const [side, setSide] = useState<'BUY' | 'SELL'>(initialSide)
   const [amount, setAmount] = useState('')
   const [slip, setSlip] = useState(300)
   const [settings, setSettings] = useState(false)
@@ -38,19 +38,23 @@ export function TradePanel({ token }: { token: Token }) {
   if (side === 'SELL' && !holding) issues.push('没有持仓，不能卖出')
   if (impactPct * 100 > slip) issues.push('预计价格冲击超过滑点上限')
   const buy = side === 'BUY'
+  const submit = () => {
+    if (!usdAmt) return toast(buy ? '先输入金额' : '先选择卖出比例')
+    toast('后端未接入：没有创建订单。接入后，这笔指令会先交给风控审批，批准后才由执行服务模拟成交。')
+  }
 
   return (
-    <section id="trade" aria-label="买卖" className="rounded-xl border border-line p-4">
+    <form id={bare ? undefined : 'trade'} aria-label="买卖" className={bare ? '' : 'rounded-xl border border-line p-4'} onSubmit={(e) => { e.preventDefault(); submit() }}>
       <div className="flex items-center gap-2">
         <div role="tablist" aria-label="买卖方向" className="flex flex-1 gap-1 rounded-lg bg-panel p-1">
           {(['BUY', 'SELL'] as const).map((s) => (
-            <button key={s} role="tab" aria-selected={side === s} onClick={() => { setSide(s); setAmount('') }}
+            <button type="button" key={s} role="tab" aria-selected={side === s} onClick={() => { setSide(s); setAmount('') }}
               className={cx('h-9 flex-1 rounded-md text-[14px]', side === s ? (s === 'BUY' ? 'bg-up text-[#060510]' : 'bg-down text-[#060510]') : 'text-sub hover:text-fg')}>
               {s === 'BUY' ? '买入' : '卖出'}
             </button>
           ))}
         </div>
-        <button onClick={() => setSettings((v) => !v)} aria-label="交易设置" aria-expanded={settings} className={cx('flex h-11 w-11 items-center justify-center rounded-lg border border-line', settings ? 'text-fg' : 'text-sub hover:text-fg')}>
+        <button type="button" onClick={() => setSettings((v) => !v)} aria-label="交易设置" aria-expanded={settings} className={cx('flex h-11 w-11 items-center justify-center rounded-lg border border-line', settings ? 'text-fg' : 'text-sub hover:text-fg')}>
           <ISliders width={18} height={18} />
         </button>
       </div>
@@ -63,17 +67,27 @@ export function TradePanel({ token }: { token: Token }) {
             className="num bg-transparent text-[40px] font-medium leading-none tracking-[-2px] outline-none placeholder:text-mute" />
           <span className={cx('num text-[40px] font-medium leading-none tracking-[-2px]', usdAmt ? 'text-fg' : 'text-mute')}>{buy ? '' : '%'}</span>
         </span>
-        <span className="mt-2 block text-[12px] font-normal text-sub">{buy ? `输入金额 · 可用 ${usd(pf.data?.cashUsd ?? 0)}` : `卖出比例 · 持仓 ${holding ? usd(holding.valueUsd) : '无'}`}</span>
+        <span className="num mt-2 block text-[12px] font-normal text-sub">
+          {usdAmt > 0
+            ? buy ? `≈ ${Math.floor(usdAmt / token.priceUsd).toLocaleString()} ${token.symbol}` : `≈ ${usd(((holding?.valueUsd ?? 0) * Math.min(usdAmt, 100)) / 100)}`
+            : buy ? `输入金额 · 可用 ${usd(pf.data?.cashUsd ?? 0)}` : `卖出比例 · 持仓 ${holding ? usd(holding.valueUsd) : '无'}`}
+        </span>
       </label>
+      {buy && (
+        <div className="mt-1 flex justify-between px-1 text-[12px] font-normal text-sub">
+          <span>单笔上限 <span className="num text-fg">{usd(maxTrade)}</span></span>
+          <button type="button" onClick={() => setAmount(String(Math.floor(Math.min(maxTrade, pf.data?.cashUsd ?? 0) * 100) / 100))} className="text-agent hover:underline">用到上限</button>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-4 gap-2">
         {(buy ? BUY_PRESETS : SELL_PRESETS).map((p) => (
-          <button key={p} onClick={() => setAmount(String(p))}
+          <button type="button" key={p} onClick={() => setAmount(String(p))}
             className={cx('num h-9 rounded-lg text-[14px]', amount === String(p) ? 'bg-raised text-fg' : 'bg-panel text-sub hover:text-fg')}>
             {buy ? `$${p}` : `${p}%`}
           </button>
         ))}
-        {!buy && <button onClick={() => setAmount('100')} className="h-9 rounded-lg bg-panel text-[14px] text-sub hover:text-fg">全部</button>}
+        {!buy && <button type="button" onClick={() => setAmount('100')} className="h-9 rounded-lg bg-panel text-[14px] text-sub hover:text-fg">全部</button>}
       </div>
 
       {settings && (
@@ -91,8 +105,7 @@ export function TradePanel({ token }: { token: Token }) {
         </ul>
       )}
 
-      <button
-        onClick={() => toast('后端未接入：没有创建订单。接入后，这笔指令会先交给风控审批，批准后才由执行服务模拟成交。')}
+      <button type="submit"
         className={cx('mt-4 h-11 w-full rounded-full text-[14px]', usdAmt > 0 ? (buy ? 'bg-up text-[#060510]' : 'bg-down text-[#060510]') : 'bg-raised text-sub')}>
         {buy ? '买入' : '卖出'} {token.symbol}
       </button>
@@ -106,7 +119,7 @@ export function TradePanel({ token }: { token: Token }) {
           <KV k="报价来源" v={<span className="text-warn">Jupiter 未接入</span>} className="py-1 text-[12px]" />
         </div>
       )}
-      <p className="mt-3 text-center text-[12px] font-normal text-mute">模拟盘 · 手动下单和 Agent 下单走同一套风控</p>
-    </section>
+      <p className="mt-3 text-center text-[12px] font-normal text-mute">模拟盘 · 手动下单和 Agent 下单走同一套风控 · 回车下单</p>
+    </form>
   )
 }

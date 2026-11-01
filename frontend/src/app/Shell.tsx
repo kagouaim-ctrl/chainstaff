@@ -171,7 +171,7 @@ function ModeSwitchBadge() {
   return (
     <>
       <button onClick={() => setOpen(true)} aria-label="当前模式：模拟盘" className="flex h-11 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-3 text-[14px] hover:bg-raised">
-        <span className="h-1.5 w-1.5 rounded-full bg-paper" />模拟<span className="hidden sm:inline">盘</span>
+        <span className="h-1.5 w-1.5 rounded-full bg-paper" /><span>模拟<span className="hidden sm:inline">盘</span></span>
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} title="当前是模拟盘"
         footer={<Button variant="outline" onClick={() => setOpen(false)}>知道了</Button>}>

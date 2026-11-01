@@ -24,8 +24,10 @@ export const useApp = create<AppState>((set) => ({
 }))
 
 interface ToastState { msg: string | null; show: (m: string) => void; clear: () => void }
+let toastTimer: ReturnType<typeof setTimeout> | undefined
 export const useToast = create<ToastState>((set) => ({
   msg: null,
-  show: (m) => { set({ msg: m }); setTimeout(() => set({ msg: null }), 4000) },
+  // 连续提示时重新计时，避免上一条的定时器把新提示提前关掉
+  show: (m) => { clearTimeout(toastTimer); set({ msg: m }); toastTimer = setTimeout(() => set({ msg: null }), 4000) },
   clear: () => set({ msg: null }),
 }))

@@ -36,7 +36,9 @@ body {
 button, a { transition: color .15s, background-color .15s, border-color .15s; }
 .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 
-:focus-visible { outline: 2px solid var(--c-agent); outline-offset: 2px; border-radius: 6px; }
+:focus-visible:not(input):not(textarea):not(select) { outline: 2px solid var(--c-agent); outline-offset: 2px; border-radius: 6px; }
+input:focus-visible, textarea:focus-visible { outline: none; }
+input[class*='border']:focus, select:focus { border-color: var(--c-agent); outline: none; }
 
 ::selection { background: rgba(81,106,246,.35); }
 input, textarea { caret-color: var(--c-agent); }
@@ -56,10 +58,12 @@ input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--c-agent); 
 .anim-enter { animation: enter 240ms ease-out; }
 @keyframes drawer { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .anim-drawer { animation: drawer 200ms ease-out; }
+@keyframes sheet { from { transform: translateY(100%); } to { transform: none; } }
+.anim-sheet { animation: sheet 220ms cubic-bezier(.2,.8,.2,1); }
 @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .anim-pulse { animation: pulse-dot 1.6s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-enter, .anim-drawer, .anim-pulse { animation: none !important; }
+  .anim-enter, .anim-drawer, .anim-pulse, .anim-sheet { animation: none !important; }
   * { transition: none !important; scroll-behavior: auto !important; }
 }

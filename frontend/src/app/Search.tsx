@@ -29,6 +29,29 @@ export function searchAll(q: string, tokens: Token[], agents: AgentInfo[], order
   return hits.slice(0, 20)
 }
 
+const RECENT_KEY = 'memeagent.recent'
+const readRecent = (): string[] => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') } catch { return [] } }
+const saveRecent = (a: string) => { try { localStorage.setItem(RECENT_KEY, JSON.stringify([a, ...readRecent().filter((x) => x !== a)].slice(0, 6))) } catch { /* 隐私模式下不记 */ } }
+
+/** 没输入时：最近看过的代币 + 热门，和交易所的搜索框一样。 */
+function Suggest({ tokens, onPick }: { tokens: Token[]; onPick: (t: Token) => void }) {
+  const recent = readRecent().map((a) => tokens.find((t) => t.address === a)).filter((t): t is Token => !!t)
+  const hot = [...tokens].sort((a, b) => b.stats['24h'].volume - a.stats['24h'].volume).slice(0, 6)
+  const Row = ({ title, list }: { title: string; list: Token[] }) => list.length ? (
+    <li className="px-2 pb-2 pt-1">
+      <div className="px-1 pb-1.5 text-[12px] font-normal text-sub">{title}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {list.map((t) => (
+          <button key={t.address} onClick={() => onPick(t)} className="flex h-8 items-center gap-1.5 rounded-full border border-line pl-1 pr-3 text-[13px] hover:bg-raised">
+            <TokenAvatar symbol={t.symbol} hue={t.hue} size={22} />{t.symbol}
+          </button>
+        ))}
+      </div>
+    </li>
+  ) : null
+  return <><Row title="最近看过" list={recent} /><Row title="24 小时成交最多" list={hot} /></>
+}
+
 export function SearchPalette() {
   const { searchOpen, setSearchOpen } = useApp()
   const [q, setQ] = useState('')
@@ -53,6 +76,7 @@ export function SearchPalette() {
   if (!searchOpen) return null
   const go = (h: Hit) => {
     setSearchOpen(false)
+    if (h.kind === 'token') saveRecent(h.token.address)
     if (h.kind === 'token') nav(`/token/${h.token.address}`)
     else if (h.kind === 'agent') nav(`/agents?agent=${h.agent.role}`)
     else nav(`/orders?order=${h.order.id}`)
@@ -77,7 +101,7 @@ export function SearchPalette() {
         </div>
         <ul role="listbox" aria-label="搜索结果" className="max-h-[50vh] overflow-y-auto p-1.5">
           {q && hits.length === 0 && <li className="p-4 text-center text-sm text-sub">没有找到「{q}」。合约地址需输入至少前 4 位。</li>}
-          {!q && <li className="p-4 text-center text-sm text-sub">输入关键词开始搜索。演示数据中可试试 ZAPP、风控、ord_7f3a。</li>}
+          {!q && <Suggest tokens={tokens.data ?? []} onPick={(t) => go({ kind: 'token', key: t.address, title: t.symbol, sub: t.name, token: t })} />}
           {hits.map((h, i) => (
             <li key={h.key} role="option" aria-selected={i === sel}>
               <button onMouseEnter={() => setSel(i)} onClick={() => go(h)}

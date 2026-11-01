@@ -43,3 +43,23 @@ export function SecurityBadge({ s }: { s: SecurityCheck }) {
     </span>
   )
 }
+
+/** 代币头部的风险速览（参考 gmgn）：一眼看到持仓集中度和合约权限，点进安全检查看细节。 */
+export function RiskStrip({ s }: { s: SecurityCheck }) {
+  if (s.checkedAt == null) return <div className="text-[12px] font-normal text-warn">安全检查还没完成，结果无法确认时风控默认拒绝买入</div>
+  const tone = (ok: boolean | null) => ok === false ? 'text-down bg-down/10' : ok === null ? 'text-warn bg-warn/10' : 'text-sub bg-raised'
+  const items: { k: string; v: string; ok: boolean | null }[] = [
+    { k: '前十持有', v: `${s.top10Pct.toFixed(1)}%`, ok: s.top10Pct > 50 ? false : s.top10Pct > 30 ? null : true },
+    { k: '开发者', v: `${s.devHoldPct.toFixed(1)}%`, ok: s.devHoldPct > 10 ? false : s.devHoldPct > 5 ? null : true },
+    ...securityFlags(s).map((f) => ({ k: f.label, v: '', ok: f.ok })),
+  ]
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="风险速览">
+      {items.map((i) => (
+        <li key={i.k} className={`flex h-6 items-center gap-1 rounded-md px-2 text-[12px] ${tone(i.ok)}`}>
+          {i.k}{i.v && <span className="num text-fg">{i.v}</span>}
+        </li>
+      ))}
+    </ul>
+  )
+}

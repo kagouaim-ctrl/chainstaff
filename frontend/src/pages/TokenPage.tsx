@@ -3,18 +3,18 @@ import { Link, useParams, useLocation } from 'react-router-dom'
 import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTrades, useTheses, useClosed, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
-import { DataState, Panel, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
+import { DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
 import { CandleChart } from '@/features/charts'
 import { TokenChat } from '@/features/TokenChat'
 import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
 import { DecisionChain } from '@/features/DecisionChain'
-import { VerdictTag, securityFlags, VERDICT } from '@/features/tokenBits'
+import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
-import type { MarkerKind, Token } from '@/domain/types'
+import type { Holder, MarkerKind, Token } from '@/domain/types'
 
 type TabKey = 'holders' | 'trades' | 'research'
 
@@ -55,13 +55,42 @@ function TokenView({ t }: { t: Token }) {
         </section>
       </div>
 
-      <div className="space-y-4 p-4">
-        <TradePanel token={t} />
+      <div className="space-y-4 p-4 pb-24 lg:pb-4">
+        <div className="hidden lg:block"><TradePanel token={t} /></div>
         <About t={t} />
         <MyPosition t={t} />
         <SecurityBlock t={t} />
       </div>
+      <MobileTradeBar t={t} />
     </div>
+  )
+}
+
+/** 手机：底部固定买入 / 卖出（照 fomo App），点开是底部弹层。 */
+function MobileTradeBar({ t }: { t: Token }) {
+  const [side, setSide] = useState<'BUY' | 'SELL' | null>(null)
+  useEffect(() => {
+    if (!side) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSide(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [side])
+  return (
+    <>
+      <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-line bg-bg px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 lg:hidden">
+        <button onClick={() => setSide('BUY')} className="h-12 flex-1 rounded-full bg-up text-[16px] text-[#060510]">买入</button>
+        <button onClick={() => setSide('SELL')} className="h-12 flex-1 rounded-full bg-raised text-[16px]">卖出</button>
+      </div>
+      {side && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setSide(null)} />
+          <div role="dialog" aria-modal="true" aria-label={`${side === 'BUY' ? '买入' : '卖出'} ${t.symbol}`} className="anim-sheet absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-line bg-bg px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
+            <TradePanel token={t} initialSide={side} bare />
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -101,6 +130,7 @@ function Header({ t }: { t: Token }) {
           </div>
         ))}
       </div>
+      <div className="mt-3"><RiskStrip s={t.security} /></div>
     </section>
   )
 }
@@ -131,7 +161,7 @@ function ChartPanel({ t }: { t: Token }) {
         {(d) => (
           <>
             <div className="px-1 pt-1">
-              <CandleChart candles={d.candles} markers={d.markers.filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))} />
+              <CandleChart label={`${t.symbol}/USD · 5分`} candles={d.candles} markers={d.markers.filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))} />
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
               <span>图表叠加层</span>
@@ -273,6 +303,7 @@ function Holders({ t }: { t: Token }) {
         const rows = all.filter((h) => (!agentOnly || h.kind === 'agent') && (!thesisOnly || h.hasThesis))
         return (
           <div>
+            <HolderBar all={all} top10={t.security.top10Pct} />
             <div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看 Agent</label>
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={thesisOnly} onChange={(e) => setThesisOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看有观点的</label>
@@ -308,12 +339,37 @@ function Holders({ t }: { t: Token }) {
   )
 }
 
+/** 持仓分布条：前十名各占多少，Agent 用强调色，一眼看出筹码是否集中。 */
+function HolderBar({ all, top10 }: { all: Holder[]; top10: number }) {
+  const top = all.slice(0, 10)
+  return (
+    <div className="px-4 pt-3">
+      <div className="flex justify-between text-[12px] font-normal text-sub">
+        <span>前十持有 <span className="num text-fg">{top10.toFixed(1)}%</span></span>
+        <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>
+      </div>
+      <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10.toFixed(1)}%`}>
+        {top.map((h) => <div key={h.rank} title={`#${h.rank} ${h.agentName ?? shortAddr(h.label)} ${h.pct.toFixed(2)}%`} className={h.kind === 'agent' ? 'bg-agent' : 'bg-sub/60'} style={{ width: `${h.pct}%` }} />)}
+      </div>
+    </div>
+  )
+}
+
 function Trades({ t }: { t: Token }) {
   const q = useTrades(t.address)
+  const [side, setSide] = useState<'all' | 'BUY' | 'SELL'>('all')
+  const [agentOnly, setAgentOnly] = useState(false)
   return (
     <DataState q={q} isEmpty={(d) => d.length === 0} empty="还没有成交。">
-      {(rows) => (
+      {(all) => {
+        const rows = all.filter((r) => (side === 'all' || r.side === side) && (!agentOnly || r.kind === 'agent'))
+        return (
         <div className="overflow-x-auto">
+          <div className="flex items-center gap-3 px-4 py-2.5">
+            <Segmented label="成交方向" size="sm" value={side} onChange={setSide} options={[{ value: 'all', label: '全部' }, { value: 'BUY', label: '买入' }, { value: 'SELL', label: '卖出' }]} />
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-sub"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} />只看 Agent</label>
+            <span className="ml-auto text-[12px] font-normal text-sub">{rows.length} 笔</span>
+          </div>
           <table className="w-full min-w-[560px] text-[13px]">
             <thead className="text-xs text-sub"><tr className="border-b border-line">
               <th className="px-4 py-2 text-left font-normal">时间</th><th className="px-2 py-2 text-left font-normal">方向</th>
@@ -332,7 +388,8 @@ function Trades({ t }: { t: Token }) {
             </tbody>
           </table>
         </div>
-      )}
+        )
+      }}
     </DataState>
   )
 }

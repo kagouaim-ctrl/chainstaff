@@ -4,7 +4,7 @@ import { useAgents, useAgentDM, useMainAgent, now } from '@/api/hooks'
 import { useDrawerLink } from '@/app/links'
 import { useToast } from '@/app/store'
 import { DataState, StatusDot, AGENT_STATUS, ModeTag, cx } from '@/components/ui'
-import { IBot } from '@/components/icons'
+import { IBot, ICheck, ICopy } from '@/components/icons'
 import { relTime, duration } from '@/lib/format'
 import type { AgentDM } from '@/domain/types'
 
@@ -68,16 +68,22 @@ export function Agents() {
 
 function Msg({ m, name }: { m: AgentDM; name: string }) {
   const open = useDrawerLink()
+  const [copied, setCopied] = useState(false)
   if (m.role === 'user') return (
     <li className="flex justify-end">
       <div className="max-w-[80%] whitespace-pre-line rounded-2xl rounded-br-md bg-raised px-4 py-2.5 text-[14px] font-normal leading-[22px]">{m.text}</div>
     </li>
   )
   return (
-    <li className="flex gap-3">
+    <li className="group flex gap-3">
       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-agent text-white"><IBot width={14} height={14} /></span>
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] text-sub">{name} · {relTime(m.at, now())}</div>
+        <div className="flex items-center gap-2 text-[12px] text-sub">{name} · {relTime(m.at, now())}
+          <button onClick={() => { navigator.clipboard?.writeText(m.text).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+            aria-label="复制回答" className="ml-auto rounded p-1 opacity-0 hover:bg-raised hover:text-fg focus:opacity-100 group-hover:opacity-100">
+            {copied ? <ICheck width={14} height={14} className="text-up" /> : <ICopy width={14} height={14} />}
+          </button>
+        </div>
         <div className="mt-1 whitespace-pre-line text-[14px] font-normal leading-[22px]">{m.text}</div>
         {m.links && (
           <div className="mt-2 flex flex-wrap gap-2">
