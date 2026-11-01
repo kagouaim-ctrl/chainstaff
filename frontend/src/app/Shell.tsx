@@ -1,7 +1,7 @@
 import { NavLink, Link, useLocation } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from './store'
-import { usePortfolio, usePositions, useOrders } from '@/api/hooks'
+import { usePortfolio, usePositions, useOrders, isDemo } from '@/api/hooks'
 import { Button, Chg, Dialog, ModeTag, Signed, TokenAvatar, cx } from '@/components/ui'
 import { IPause, IPlay, ISearch, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
 import { usd } from '@/lib/format'
@@ -157,10 +157,12 @@ export function FooterBar() {
       {['BTC', 'ETH', 'SOL'].map((s) => (
         <span key={s} className="flex items-center gap-1.5"><span className="text-sub">{s}</span><span className="text-mute">--</span></span>
       ))}
-      <span className="text-mute">行情未接入</span>
+      {isDemo() && <span className="text-mute">行情未接入</span>}
       <span className="ml-auto flex items-center gap-3 text-sub">
-        <span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span>
-        <span>后端未接入</span><span>·</span><span>隐私</span><span>·</span><span>条款</span><span>·</span><span>帮助</span>
+        {isDemo()
+          ? <><span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span><span>后端未接入</span></>
+          : <><span className="flex items-center gap-1.5 text-up"><span className="h-1.5 w-1.5 rounded-full bg-up" />实时数据</span><span>不会下单</span></>}
+        <span>·</span><span>隐私</span><span>·</span><span>条款</span><span>·</span><span>帮助</span>
       </span>
     </footer>
   )

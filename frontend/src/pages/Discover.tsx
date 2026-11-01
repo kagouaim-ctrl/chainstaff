@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useTokens, now } from '@/api/hooks'
+import { useTokens, isDemo, now } from '@/api/hooks'
 import { useApp, useToast } from '@/app/store'
+import { useResearch } from '@/features/Research'
 import { DataState, Segmented, TokenAvatar, Chg, cx } from '@/components/ui'
 import { IStar, IBot } from '@/components/icons'
 import { VerdictTag, SecurityBadge, securityPass } from '@/features/tokenBits'
@@ -31,14 +32,14 @@ export function filterTokens(list: Token[], o: Filter) {
   if (o.tab === 'blue') r = r.filter((t) => t.verified)
   if (o.tab === 'graduated') r = r.filter((t) => t.graduated)
   if (o.tab === 'bonding') r = r.filter((t) => !t.graduated)
-  if (o.tab === 'agent') r = r.filter((t) => t.verdict === 'bought')
+  if (o.tab === 'agent') r = r.filter((t) => t.verdict === 'bought' || t.verdict === 'buy_signal')
   if (o.tab === 'watch') r = r.filter((t) => o.watch[t.address] ?? t.watch)
   if (o.safeOnly) r = r.filter((t) => securityPass(t.security) === true)
   if (o.minMcap) r = r.filter((t) => t.mcapUsd >= o.minMcap)
   if (o.launchpad !== 'all') r = r.filter((t) => t.launchpad === o.launchpad)
   const key = (t: Token) => ({
     mcap: t.mcapUsd, change: t.stats[o.tf].change, volume: t.stats[o.tf].volume, liquidity: t.liquidityUsd,
-    holders: t.holders, age: -t.ageMinutes, bonding: t.bondingPct,
+    holders: t.holders ?? 0, age: -t.ageMinutes, bonding: t.bondingPct ?? 0,
   })[o.sort]
   r.sort((a, b) => (key(b) - key(a)) * o.dir)
   return r
@@ -51,7 +52,7 @@ export function Discover() {
     <div className="space-y-4">
       <WatchStrip />
       <div className="flex items-center justify-between text-[12px] font-normal text-sub">
-        <span>数据源：DexScreener（未接入，显示演示数据）{q.data?.[0] && ` · 更新于 ${relTime(q.data[0].updatedAt, now())}`}</span>
+        <span>数据源：{isDemo() ? 'DexScreener（未接入，显示演示数据）' : 'DexScreener，按付费推广和最新资料排序，不代表推荐'}{q.data?.[0] && ` · 更新于 ${relTime(q.data[0].updatedAt, now())}`}</span>
         <button onClick={() => setSplit((v) => !v)} aria-pressed={split} className="hidden rounded-lg border border-line px-2.5 py-1 hover:text-fg 2xl:block">{split ? '单表' : '分屏'}</button>
       </div>
       <div className={cx('grid gap-4', split && '2xl:grid-cols-2')}>
@@ -100,7 +101,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const [dir, setDir] = useState<1 | -1>(1)
   const rows = useMemo(() => filterTokens(q.data ?? [], { tab, tf, safeOnly, minMcap, launchpad, watch, sort, dir }), [q.data, tab, tf, safeOnly, minMcap, launchpad, watch, sort, dir])
   const quickBuy = (t: Token) => toast(`后端未接入：没有下单。接入后「+ $10」会把 ${t.symbol} 的模拟买入交给风控审批。`)
-  const research = (t: Token) => toast(`后端未接入：没有为 ${t.symbol} 创建研究任务。`)
+  const research = useResearch()
   const switchTab = (v: TabKey) => { setTab(v); setSort(DEFAULT_SORT[v]); setDir(1) }
   const th = (k: SortKey, label: string, cls = '') => (
     <th className={cx('px-3 py-3 text-right font-normal', cls)} aria-sort={sort === k ? (dir === 1 ? 'descending' : 'ascending') : 'none'}>
@@ -122,7 +123,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2 py-3">
-        <Segmented label="时间段" size="sm" value={tf} onChange={setTf} options={(['5m', '1h', '4h', '24h'] as Timeframe[]).map((v) => ({ value: v, label: v }))} />
+        <Segmented label="时间段" size="sm" value={tf} onChange={setTf} options={(['5m', '1h', '6h', '24h'] as Timeframe[]).map((v) => ({ value: v, label: v }))} />
         <select aria-label="市值" className={sel} value={minMcap} onChange={(e) => setMinMcap(Number(e.target.value))}>
           <option value={0}>市值：全部</option><option value={1e6}>≥ $100万</option><option value={1e7}>≥ $1000万</option><option value={1e8}>≥ $1亿</option>
         </select>
@@ -184,13 +185,13 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                         </td>
                         {tab === 'bonding' ? (
                           <td className="px-3 text-right">
-                            <div className="ml-auto flex w-28 items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-raised"><div className="h-full rounded-full bg-up" style={{ width: `${t.bondingPct}%` }} /></div><span className="num w-9 text-xs">{t.bondingPct}%</span></div>
+                            <div className="ml-auto flex w-28 items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-raised"><div className="h-full rounded-full bg-up" style={{ width: `${t.bondingPct ?? 0}%` }} /></div><span className="num w-9 text-xs">{t.bondingPct ?? '--'}%</span></div>
                           </td>
                         ) : <td className="num px-3 text-right">{usd(t.mcapUsd, { compact: true })}</td>}
                         <td className="px-3 text-right"><Chg v={s.change} /></td>
                         {!compact && <td className="num px-3 text-right">{usd(s.volume, { compact: true })}</td>}
                         {!compact && <td className="num px-3 text-right">{usd(t.liquidityUsd, { compact: true })}</td>}
-                        <td className="num px-3 text-right">{compactCN(t.holders)}</td>
+                        <td className="num px-3 text-right">{t.holders === null ? '--' : compactCN(t.holders)}</td>
                         <td className="px-3"><VerdictTag v={t.verdict} /></td>
                       </tr>
                     )
@@ -224,7 +225,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
 }
 
 function VerdictInline({ t }: { t: Token }) {
-  const map = { unresearched: '未研究', researching: '研究中', security_veto: '安全否决', no_trade: '不交易', bought: 'Agent 已买' }
+  const map = { unresearched: '未研究', researching: '研究中', security_veto: '安全否决', no_trade: '不交易', buy_signal: '建议买入', bought: 'Agent 已买' }
   return <span className={t.verdict === 'bought' ? 'text-up' : t.verdict === 'security_veto' ? 'text-down' : ''}>{map[t.verdict]}</span>
 }
 

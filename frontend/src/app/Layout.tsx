@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import { TopBar, BottomNav, FooterBar } from './Shell'
 import { DemoBanner, PauseBanner } from './Banners'
+import { ResearchRunner } from '@/features/Research'
 import { SearchPalette } from './Search'
 import { Toast } from './Toast'
 import { AgentDrawer } from '@/features/AgentDrawer'
@@ -24,6 +25,7 @@ export function Layout() {
       <div className="flex min-h-full flex-col">
         <TopBar />
         <DemoBanner />
+        <ResearchRunner />
         <PauseBanner />
         <main className="w-full flex-1 px-4 pb-24 pt-4 md:pb-12">
           <Outlet />

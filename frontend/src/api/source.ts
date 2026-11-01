@@ -1,11 +1,13 @@
 /**
  * 数据源接口。前端只依赖这个接口；后端实现后换成 HTTP + WebSocket 版本即可。
- * 当前唯一实现是 demoSource（演示数据），sourceInfo.kind === 'demo' 时界面必须显示「演示」。
+ * demoSource 是演示数据，sourceInfo.kind === 'demo' 时界面必须显示「演示」。
+ * 设置 VITE_MEME_API_URL 时用 liveSource（真实行情和 Agent 分析，见 live.ts）。
  */
 import * as D from './demo'
+import { API_URL, liveSource } from './live'
 import type {
   AgentDM,
-  AgentEvent, AgentInfo, AuditEntry, ChatMessage, ClosedPosition, DataSourceStatus, Holder, MainAgent,
+  AgentEvent, AgentInfo, AuditEntry, ChatMessage, ClosedPosition, DataSourceStatus, DecisionStep, Holder, MainAgent,
   Order, PipelineStage, Portfolio, Position, StrategyConfig, Thesis, Token, Trade, Candle, ChartMarker,
 } from '@/domain/types'
 
@@ -20,6 +22,7 @@ export interface DataSource {
   chat(address: string): Promise<ChatMessage[]>
   agentDM(): Promise<AgentDM[]>
   theses(address: string): Promise<Thesis[]>
+  research(address: string): Promise<DecisionStep[]>
   trades(address: string): Promise<Trade[]>
   mainAgent(): Promise<MainAgent>
   agents(): Promise<AgentInfo[]>
@@ -46,6 +49,7 @@ export const demoSource: DataSource = {
   chat: (a) => wait(D.chat(a)),
   agentDM: () => wait(D.AGENT_DM),
   theses: (a) => wait(D.theses(a)),
+  research: () => wait([]),
   trades: (a) => wait(D.trades(a)),
   mainAgent: () => wait(D.MAIN_AGENT),
   agents: () => wait(D.AGENTS),
@@ -61,6 +65,6 @@ export const demoSource: DataSource = {
   dataSources: () => wait(D.DATA_SOURCES),
 }
 
-let current: DataSource = demoSource
+let current: DataSource = API_URL ? liveSource : demoSource
 export const source = () => current
 export function setSource(s: DataSource) { current = s }

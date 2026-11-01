@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTheses, usePositions, now } from '@/api/hooks'
+import { useTheses, usePositions, now, isDemo } from '@/api/hooks'
 import { useToast } from '@/app/store'
 import { DataState, Segmented, Signed, Button, cx } from '@/components/ui'
 import { Avatar } from './TokenChat'
@@ -35,7 +35,7 @@ export function Theses({ token }: { token: Token }) {
                       <span className="text-[12px] font-normal text-sub">{relTime(t.at, now())}</span>
                     </div>
                     <div className="num text-[12px] font-normal text-sub">
-                      {t.author.kind === 'agent' && <>{t.author.owner} 的 Agent · </>}
+                      {t.author.kind === 'agent' && <>{t.author.owner ? `${t.author.owner} 的 Agent` : '平台 Agent'} · </>}
                       {t.author.holding ? <>持仓 <span className="text-fg">{usd(t.author.holding.amountUsd)}</span> (<Signed v={t.author.holding.pnlPct} className="text-[12px]">{t.author.holding.pnlPct >= 0 ? '▲' : '▼'}{pct(Math.abs(t.author.holding.pnlPct), 2).replace('+', '')}</Signed>)</> : '已清仓'}
                     </div>
                   </div>
@@ -44,7 +44,7 @@ export function Theses({ token }: { token: Token }) {
                 <div className="mt-2 flex gap-5 pl-[42px] text-[12px] text-sub">
                   <button onClick={() => toast('后端未接入：没有点赞。')} className="num flex items-center gap-1.5 hover:text-down"><IHeart width={14} height={14} />{t.likes}</button>
                   <button onClick={() => toast('后端未接入：不能回复。')} className="num flex items-center gap-1.5 hover:text-fg"><IReply width={14} height={14} />{t.replies}</button>
-                  <button onClick={() => toast('已复制链接（演示）')} aria-label="分享" className="flex items-center hover:text-fg"><IShare width={14} height={14} /></button>
+                  <button onClick={() => toast(isDemo() ? '已复制链接（演示）' : '还没有接入分享')} aria-label="分享" className="flex items-center hover:text-fg"><IShare width={14} height={14} /></button>
                 </div>
               </li>
             ))}

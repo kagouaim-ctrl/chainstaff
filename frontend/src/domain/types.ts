@@ -1,7 +1,7 @@
 /** 前端领域类型。和后端（未实现）对齐用，字段名按计划第 7 节数据模型。 */
 
 export type Mode = 'backtest' | 'paper' | 'live'
-export type Timeframe = '5m' | '1h' | '4h' | '24h'
+export type Timeframe = '5m' | '1h' | '6h' | '24h'
 
 export type AgentRole =
   | 'scout' | 'onchain' | 'security' | 'sentiment' | 'quant'
@@ -41,16 +41,18 @@ export interface MainAgent {
   chatIntervalHours: number
 }
 
-export type Verdict = 'unresearched' | 'researching' | 'security_veto' | 'no_trade' | 'bought'
+/** buy_signal：Agent 建议买入，但没有下单。bought 才是真的买了。 */
+export type Verdict = 'unresearched' | 'researching' | 'security_veto' | 'no_trade' | 'buy_signal' | 'bought'
 
+/** null 表示没查到，不等于安全。 */
 export interface SecurityCheck {
-  mintAuthority: boolean
-  freezeAuthority: boolean
+  mintAuthority: boolean | null
+  freezeAuthority: boolean | null
   lp: 'burned' | 'locked' | 'unlocked' | 'unknown'
   sellSimulation: 'pass' | 'fail' | 'unknown'
-  transferFeeBps: number
-  top10Pct: number
-  devHoldPct: number
+  transferFeeBps: number | null
+  top10Pct: number | null
+  devHoldPct: number | null
   checkedAt: string | null
 }
 
@@ -65,7 +67,7 @@ export interface Token {
   priceUsd: number
   mcapUsd: number
   liquidityUsd: number
-  holders: number
+  holders: number | null
   ageMinutes: number
   stats: Record<Timeframe, WindowStat>
   security: SecurityCheck
@@ -73,9 +75,9 @@ export interface Token {
   tags: string[]
   graduated: boolean
   /** 内盘（发射曲线）进度 0–100，已毕业为 100 */
-  bondingPct: number
+  bondingPct: number | null
   verified: boolean
-  launchpad: 'pump.fun' | 'bonk.fun' | 'Raydium'
+  launchpad: string
   watch?: boolean
   dataSource: string
   updatedAt: string
@@ -187,9 +189,9 @@ export interface Holder {
   ownerName?: string
   amountUsd: number
   pct: number
-  avgCost: number
-  pnlPct: number
-  heldMinutes: number
+  avgCost: number | null
+  pnlPct: number | null
+  heldMinutes: number | null
   hasThesis?: boolean
 }
 

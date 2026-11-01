@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
-import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTrades, useTheses, useClosed, now } from '@/api/hooks'
+import { useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
-import { DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
+import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
 import { CandleChart } from '@/features/charts'
 import { TokenChat } from '@/features/TokenChat'
 import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
 import { DecisionChain } from '@/features/DecisionChain'
+import { useResearch } from '@/features/Research'
 import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
@@ -45,7 +46,7 @@ function TokenView({ t }: { t: Token }) {
         <ChartPanel t={t} />
         <section>
           <Tabs label="代币信息" value={tab} onChange={setTab} options={[
-            { value: 'holders', label: <>持有者 <span className="text-sub">({compactCN(t.holders)})</span></> },
+            { value: 'holders', label: <>持有者 <span className="text-sub">({t.holders === null ? '--' : compactCN(t.holders)})</span></> },
             { value: 'trades', label: '交易' },
             { value: 'research', label: 'Agent 研究' },
           ]} />
@@ -155,7 +156,7 @@ function ChartPanel({ t }: { t: Token }) {
         <button onClick={() => setUnit('price')} className={cx('rounded-md px-1 py-1', unit === 'price' ? 'text-fg' : 'text-sub hover:text-fg')}>价格</button>
         <span className="text-mute">/</span>
         <button onClick={() => setUnit('mcap')} className={cx('rounded-md px-1 py-1', unit === 'mcap' ? 'text-fg' : 'text-sub hover:text-fg')}>市值</button>
-        <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">演示 K 线固定 5 分钟</span>
+        <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">{isDemo() ? '演示 K 线固定 5 分钟' : 'K 线固定 5 分钟'}</span>
       </div>
       <DataState q={q} rows={1}>
         {(d) => (
@@ -208,14 +209,13 @@ function Bar({ l, r, lv, rv }: { l: string; r: string; lv: number; rv: number })
 
 function About({ t }: { t: Token }) {
   const s = t.stats['24h']
-  const bShare = s.buyers / (s.buyers + s.sellers)
-  const buys = Math.round(s.txns * bShare)
+  const bShare = s.buyers + s.sellers ? s.buyers / (s.buyers + s.sellers) : 0.5
   return (
     <section className="rounded-xl border border-line p-4" aria-label={`关于 ${t.symbol}`}>
       <h2 className="text-[16px]">关于 {t.symbol}</h2>
-      <p className="mt-1 text-[14px] font-normal text-sub">{t.name} · {t.launchpad} 发射 · {t.graduated ? '已毕业' : `内盘进度 ${t.bondingPct}%`}</p>
+      <p className="mt-1 text-[14px] font-normal text-sub">{t.name} · {t.launchpad} 发射 · {t.graduated ? '已毕业' : t.bondingPct === null ? '未毕业' : `内盘进度 ${t.bondingPct}%`}</p>
       <div className="mt-3 grid grid-cols-4 gap-2">
-        {([['5M', '5m'], ['1H', '1h'], ['4H', '4h'], ['1D', '24h']] as const).map(([l, k]) => (
+        {([['5M', '5m'], ['1H', '1h'], ['6H', '6h'], ['1D', '24h']] as const).map(([l, k]) => (
           <div key={k} className="rounded-lg border border-line px-2 py-2 text-center">
             <div className="text-[12px] font-normal text-sub">{l}</div>
             <Chg v={t.stats[k].change} className="text-[13px]" />
@@ -223,14 +223,13 @@ function About({ t }: { t: Token }) {
         ))}
       </div>
       <div className="mt-4 space-y-3">
-        <Bar l={`${buys} 买入`} r={`${s.txns - buys} 卖出`} lv={buys} rv={s.txns - buys} />
         <Bar l={`${usd(s.volume * bShare, { compact: true })} 交易量`} r={`${usd(s.volume * (1 - bShare), { compact: true })} 交易量`} lv={bShare} rv={1 - bShare} />
-        <Bar l={`${s.buyers} 买家`} r={`${s.sellers} 卖家`} lv={s.buyers} rv={s.sellers} />
+        <Bar l={`${s.buyers} 笔买入`} r={`${s.sellers} 笔卖出`} lv={s.buyers} rv={s.sellers} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <a href={`https://x.com/search?q=%24${t.symbol}`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜索</a>
       </div>
-      <p className="mt-3 text-[12px] font-normal text-mute">买入 / 卖出笔数和交易量按买家占比估算（演示）</p>
+      <p className="mt-3 text-[12px] font-normal text-mute">{isDemo() ? '买入 / 卖出笔数和交易量按买家占比估算（演示）' : '交易量按买卖笔数的比例估算，不是实际买卖金额。'}</p>
     </section>
   )
 }
@@ -283,10 +282,10 @@ function SecurityBlock({ t }: { t: Token }) {
             ))}
           </ul>
           <div className="mt-3 border-t border-line pt-2">
-            <KV k="前十持有占比" v={pct(s.top10Pct, 1).replace('+', '')} />
-            <KV k="开发者持有" v={pct(s.devHoldPct, 1).replace('+', '')} />
+            <KV k="前十持有占比" v={s.top10Pct === null ? '未知' : pct(s.top10Pct, 1).replace('+', '')} />
+            <KV k="开发者持有" v={s.devHoldPct === null ? '未知' : pct(s.devHoldPct, 1).replace('+', '')} />
           </div>
-          <p className="mt-2 text-[11px] text-sub">模拟盘的「可卖出」是近似结果：反向报价能否路由 + Token-2022 扩展检查，不是真实卖出模拟。RugCheck 未接入。</p>
+          <p className="mt-2 text-[11px] text-sub">「可卖出」只是近似结果：反向报价能否路由，不是真实卖出模拟。{isDemo() ? 'RugCheck 未接入。' : ''}</p>
         </>
       )}
     </Panel>
@@ -326,7 +325,7 @@ function Holders({ t }: { t: Token }) {
                       <td className="num px-2 py-2.5 text-right">{usd(h.amountUsd)}</td>
                       <td className="num px-2 py-2.5 text-right">{h.pct.toFixed(2)}%</td>
                       <td className="px-2 py-2.5 text-right"><Pct v={h.pnlPct} digits={1} /></td>
-                      <td className="num px-4 py-2.5 text-right text-sub">{duration(h.heldMinutes * 60000)}</td>
+                      <td className="num px-4 py-2.5 text-right text-sub">{h.heldMinutes === null ? '--' : duration(h.heldMinutes * 60000)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -340,15 +339,15 @@ function Holders({ t }: { t: Token }) {
 }
 
 /** 持仓分布条：前十名各占多少，Agent 用强调色，一眼看出筹码是否集中。 */
-function HolderBar({ all, top10 }: { all: Holder[]; top10: number }) {
+function HolderBar({ all, top10 }: { all: Holder[]; top10: number | null }) {
   const top = all.slice(0, 10)
   return (
     <div className="px-4 pt-3">
       <div className="flex justify-between text-[12px] font-normal text-sub">
-        <span>前十持有 <span className="num text-fg">{top10.toFixed(1)}%</span></span>
+        <span>前十持有 <span className="num text-fg">{top10 === null ? '未知' : `${top10.toFixed(1)}%`}</span></span>
         <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>
       </div>
-      <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10.toFixed(1)}%`}>
+      <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10 === null ? '未知' : `${top10.toFixed(1)}%`}`}>
         {top.map((h) => <div key={h.rank} title={`#${h.rank} ${h.agentName ?? shortAddr(h.label)} ${h.pct.toFixed(2)}%`} className={h.kind === 'agent' ? 'bg-agent' : 'bg-sub/60'} style={{ width: `${h.pct}%` }} />)}
       </div>
     </div>
@@ -430,13 +429,17 @@ function Activity({ t }: { t: Token }) {
 
 function Research({ t }: { t: Token }) {
   const orders = useOrders()
+  const steps = useResearchSteps(t.address)
+  const research = useResearch()
   const o = (orders.data ?? []).find((x) => x.token.address === t.address)
-  if (t.verdict === 'unresearched') return <p className="p-6 text-center text-[13px] text-sub">还没有研究。点发现页的「交给 Agent」开始研究（后端未接入）。</p>
-  if (t.verdict === 'researching') return <p className="p-6 text-center text-[13px] text-sub">研究中：链上、安全、情绪、量化并行分析，完成后主 Agent 给出结论。</p>
+  const again = !isDemo() && t.verdict !== 'researching' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{t.verdict === 'unresearched' ? '交给 Agent 研究' : '重新研究'}</Button>
+  if (t.verdict === 'unresearched') return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。{isDemo() ? '点发现页的「交给 Agent」开始研究（后端未接入）。' : ''}</p>{again}</div>
+  const live = steps.data ?? []
+  if (t.verdict === 'researching' && live.length === 0) return <p className="p-6 text-center text-[13px] text-sub">研究中：链上、安全、情绪、量化并行分析，完成后主 Agent 给出结论。</p>
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center gap-2 text-[13px]">主 Agent 结论：<VerdictTag v={t.verdict} /><span className="text-sub">{VERDICT[t.verdict].label === '不交易' ? '数据不足或结论冲突时输出 NO_TRADE' : ''}</span></div>
-      {o ? <DecisionChain steps={o.decisionChain} /> : <p className="text-[13px] text-sub">{t.verdict === 'security_veto' ? '安全检查一票否决，没有进入策略阶段。' : '没有生成交易方案。'}</p>}
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">主 Agent 结论：<VerdictTag v={t.verdict} /><span className="text-sub">{VERDICT[t.verdict].label === '不交易' ? '数据不足或结论冲突时输出 NO_TRADE' : ''}</span><span className="ml-auto">{again}</span></div>
+      {live.length > 0 ? <DecisionChain steps={live} /> : o ? <DecisionChain steps={o.decisionChain} /> : <p className="text-[13px] text-sub">{t.verdict === 'security_veto' ? '安全检查一票否决，没有进入策略阶段。' : '没有生成交易方案。'}</p>}
     </div>
   )
 }

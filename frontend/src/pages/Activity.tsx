@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useEvents } from '@/api/hooks'
+import { useEvents, isDemo } from '@/api/hooks'
 import { useDrawerLink } from '@/app/links'
 import { DataState, Panel, Button, cx } from '@/components/ui'
 import { IPause, IPlay } from '@/components/icons'
@@ -42,7 +42,7 @@ export function Activity() {
           <option value="all">全部状态</option>{(Object.keys(STATUS_TXT) as EventStatus[]).map((s) => <option key={s} value={s}>{STATUS_TXT[s]}</option>)}
         </select>
         <input aria-label="按代币筛选" placeholder="代币符号" value={token} onChange={(e) => setToken(e.target.value)} className={cx(sel, 'w-32 placeholder:text-sub')} />
-        <span className="ml-auto self-center text-xs text-sub">事件来自任务日志。实时推送未接入，当前显示固定演示样例。</span>
+        <span className="ml-auto self-center text-xs text-sub">{isDemo() ? '事件来自任务日志。实时推送未接入，当前显示固定演示样例。' : '事件来自 Agent 的分析记录，每次发言后刷新。'}</span>
       </div>
       <DataState q={q} rows={8} isEmpty={() => list.length === 0} empty="没有符合条件的事件。">
         {() => (
