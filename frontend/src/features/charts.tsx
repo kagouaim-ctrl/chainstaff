@@ -1,0 +1,95 @@
+import { useEffect, useRef, useState } from 'react'
+import { createChart, ColorType, CrosshairMode, type IChartApi, type UTCTimestamp, type SeriesMarker, type Time } from 'lightweight-charts'
+import type { Candle, ChartMarker } from '@/domain/types'
+
+const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'
+
+function baseChart(el: HTMLElement, height: number): IChartApi {
+  return createChart(el, {
+    height,
+    autoSize: true,
+    layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: css('--c-sub'), fontFamily: '"Inter Tight", sans-serif', fontSize: 11 },
+    grid: { vertLines: { color: 'rgba(203,208,235,0.04)' }, horzLines: { color: 'rgba(203,208,235,0.04)' } },
+    rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.14, bottom: 0.22 } },
+    timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 7, minBarSpacing: 2 },
+    crosshair: {
+      mode: CrosshairMode.Normal,
+      vertLine: { color: 'rgba(152,153,163,0.5)', width: 1, style: 3, labelBackgroundColor: '#161522' },
+      horzLine: { color: 'rgba(152,153,163,0.5)', width: 1, style: 3, labelBackgroundColor: '#161522' },
+    },
+    handleScale: { axisPressedMouseMove: { time: true, price: true } },
+    localization: { priceFormatter: (p: number) => (p >= 1 ? p.toFixed(4) : p.toPrecision(4)) },
+  })
+}
+
+const MARKER_STYLE: Record<ChartMarker['kind'], { color: string; shape: SeriesMarker<Time>['shape']; position: SeriesMarker<Time>['position'] }> = {
+  discovered: { color: '#516AF6', shape: 'circle', position: 'belowBar' },
+  no_trade: { color: '#9899A3', shape: 'square', position: 'aboveBar' },
+  risk_rejected: { color: '#FF622E', shape: 'square', position: 'aboveBar' },
+  buy: { color: '#21C95E', shape: 'arrowUp', position: 'belowBar' },
+  sell: { color: '#FF622E', shape: 'arrowDown', position: 'aboveBar' },
+}
+
+/** K 线 + Agent 决策点（发现、NO_TRADE、风控否决、买卖）。 */
+const fp = (p: number) => (p >= 1 ? p.toFixed(4) : p.toPrecision(4))
+const fv = (v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : v.toFixed(0))
+
+/** 左上角的开高低收图例：鼠标在哪根 K 线就显示哪根，移出图表回到最新一根（和 TradingView 一样）。 */
+function Legend({ c, prev, label }: { c?: Candle; prev?: Candle; label?: string }) {
+  if (!c) return null
+  const chg = prev ? ((c.close - prev.close) / prev.close) * 100 : 0
+  const tone = c.close >= c.open ? 'text-up' : 'text-down'
+  return (
+    <div className="pointer-events-none absolute left-3 top-2 z-10 flex flex-wrap items-center gap-x-2.5 text-[12px] font-normal">
+      {label && <span className="text-sub">{label}</span>}
+      {([['开', c.open], ['高', c.high], ['低', c.low], ['收', c.close]] as const).map(([k, v]) => (
+        <span key={k} className="num"><span className="text-sub">{k}</span> <span className={tone}>{fp(v)}</span></span>
+      ))}
+      <span className={`num ${chg >= 0 ? 'text-up' : 'text-down'}`}>{chg >= 0 ? '+' : ''}{chg.toFixed(2)}%</span>
+      <span className="num"><span className="text-sub">量</span> {fv(c.volume)}</span>
+    </div>
+  )
+}
+
+export function CandleChart({ candles, markers, height = 360, label }: { candles: Candle[]; markers: ChartMarker[]; height?: number; label?: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [hover, setHover] = useState<number | null>(null)
+  useEffect(() => {
+    if (!ref.current) return
+    const chart = baseChart(ref.current, height)
+    const s = chart.addCandlestickSeries({
+      upColor: css('--c-up'), downColor: css('--c-down'), borderVisible: false, priceLineStyle: 2, wickUpColor: css('--c-up'), wickDownColor: css('--c-down'),
+      priceFormat: { type: 'price', precision: 10, minMove: 1e-10 },
+    })
+    s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close })))
+    const v = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } })
+    chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
+    v.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(33,201,94,0.25)' : 'rgba(255,98,46,0.25)' })))
+    s.setMarkers([...markers].sort((a, b) => a.time - b.time).map((m) => ({ time: m.time as UTCTimestamp, text: m.label, ...MARKER_STYLE[m.kind] })))
+    chart.timeScale().fitContent()
+    const index = new Map(candles.map((c, i) => [c.time, i]))
+    chart.subscribeCrosshairMove((p) => setHover(p.time != null ? index.get(p.time as number) ?? null : null))
+    return () => chart.remove()
+  }, [candles, markers, height])
+  const i = hover ?? candles.length - 1
+  return (
+    <div className="relative">
+      <Legend c={candles[i]} prev={candles[i - 1]} label={label} />
+      <div ref={ref} className="w-full" style={{ height }} role="img" aria-label="K 线图，标注了 Agent 的发现、决策和交易点" />
+    </div>
+  )
+}
+
+export function EquityChart({ data, height = 220 }: { data: { time: number; value: number }[]; height?: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!ref.current) return
+    const chart = baseChart(ref.current, height)
+    chart.applyOptions({ localization: { priceFormatter: (p: number) => `$${p.toFixed(0)}` } })
+    const s = chart.addAreaSeries({ lineColor: css('--c-paper'), topColor: 'rgba(245,181,68,0.18)', bottomColor: 'rgba(245,181,68,0)', lineWidth: 2 })
+    s.setData(data.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })))
+    chart.timeScale().fitContent()
+    return () => chart.remove()
+  }, [data, height])
+  return <div ref={ref} className="w-full" style={{ height }} role="img" aria-label="资金曲线（模拟盘）" />
+}
