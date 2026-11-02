@@ -1,6 +1,8 @@
 /**
- * 真实数据源：KAGOUAI-meme-agent 后端。设置 VITE_MEME_API_URL 时启用。
- * 行情、安全检查和 Agent 分析是真的；交易、持仓、私聊还没有后端，这里返回空，绝不返回样例。
+ * 真实数据源。设置 VITE_MEME_LIVE=1 或 VITE_MEME_API_URL 时启用。
+ * 行情和安全检查：有后端时走后端，没有时浏览器直接读公开接口（chain.ts）。
+ * Agent 分析只来自 KAGOUAI-meme-agent 后端（VITE_MEME_API_URL），没有后端时为空。
+ * 交易、持仓、私聊还没有后端，这里返回空，绝不返回样例。
  * 后端内容引用了陌生人写的代币名称和简介，只能当文本显示。
  */
 import { ROLES } from '@/domain/agents'
@@ -10,8 +12,12 @@ import type {
   Portfolio, StrategyConfig, Thesis, Token, Trade, Candle,
 } from '@/domain/types'
 import type { DataSource } from './source'
+import * as chain from './chain'
 
 export const API_URL = (import.meta.env.VITE_MEME_API_URL ?? '').replace(/\/+$/, '')
+export const LIVE = !!API_URL || import.meta.env.VITE_MEME_LIVE === '1'
+/** 没有后端时 Agent 不能分析。 */
+export const AGENTS_ONLINE = !!API_URL
 
 /** 后端事件。字段见 tradingagents/meme/graph.py。 */
 export interface RunEvent {
@@ -160,6 +166,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function latestRun(mint: string): Promise<Run | null> {
+  if (!AGENTS_ONLINE) return null
   const rows = await get<Run[]>(`/api/analyses?mint=${encodeURIComponent(mint)}&limit=1`)
   return rows[0] ? get<Run>(`/api/analyses/${encodeURIComponent(rows[0].id)}`) : null
 }
@@ -207,14 +214,15 @@ const STRATEGY: StrategyConfig = { chain: 'solana', scope: '尚未配置', templ
 const DATA_SOURCES: DataSourceStatus[] = [
   { name: 'DexScreener', kind: '行情、交易对', state: 'connected', note: '无需 key' },
   { name: 'GeckoTerminal', kind: 'K 线、成交', state: 'connected', note: '免费档有频率限制，超限时这部分显示缺失' },
-  { name: 'Solana RPC', kind: 'Mint / Freeze 权限', state: 'connected', note: '公共节点不提供持有者查询，RugCheck 不可用时持有者数据缺失' },
+  { name: 'Solana RPC', kind: 'Mint / Freeze 权限', state: 'connected', note: '后端用它核对权限；没有后端时以 RugCheck 为准' },
   { name: 'RugCheck', kind: '风险项、持有者、LP', state: 'connected', note: '无需 key' },
   { name: 'Jupiter', kind: '卖出报价', state: 'connected', note: '只查报价，不是真实卖出模拟' },
   { name: 'X / Telegram', kind: '社交内容', state: 'not_connected', note: '没有接入，情绪分析师只能看链接和付费推广' },
+  { name: 'Agent 分析', kind: '多 Agent 研究和辩论', state: AGENTS_ONLINE ? 'connected' : 'not_connected', note: AGENTS_ONLINE ? '' : '后端还没上线' },
   { name: '交易执行', kind: '下单、持仓', state: 'not_connected', note: '只出决定，不下单' },
 ]
 
-async function allRuns(): Promise<Run[]> { return get<Run[]>('/api/analyses/events') }
+async function allRuns(): Promise<Run[]> { return AGENTS_ONLINE ? get<Run[]>('/api/analyses/events') : [] }
 
 async function agents(): Promise<AgentInfo[]> {
   const runs = await allRuns()
@@ -223,7 +231,7 @@ async function agents(): Promise<AgentInfo[]> {
   const started = new Date().toISOString()
   return ROLES.map((d) => {
     const mine = steps.filter((s) => s.role === d.role && s.said)
-    const noBackend = d.role === 'execution' || d.role === 'position' || d.role === 'supervisor'
+    const noBackend = !AGENTS_ONLINE || d.role === 'execution' || d.role === 'position' || d.role === 'supervisor'
     return {
       role: d.role, name: d.name, duty: d.duty, impl: d.impl, noModel: d.noModel,
       status: noBackend ? 'paused' : d.role === 'sentiment' ? 'degraded' : running ? 'running' : 'idle',
@@ -241,11 +249,11 @@ async function agents(): Promise<AgentInfo[]> {
 
 export const liveSource: DataSource = {
   info: { kind: 'live', label: '实时数据', now: () => new Date() },
-  tokens: () => get<Token[]>('/api/tokens'),
-  token: (a) => get<Token | null>(`/api/tokens/${encodeURIComponent(a)}`),
-  candles: async (a) => ({ candles: await get<Candle[]>(`/api/tokens/${encodeURIComponent(a)}/candles`), markers: [] }),
-  holders: (a) => get<Holder[]>(`/api/tokens/${encodeURIComponent(a)}/holders`),
-  trades: (a) => get<Trade[]>(`/api/tokens/${encodeURIComponent(a)}/trades`),
+  tokens: () => AGENTS_ONLINE ? get<Token[]>('/api/tokens') : chain.tokens(),
+  token: (a) => AGENTS_ONLINE ? get<Token | null>(`/api/tokens/${encodeURIComponent(a)}`) : chain.token(a),
+  candles: async (a) => ({ candles: AGENTS_ONLINE ? await get<Candle[]>(`/api/tokens/${encodeURIComponent(a)}/candles`) : await chain.candles(a), markers: [] }),
+  holders: (a) => AGENTS_ONLINE ? get<Holder[]>(`/api/tokens/${encodeURIComponent(a)}/holders`) : chain.holders(a),
+  trades: (a) => AGENTS_ONLINE ? get<Trade[]>(`/api/tokens/${encodeURIComponent(a)}/trades`) : chain.trades(a),
   chat: async (a) => { const run = await latestRun(a); return run ? runToChat(run) : [] },
   theses: async (a) => { const run = await latestRun(a); return run ? runToTheses(run) : [] },
   research: async (a) => { const run = await latestRun(a); return run ? runToSteps(run) : [] },
@@ -258,6 +266,7 @@ export const liveSource: DataSource = {
   pipeline: async () => [],
   events: async () => {
     const runs = await allRuns()
+    if (!runs.length) return []
     const tokens = await get<Token[]>('/api/tokens').catch(() => [] as Token[])
     const symbolOf = (mint: string) => tokens.find((t) => t.address === mint)?.symbol ?? `${mint.slice(0, 4)}…`
     return runs.flatMap((r) => runToEvents(r, symbolOf)).sort((x, y) => y.at.localeCompare(x.at))

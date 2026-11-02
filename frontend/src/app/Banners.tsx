@@ -1,5 +1,6 @@
 import { useApp } from './store'
 import { isDemo, useOrders } from '@/api/hooks'
+import { AGENTS_ONLINE } from '@/api/live'
 import { TERMINAL } from '@/domain/orderMachine'
 import { IAlert } from '@/components/icons'
 
@@ -8,7 +9,7 @@ export function DemoBanner() {
     <div role="note" className="border-b border-line">
       <div className="flex items-center gap-2 px-4 py-2 text-[12px] font-normal text-sub">
         <span className="shrink-0 font-medium text-up">实时数据</span>
-        <span className="truncate">行情、安全检查和 Agent 分析是真实的。Agent 只出决定，不会下单；交易、持仓和私聊还没有接入。</span>
+        <span className="truncate">{AGENTS_ONLINE ? '行情、安全检查和 Agent 分析是真实的。Agent 只出决定，不会下单；交易、持仓和私聊还没有接入。' : '行情、K 线和安全检查是真实链上数据。Agent 分析、交易、持仓和私聊还没有上线。'}</span>
       </div>
     </div>
   )

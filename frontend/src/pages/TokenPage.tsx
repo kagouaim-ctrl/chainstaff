@@ -11,6 +11,7 @@ import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
 import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
+import { AGENTS_ONLINE } from '@/api/live'
 import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
@@ -432,8 +433,8 @@ function Research({ t }: { t: Token }) {
   const steps = useResearchSteps(t.address)
   const research = useResearch()
   const o = (orders.data ?? []).find((x) => x.token.address === t.address)
-  const again = !isDemo() && t.verdict !== 'researching' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{t.verdict === 'unresearched' ? '交给 Agent 研究' : '重新研究'}</Button>
-  if (t.verdict === 'unresearched') return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。{isDemo() ? '点发现页的「交给 Agent」开始研究（后端未接入）。' : ''}</p>{again}</div>
+  const again = AGENTS_ONLINE && t.verdict !== 'researching' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{t.verdict === 'unresearched' ? '交给 Agent 研究' : '重新研究'}</Button>
+  if (t.verdict === 'unresearched') return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。{isDemo() ? '点发现页的「交给 Agent」开始研究（后端未接入）。' : AGENTS_ONLINE ? '' : 'Agent 分析还没上线。'}</p>{again}</div>
   const live = steps.data ?? []
   if (t.verdict === 'researching' && live.length === 0) return <p className="p-6 text-center text-[13px] text-sub">研究中：链上、安全、情绪、量化并行分析，完成后主 Agent 给出结论。</p>
   return (

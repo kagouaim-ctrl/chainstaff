@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
 import { isDemo } from '@/api/hooks'
-import { startRun, watchRun } from '@/api/live'
+import { AGENTS_ONLINE, startRun, watchRun } from '@/api/live'
 import { useToast } from '@/app/store'
 import { Button, Dialog } from '@/components/ui'
 
@@ -19,6 +19,7 @@ export function useResearch() {
   const set = useTarget((s) => s.set)
   return (t: Target) => {
     if (isDemo()) toast(`后端未接入：没有为 ${t.symbol} 创建研究任务。`)
+    else if (!AGENTS_ONLINE) toast(`Agent 分析还没上线：没有为 ${t.symbol} 创建研究任务。`)
     else set(t)
   }
 }

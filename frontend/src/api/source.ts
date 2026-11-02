@@ -1,10 +1,10 @@
 /**
  * 数据源接口。前端只依赖这个接口；后端实现后换成 HTTP + WebSocket 版本即可。
  * demoSource 是演示数据，sourceInfo.kind === 'demo' 时界面必须显示「演示」。
- * 设置 VITE_MEME_API_URL 时用 liveSource（真实行情和 Agent 分析，见 live.ts）。
+ * 设置 VITE_MEME_LIVE=1 或 VITE_MEME_API_URL 时用 liveSource（真实行情，有后端时还有 Agent 分析，见 live.ts）。
  */
 import * as D from './demo'
-import { API_URL, liveSource } from './live'
+import { LIVE, liveSource } from './live'
 import type {
   AgentDM,
   AgentEvent, AgentInfo, AuditEntry, ChatMessage, ClosedPosition, DataSourceStatus, DecisionStep, Holder, MainAgent,
@@ -65,6 +65,6 @@ export const demoSource: DataSource = {
   dataSources: () => wait(D.DATA_SOURCES),
 }
 
-let current: DataSource = API_URL ? liveSource : demoSource
+let current: DataSource = LIVE ? liveSource : demoSource
 export const source = () => current
 export function setSource(s: DataSource) { current = s }
