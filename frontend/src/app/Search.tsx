@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from './store'
-import { useAgents, useOrders, useTokens } from '@/api/hooks'
+import { useQuery } from '@tanstack/react-query'
+import { isDemo, useAgents, useOrders, useTokens } from '@/api/hooks'
 import { ISearch } from '@/components/icons'
 import { TokenAvatar, cx } from '@/components/ui'
-import { shortAddr } from '@/lib/format'
-import { isAddress } from '@/api/chain'
+import { shortAddr, usd } from '@/lib/format'
+import { CHAIN_LABEL, isAddress, search } from '@/api/chain'
 import type { AgentInfo, Order, Token } from '@/domain/types'
 
 export type Hit =
@@ -19,7 +20,7 @@ export function searchAll(q: string, tokens: Token[], agents: AgentInfo[], order
   const hits: Hit[] = []
   for (const t of tokens) {
     if (t.symbol.toLowerCase().includes(s) || t.name.toLowerCase().includes(s) || t.address.toLowerCase() === s || (s.length >= 4 && t.address.toLowerCase().startsWith(s)))
-      hits.push({ kind: 'token', key: `t${t.address}`, title: t.symbol, sub: `${t.name} · ${shortAddr(t.address)}`, token: t })
+      hits.push({ kind: 'token', key: `t${t.address}`, title: t.symbol, sub: `${t.name} · ${CHAIN_LABEL[t.chain] ?? ''} · ${shortAddr(t.address)}`, token: t })
   }
   // 粘贴了一个列表里没有的合约地址：直接去代币页查
   if (isAddress(q.trim()) && !hits.length) hits.push({ kind: 'token', key: `t${q.trim()}`, title: shortAddr(q.trim()), sub: '查看这个合约地址', token: { address: q.trim(), symbol: shortAddr(q.trim()), name: '', hue: 0 } as Token })
@@ -62,7 +63,21 @@ export function SearchPalette() {
   const inputRef = useRef<HTMLInputElement>(null)
   const nav = useNavigate()
   const tokens = useTokens(); const agents = useAgents(); const orders = useOrders()
-  const hits = useMemo(() => searchAll(q, tokens.data ?? [], agents.data ?? [], orders.data ?? []), [q, tokens.data, agents.data, orders.data])
+  const local = useMemo(() => searchAll(q, tokens.data ?? [], agents.data ?? [], orders.data ?? []), [q, tokens.data, agents.data, orders.data])
+  // 发现页只列几十个代币；其余的在 DexScreener 上搜，停止输入 300 毫秒后再查
+  const [term, setTerm] = useState('')
+  useEffect(() => { const t = setTimeout(() => setTerm(q.trim()), 300); return () => clearTimeout(t) }, [q])
+  const remote = useQuery({ queryKey: ['search', term], queryFn: () => search(term), enabled: !isDemo() && term.length >= 2 && !isAddress(term), staleTime: 60_000 })
+  const hits = useMemo(() => {
+    const seen = new Set(local.filter((h) => h.kind === 'token').map((h) => h.token.address.toLowerCase()))
+    const extra: Hit[] = (term === q.trim() ? remote.data ?? [] : []).filter((r) => !seen.has(r.address.toLowerCase())).map((r) => ({
+      kind: 'token', key: `s${r.chain}${r.address}`, title: r.symbol,
+      sub: `${r.name} · ${CHAIN_LABEL[r.chain]} · 24h 成交 ${usd(r.volumeH24, { compact: true })} · ${shortAddr(r.address)}`,
+      token: { address: r.address, symbol: r.symbol, name: r.name, hue: 0, chain: r.chain } as Token,
+    }))
+    return [...local.filter((h) => h.kind === 'token'), ...extra, ...local.filter((h) => h.kind !== 'token')].slice(0, 20)
+  }, [local, remote.data, term, q])
+  const searching = !isDemo() && q.trim().length >= 2 && !isAddress(q.trim()) && (term !== q.trim() || remote.isFetching)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -103,7 +118,7 @@ export function SearchPalette() {
           <kbd className="rounded border border-line px-1.5 text-[11px] text-sub">Esc</kbd>
         </div>
         <ul role="listbox" aria-label="搜索结果" className="max-h-[50vh] overflow-y-auto p-1.5">
-          {q && hits.length === 0 && <li className="p-4 text-center text-sm text-sub">没有找到「{q}」。合约地址需输入至少前 4 位。</li>}
+          {q && hits.length === 0 && <li className="p-4 text-center text-sm text-sub">{searching ? '正在搜索…' : remote.isError ? '搜索暂时不可用，可以直接粘贴合约地址。' : `没有找到「${q}」。可以输入代币名称、符号或完整的合约地址。`}</li>}
           {!q && <Suggest tokens={tokens.data ?? []} onPick={(t) => go({ kind: 'token', key: t.address, title: t.symbol, sub: t.name, token: t })} />}
           {hits.map((h, i) => (
             <li key={h.key} role="option" aria-selected={i === sel}>

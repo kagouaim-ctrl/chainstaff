@@ -295,3 +295,28 @@ export async function holders(addr: string): Promise<Holder[]> {
     amountUsd: (h.uiAmount ?? 0) * price, pct: h.pct ?? 0, avgCost: null, pnlPct: null, heldMinutes: null,
   }))
 }
+
+export interface SearchHit { chain: Chain; address: string; symbol: string; name: string; liquidityUsd: number; volumeH24: number; priceUsd: number | null }
+
+/**
+ * 在 DexScreener 上按名称、符号或地址搜三条链的代币。
+ * 按 24 小时总成交额排序：骗子盘常常报出离谱的流动性，但很难有真实成交。
+ */
+export async function search(q: string): Promise<SearchHit[]> {
+  const term = q.trim()
+  if (term.length < 2) return []
+  const body = await getJson(`${DEX}/latest/dex/search?q=${encodeURIComponent(term)}`)
+  const by = new Map<string, { p: Json; volume: number }>()
+  for (const p of body?.pairs ?? []) {
+    const a = p.baseToken?.address
+    if (!isChain(p.chainId) || !a || !isAddress(a)) continue
+    const k = `${p.chainId}:${a.toLowerCase()}`
+    const cur = by.get(k)
+    const volume = (cur?.volume ?? 0) + (p.volume?.h24 ?? 0)
+    by.set(k, { p: !cur || liq(p) > liq(cur.p) ? p : cur.p, volume })
+  }
+  return [...by.values()].sort((x, y) => y.volume - x.volume).slice(0, 15).map(({ p, volume }) => {
+    chainOfAddress.set(p.baseToken.address.toLowerCase(), p.chainId)
+    return { chain: p.chainId, address: p.baseToken.address, symbol: p.baseToken.symbol ?? '', name: p.baseToken.name ?? '', liquidityUsd: liq(p), volumeH24: volume, priceUsd: num(p.priceUsd) }
+  })
+}
