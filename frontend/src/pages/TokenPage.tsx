@@ -12,6 +12,7 @@ import { TradePanel } from '@/features/TradePanel'
 import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
 import { AGENTS_ONLINE } from '@/api/live'
+import { CHAIN_LABEL } from '@/api/chain'
 import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
@@ -214,7 +215,7 @@ function About({ t }: { t: Token }) {
   return (
     <section className="rounded-xl border border-line p-4" aria-label={`关于 ${t.symbol}`}>
       <h2 className="text-[16px]">关于 {t.symbol}</h2>
-      <p className="mt-1 text-[14px] font-normal text-sub">{t.name} · {t.launchpad} 发射 · {t.graduated ? '已毕业' : t.bondingPct === null ? '未毕业' : `内盘进度 ${t.bondingPct}%`}</p>
+      <p className="mt-1 text-[14px] font-normal text-sub">{t.name} · {CHAIN_LABEL[t.chain]} · {t.chain === 'solana' ? <>{t.launchpad} 发射 · {t.graduated ? '已毕业' : t.bondingPct === null ? '未毕业' : `内盘进度 ${t.bondingPct}%`}</> : `主要交易对在 ${t.launchpad}`}</p>
       <div className="mt-3 grid grid-cols-4 gap-2">
         {([['5M', '5m'], ['1H', '1h'], ['6H', '6h'], ['1D', '24h']] as const).map(([l, k]) => (
           <div key={k} className="rounded-lg border border-line px-2 py-2 text-center">
@@ -286,7 +287,7 @@ function SecurityBlock({ t }: { t: Token }) {
             <KV k="前十持有占比" v={s.top10Pct === null ? '未知' : pct(s.top10Pct, 1).replace('+', '')} />
             <KV k="开发者持有" v={s.devHoldPct === null ? '未知' : pct(s.devHoldPct, 1).replace('+', '')} />
           </div>
-          <p className="mt-2 text-[11px] text-sub">「可卖出」只是近似结果：反向报价能否路由，不是真实卖出模拟。{isDemo() ? 'RugCheck 未接入。' : ''}</p>
+          <p className="mt-2 text-[11px] text-sub">{t.chain === 'solana' ? '「可卖出」只是近似结果：反向报价能否路由，不是真实卖出模拟。' : '安全检查来自 GoPlus：可卖出、税率、权限都是它的模拟和合约分析结果。'}{isDemo() ? 'RugCheck 未接入。' : ''}</p>
         </>
       )}
     </Panel>

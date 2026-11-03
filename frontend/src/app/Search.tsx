@@ -5,6 +5,7 @@ import { useAgents, useOrders, useTokens } from '@/api/hooks'
 import { ISearch } from '@/components/icons'
 import { TokenAvatar, cx } from '@/components/ui'
 import { shortAddr } from '@/lib/format'
+import { isAddress } from '@/api/chain'
 import type { AgentInfo, Order, Token } from '@/domain/types'
 
 export type Hit =
@@ -20,6 +21,8 @@ export function searchAll(q: string, tokens: Token[], agents: AgentInfo[], order
     if (t.symbol.toLowerCase().includes(s) || t.name.toLowerCase().includes(s) || t.address.toLowerCase() === s || (s.length >= 4 && t.address.toLowerCase().startsWith(s)))
       hits.push({ kind: 'token', key: `t${t.address}`, title: t.symbol, sub: `${t.name} · ${shortAddr(t.address)}`, token: t })
   }
+  // 粘贴了一个列表里没有的合约地址：直接去代币页查
+  if (isAddress(q.trim()) && !hits.length) hits.push({ kind: 'token', key: `t${q.trim()}`, title: shortAddr(q.trim()), sub: '查看这个合约地址', token: { address: q.trim(), symbol: shortAddr(q.trim()), name: '', hue: 0 } as Token })
   for (const a of agents) {
     if (a.name.toLowerCase().includes(s) || a.role.includes(s)) hits.push({ kind: 'agent', key: `a${a.role}`, title: a.name, sub: a.duty, agent: a })
   }

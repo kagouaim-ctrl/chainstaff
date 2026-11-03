@@ -58,8 +58,11 @@ export interface SecurityCheck {
 
 export interface WindowStat { change: number; volume: number; txns: number; buyers: number; sellers: number }
 
+/** 行情支持的链。交易只计划支持 Solana。 */
+export type Chain = 'solana' | 'bsc' | 'robinhood'
+
 export interface Token {
-  chain: 'solana'
+  chain: Chain
   address: string
   symbol: string
   name: string

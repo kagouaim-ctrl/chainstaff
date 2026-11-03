@@ -212,9 +212,10 @@ const EMPTY_PORTFOLIO: Portfolio = {
 }
 const STRATEGY: StrategyConfig = { chain: 'solana', scope: '尚未配置', template: '尚未配置', riskBudgetUsd: 0, mode: 'paper', policy: DEFAULT_POLICY, version: 0 }
 const DATA_SOURCES: DataSourceStatus[] = [
-  { name: 'DexScreener', kind: '行情、交易对', state: 'connected', note: '无需 key' },
+  { name: 'DexScreener', kind: '行情、交易对（Solana、BSC、Robinhood）', state: 'connected', note: '无需 key' },
   { name: 'GeckoTerminal', kind: 'K 线、成交', state: 'connected', note: '免费档有频率限制，超限时这部分显示缺失' },
   { name: 'Solana RPC', kind: 'Mint / Freeze 权限', state: 'connected', note: '后端用它核对权限；没有后端时以 RugCheck 为准' },
+  { name: 'GoPlus', kind: 'BSC、Robinhood 安全检查', state: 'connected', note: '无需 key；买卖模拟、税率、权限、持有者' },
   { name: 'RugCheck', kind: '风险项、持有者、LP', state: 'connected', note: '无需 key' },
   { name: 'Jupiter', kind: '卖出报价', state: 'connected', note: '只查报价，不是真实卖出模拟' },
   { name: 'X / Telegram', kind: '社交内容', state: 'not_connected', note: '没有接入，情绪分析师只能看链接和付费推广' },

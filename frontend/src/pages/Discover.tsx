@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useTokens, isDemo, now } from '@/api/hooks'
 import { useApp, useToast } from '@/app/store'
 import { useResearch } from '@/features/Research'
+import { CHAIN_LABEL } from '@/api/chain'
 import { DataState, Segmented, TokenAvatar, Chg, cx } from '@/components/ui'
 import { IStar, IBot } from '@/components/icons'
 import { VerdictTag, SecurityBadge, securityPass } from '@/features/tokenBits'
 import { usd, price, age, compactCN, relTime } from '@/lib/format'
-import type { Timeframe, Token } from '@/domain/types'
+import type { Timeframe, Token, Chain } from '@/domain/types'
 
 export type TabKey = 'trending' | 'blue' | 'held' | 'graduated' | 'bonding' | 'agent' | 'watch'
 export type SortKey = 'mcap' | 'change' | 'volume' | 'liquidity' | 'holders' | 'age' | 'bonding'
@@ -25,7 +26,7 @@ export const TABS: { value: TabKey; label: string }[] = [
 
 const DEFAULT_SORT: Record<TabKey, SortKey> = { trending: 'volume', agent: 'volume', blue: 'mcap', held: 'holders', graduated: 'age', bonding: 'bonding', watch: 'mcap' }
 
-export interface Filter { tab: TabKey; tf: Timeframe; safeOnly: boolean; minMcap: number; launchpad: string; watch: Record<string, boolean>; sort: SortKey; dir: 1 | -1 }
+export interface Filter { tab: TabKey; tf: Timeframe; safeOnly: boolean; minMcap: number; launchpad: string; chain?: string; watch: Record<string, boolean>; sort: SortKey; dir: 1 | -1 }
 
 export function filterTokens(list: Token[], o: Filter) {
   let r = list.slice()
@@ -37,6 +38,7 @@ export function filterTokens(list: Token[], o: Filter) {
   if (o.safeOnly) r = r.filter((t) => securityPass(t.security) === true)
   if (o.minMcap) r = r.filter((t) => t.mcapUsd >= o.minMcap)
   if (o.launchpad !== 'all') r = r.filter((t) => t.launchpad === o.launchpad)
+  if (o.chain && o.chain !== 'all') r = r.filter((t) => t.chain === o.chain)
   const key = (t: Token) => ({
     mcap: t.mcapUsd, change: t.stats[o.tf].change, volume: t.stats[o.tf].volume, liquidity: t.liquidityUsd,
     holders: t.holders ?? 0, age: -t.ageMinutes, bonding: t.bondingPct ?? 0,
@@ -97,9 +99,10 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const [safeOnly, setSafeOnly] = useState(false)
   const [minMcap, setMinMcap] = useState(0)
   const [launchpad, setLaunchpad] = useState('all')
+  const [chain, setChain] = useState('all')
   const [sort, setSort] = useState<SortKey>(DEFAULT_SORT[initial])
   const [dir, setDir] = useState<1 | -1>(1)
-  const rows = useMemo(() => filterTokens(q.data ?? [], { tab, tf, safeOnly, minMcap, launchpad, watch, sort, dir }), [q.data, tab, tf, safeOnly, minMcap, launchpad, watch, sort, dir])
+  const rows = useMemo(() => filterTokens(q.data ?? [], { tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir }), [q.data, tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir])
   const quickBuy = (t: Token) => toast(`后端未接入：没有下单。接入后「+ $10」会把 ${t.symbol} 的模拟买入交给风控审批。`)
   const research = useResearch()
   const switchTab = (v: TabKey) => { setTab(v); setSort(DEFAULT_SORT[v]); setDir(1) }
@@ -130,7 +133,11 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
         <select aria-label="发射平台" className={sel} value={launchpad} onChange={(e) => setLaunchpad(e.target.value)}>
           <option value="all">平台：全部</option><option>pump.fun</option><option>bonk.fun</option><option>Raydium</option>
         </select>
-        <span className="flex h-9 items-center rounded-lg border border-line px-3 text-[14px] text-sub" title="只支持 Solana，其他链未适配">链：Solana</span>
+        {isDemo()
+          ? <span className="flex h-9 items-center rounded-lg border border-line px-3 text-[14px] text-sub" title="只支持 Solana，其他链未适配">链：Solana</span>
+          : <select aria-label="链" className={sel} value={chain} onChange={(e) => setChain(e.target.value)}>
+              <option value="all">链：全部</option>{(Object.keys(CHAIN_LABEL) as Chain[]).map((c) => <option key={c} value={c}>{CHAIN_LABEL[c]}</option>)}
+            </select>}
         <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[14px] text-sub">
           <input type="checkbox" checked={safeOnly} onChange={(e) => setSafeOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看安全
         </label>
@@ -173,7 +180,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                                 {t.verified && <span title="已认证" className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-agent text-[9px] text-white">✓</span>}
                                 <SecurityBadge s={t.security} />
                               </div>
-                              <div className="truncate text-[12px] font-normal text-sub">{t.name} · {age(t.ageMinutes)}</div>
+                              <div className="truncate text-[12px] font-normal text-sub">{t.chain !== 'solana' && <span className="mr-1 rounded bg-raised px-1 text-[11px] text-fg/80">{CHAIN_LABEL[t.chain]}</span>}{t.name} · {age(t.ageMinutes)}</div>
                             </div>
                           </div>
                         </td>
@@ -206,7 +213,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                     <TokenAvatar symbol={t.symbol} hue={t.hue} size={38} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 text-[14px]">{t.symbol}{t.verified && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-agent text-[9px] text-white">✓</span>}<SecurityBadge s={t.security} /></div>
-                      <div className="num truncate text-[12px] font-normal text-sub">{usd(t.mcapUsd, { compact: true })} · <VerdictInline t={t} /></div>
+                      <div className="num truncate text-[12px] font-normal text-sub">{t.chain !== 'solana' && <>{CHAIN_LABEL[t.chain]} · </>}{usd(t.mcapUsd, { compact: true })} · <VerdictInline t={t} /></div>
                     </div>
                     <div className="text-right">
                       <div className="num text-[14px] font-medium">{price(t.priceUsd)}</div>
