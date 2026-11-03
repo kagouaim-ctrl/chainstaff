@@ -84,7 +84,14 @@ export interface Token {
   watch?: boolean
   dataSource: string
   updatedAt: string
+  /** 代币图标，只收 https 链接；没有时用生成头像 */
+  image?: string | null
+  /** 项目方自己填的简介，陌生人写的，只当文本显示 */
+  description?: string | null
+  links?: TokenLink[]
 }
+
+export interface TokenLink { kind: 'website' | 'x' | 'telegram' | 'discord' | 'other'; label: string; url: string }
 
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
 

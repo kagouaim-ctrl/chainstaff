@@ -77,7 +77,7 @@ function WatchStrip() {
       {list.length === 0 && <p className="text-xs text-sub">还没有自选。点代币左边的星标加入。</p>}
       {list.map((t) => (
         <button key={t.address} onClick={() => nav(`/token/${t.address}`)} className="flex min-w-[200px] shrink-0 items-center gap-3 rounded-xl border border-line px-3 py-2.5 text-left hover:bg-raised">
-          <TokenAvatar symbol={t.symbol} hue={t.hue} size={30} />
+          <TokenAvatar image={t.image} symbol={t.symbol} hue={t.hue} size={30} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1 text-[14px]">{t.symbol}<IStar filled className="text-paper" width={11} height={11} /></span>
             <span className="num block whitespace-nowrap text-[12px] font-normal text-sub">市值 {usd(t.mcapUsd, { compact: true })}</span>
@@ -173,7 +173,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                         </td>
                         <td className="px-3">
                           <div className="flex items-center gap-3">
-                            <TokenAvatar symbol={t.symbol} hue={t.hue} size={36} />
+                            <TokenAvatar image={t.image} symbol={t.symbol} hue={t.hue} size={36} />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 {t.symbol}
@@ -210,7 +210,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
               {rows.map((t) => (
                 <li key={t.address} className="flex h-[61px] items-center gap-3 border-t border-line">
                   <button onClick={() => nav(`/token/${t.address}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                    <TokenAvatar symbol={t.symbol} hue={t.hue} size={38} />
+                    <TokenAvatar image={t.image} symbol={t.symbol} hue={t.hue} size={38} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 text-[14px]">{t.symbol}{t.verified && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-agent text-[9px] text-white">✓</span>}<SecurityBadge s={t.security} /></div>
                       <div className="num truncate text-[12px] font-normal text-sub">{t.chain !== 'solana' && <>{CHAIN_LABEL[t.chain]} · </>}{usd(t.mcapUsd, { compact: true })} · <VerdictInline t={t} /></div>

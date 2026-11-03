@@ -5,7 +5,7 @@
  * 读不到的值保持 null，界面显示为未知：查不到权限不等于没有权限。
  * 和后端 tradingagents/meme/market.py 的换算一致。
  */
-import type { Candle, Chain, Holder, SecurityCheck, Timeframe, Token, Trade, WindowStat } from '@/domain/types'
+import type { Candle, Chain, Holder, SecurityCheck, Timeframe, Token, TokenLink, Trade, WindowStat } from '@/domain/types'
 
 const DEX = 'https://api.dexscreener.com'
 const GECKO = 'https://api.geckoterminal.com/api/v2/networks'
@@ -135,6 +135,25 @@ export function evmSecurity(g: Json): SecurityCheck {
   }
 }
 
+const https = (u: unknown): string | null => typeof u === 'string' && /^https:\/\//i.test(u) ? u : null
+const SOCIAL: Record<string, TokenLink['kind']> = { twitter: 'x', x: 'x', telegram: 'telegram', discord: 'discord' }
+const LINK_LABEL: Record<TokenLink['kind'], string> = { website: '官网', x: 'X', telegram: 'Telegram', discord: 'Discord', other: '链接' }
+
+/** DexScreener 里项目方登记的官网和社交账号。只收 https 链接。 */
+function links(info: Json): TokenLink[] {
+  const out: TokenLink[] = []
+  for (const w of info?.websites ?? []) { const url = https(w.url); if (url) out.push({ kind: 'website', label: LINK_LABEL.website, url }) }
+  for (const s of info?.socials ?? []) {
+    const url = https(s.url)
+    const kind = SOCIAL[String(s.type).toLowerCase()] ?? 'other'
+    if (url) out.push({ kind, label: kind === 'other' ? String(s.type || LINK_LABEL.other) : LINK_LABEL[kind], url })
+  }
+  return out
+}
+
+/** 简介只在 DexScreener 的代币资料里有，列表加载时记下来。 */
+const descriptions = new Map<string, string>()
+
 function tokenView(chain: Chain, pairs: Json[], report: Json, sell?: Json): Token {
   const top = pairs[0]
   const mint: string = top.baseToken.address
@@ -149,6 +168,9 @@ function tokenView(chain: Chain, pairs: Json[], report: Json, sell?: Json): Toke
     stats: stats(top), security: evm ? evmSecurity(report) : solanaSecurity(report, sell), verdict: 'unresearched', tags: [],
     graduated: !BONDING_DEXES.has(top.dexId), bondingPct: null, verified: false, launchpad,
     dataSource: `DexScreener、${evm ? 'GoPlus' : 'RugCheck'}（浏览器直接读取）`, updatedAt: new Date().toISOString(),
+    image: https(pairs.find((p) => p.info?.imageUrl)?.info?.imageUrl),
+    description: descriptions.get(`${chain}:${mint.toLowerCase()}`) ?? null,
+    links: links(pairs.find((p) => p.info?.websites?.length || p.info?.socials?.length)?.info),
   }
 }
 
@@ -187,7 +209,9 @@ async function trending(chain: Chain): Promise<{ chain: Chain; address: string }
 
 async function listed(path: string): Promise<{ chain: Chain; address: string }[]> {
   const rows: Json[] = (await getJson(`${DEX}${path}`).catch(() => [])) ?? []
-  return rows.filter((r) => isChain(r.chainId) && isAddress(r.tokenAddress ?? '')).map((r) => ({ chain: r.chainId as Chain, address: r.tokenAddress }))
+  const ok = rows.filter((r) => isChain(r.chainId) && isAddress(r.tokenAddress ?? ''))
+  for (const r of ok) if (typeof r.description === 'string' && r.description.trim()) descriptions.set(`${r.chainId}:${r.tokenAddress.toLowerCase()}`, r.description.trim().slice(0, 600))
+  return ok.map((r) => ({ chain: r.chainId as Chain, address: r.tokenAddress }))
 }
 
 /** 一次最多几个并发，免得一个页面把 RugCheck 打满。 */

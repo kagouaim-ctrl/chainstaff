@@ -108,10 +108,10 @@ function Header({ t }: { t: Token }) {
   return (
     <section className="border-b border-line px-4 py-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <TokenAvatar symbol={t.symbol} hue={t.hue} size={40} />
+        <TokenAvatar image={t.image} symbol={t.symbol} hue={t.hue} size={40} />
         <h1 className="text-[20px] font-bold leading-6 tracking-[-0.4px]">{t.symbol}</h1>
         <div className="flex items-center gap-1 text-sub">
-          <a href={`https://x.com/search?q=%24${t.symbol}`} target="_blank" rel="noreferrer" aria-label="在 X 上搜索" className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised hover:text-fg"><ISearch /></a>
+          <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" aria-label="在 X 上搜索" className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised hover:text-fg"><ISearch /></a>
           <button onClick={() => toggleWatch(t.address)} aria-pressed={!!w} aria-label={w ? '取消自选' : '加入自选'} className={cx('flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised', w ? 'text-paper' : 'hover:text-fg')}><IStar filled={!!w} /></button>
         </div>
         <span className="text-[14px] text-sub">{age(t.ageMinutes)}</span>
@@ -228,9 +228,15 @@ function About({ t }: { t: Token }) {
         <Bar l={`${usd(s.volume * bShare, { compact: true })} 交易量`} r={`${usd(s.volume * (1 - bShare), { compact: true })} 交易量`} lv={bShare} rv={1 - bShare} />
         <Bar l={`${s.buyers} 笔买入`} r={`${s.sellers} 笔卖出`} lv={s.buyers} rv={s.sellers} />
       </div>
+      {t.description && <p className="mt-4 line-clamp-4 whitespace-pre-line text-[13px] font-normal text-fg/80">{t.description}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
-        <a href={`https://x.com/search?q=%24${t.symbol}`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜索</a>
+        {(t.links ?? []).map((l) => (
+          <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" title={l.url} className="flex h-9 items-center rounded-lg bg-panel px-3 text-[14px] hover:bg-raised">{l.label}</a>
+        ))}
+        <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜 ${t.symbol}</a>
+        <a href={`https://x.com/search?q=${encodeURIComponent(t.address)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜合约地址</a>
       </div>
+      {!isDemo() && !(t.links ?? []).length && <p className="mt-2 text-[12px] font-normal text-sub">项目方没有在 DexScreener 登记官网或社交账号。</p>}
       <p className="mt-3 text-[12px] font-normal text-mute">{isDemo() ? '买入 / 卖出笔数和交易量按买家占比估算（演示）' : '交易量按买卖笔数的比例估算，不是实际买卖金额。'}</p>
     </section>
   )
