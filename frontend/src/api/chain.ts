@@ -23,13 +23,14 @@ const CHAINS: Record<Chain, { gecko: string; goplus: string | null }> = {
   ethereum: { gecko: 'eth', goplus: '1' },
 }
 export const CHAIN_LABEL: Record<Chain, string> = { solana: 'Solana', bsc: 'BSC', robinhood: 'Robinhood', ethereum: 'ETH' }
+/** 每条链最多列多少个，免得 Solana 的推广代币把别的链挤掉。 */
+const PER_CHAIN = 12
 const EVM_CHAINS: Chain[] = ['bsc', 'robinhood', 'ethereum']
+/** 每条链都能列满，加链时总数跟着变 */
+const LIST_MAX = PER_CHAIN * Object.keys(CHAINS).length
 const isChain = (c: string): c is Chain => c in CHAINS
 // EVM 上的「死地址」：打到这里的代币和 LP 就是销毁了
 const BURN = new Set(['0x000000000000000000000000000000000000dead', '0x0000000000000000000000000000000000000000'])
-const LIST_MAX = 36
-/** 每条链最多列多少个，免得 Solana 的推广代币把别的链挤掉。 */
-const PER_CHAIN = 12
 const LP_LOCKED_MIN_PCT = 80
 const SELL_QUOTE_USD = 100
 const BONDING_DEXES = new Set(['pumpfun', 'launchlab', 'moonshot', 'boop'])
