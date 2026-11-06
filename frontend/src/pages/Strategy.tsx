@@ -35,7 +35,7 @@ export function Strategy() {
           <DataState q={q} rows={3}>
             {(s) => (
               <dl className="grid gap-x-8 gap-y-3 text-[13px] sm:grid-cols-2">
-                <div><dt className="text-xs text-sub">网络</dt><dd className="mt-0.5">Solana <span className="text-xs text-sub">{isDemo() ? '（BSC、Base 未适配，不可选）' : '（行情还支持 BSC 和 Robinhood Chain，交易只计划支持 Solana）'}</span></dd></div>
+                <div><dt className="text-xs text-sub">网络</dt><dd className="mt-0.5">Solana <span className="text-xs text-sub">{isDemo() ? '（BSC、Base 未适配，不可选）' : '（行情和交易还支持 BSC、ETH、Robinhood Chain）'}</span></dd></div>
                 <div><dt className="text-xs text-sub">监控范围</dt><dd className="mt-0.5">{s.scope}</dd></div>
                 <div><dt className="text-xs text-sub">策略模板</dt><dd className="mt-0.5">{s.template} <span className="text-xs text-sub">v{s.version}</span></dd></div>
                 <div><dt className="text-xs text-sub">风险预算</dt><dd className="num mt-0.5">${s.riskBudgetUsd.toLocaleString()}（模拟资金）</dd></div>

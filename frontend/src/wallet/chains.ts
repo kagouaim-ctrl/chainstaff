@@ -4,6 +4,7 @@ import type { Chain } from '@/domain/types'
 export const NET: Record<Chain, { family: 'solana' | 'evm'; native: string; decimals: number; rpc: string; explorer: string; chainId?: number }> = {
   solana: { family: 'solana', native: 'SOL', decimals: 9, rpc: 'https://solana-rpc.publicnode.com', explorer: 'https://solscan.io' },
   bsc: { family: 'evm', native: 'BNB', decimals: 18, rpc: 'https://bsc-rpc.publicnode.com', explorer: 'https://bscscan.com', chainId: 56 },
+  ethereum: { family: 'evm', native: 'ETH', decimals: 18, rpc: 'https://ethereum-rpc.publicnode.com', explorer: 'https://etherscan.io', chainId: 1 },
   robinhood: { family: 'evm', native: 'ETH', decimals: 18, rpc: 'https://robinhood-rpc.publicnode.com', explorer: 'https://robinhoodchain.blockscout.com', chainId: 4663 },
 }
 

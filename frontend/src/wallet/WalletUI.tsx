@@ -33,7 +33,7 @@ export function WalletPicker() {
     try { await connect(); openPicker(null); toast(`已连接 ${name}`) } catch (e) { toast(e instanceof Error ? `没有连上：${e.message}` : '没有连上') } finally { setBusy('') }
   }
   return (
-    <Dialog open onClose={() => openPicker(null)} title={family === 'solana' ? '连接 Solana 钱包' : '连接 BSC / Robinhood 钱包'} footer={<Button onClick={() => openPicker(null)}>取消</Button>}>
+    <Dialog open onClose={() => openPicker(null)} title={family === 'solana' ? '连接 Solana 钱包' : '连接 BSC / ETH / Robinhood 钱包'} footer={<Button onClick={() => openPicker(null)}>取消</Button>}>
       <p className="text-sub">资金一直在你自己的钱包里。每笔交易都要你在钱包里确认，平台拿不到你的私钥，也动不了你的钱。</p>
       <ul className="mt-3 space-y-2">
         {list.map((w) => (
@@ -97,9 +97,9 @@ export function WalletButton() {
         <div role="dialog" aria-label="钱包" className={cx('anim-enter absolute right-0 top-[52px] z-40 w-[320px] rounded-xl border border-line bg-panel p-4')}>
           <ul className="divide-y divide-line">
             {row('Solana', solana?.address, 'solana')}
-            {row('BSC / Robinhood', evm?.address, 'evm')}
+            {row('BSC / ETH / Robinhood', evm?.address, 'evm')}
           </ul>
-          <p className="mt-2 text-[11px] text-sub">BSC 余额只是参考；同一个 EVM 钱包在 Robinhood Chain 上的余额在交易面板里显示。</p>
+          <p className="mt-2 text-[11px] text-sub">这里显示 BSC 余额；同一个 EVM 钱包在 ETH 和 Robinhood Chain 上的余额在交易面板里显示。</p>
         </div>
       )}
     </div>

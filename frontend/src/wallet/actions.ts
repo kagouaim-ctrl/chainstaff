@@ -50,7 +50,7 @@ export async function ensureEvmChain(chain: Chain) {
   } catch (e: any) {
     if (e?.code !== 4902) throw e
     await w.wallet.provider.request({ method: 'wallet_addEthereumChain', params: [{
-      chainId: hex, chainName: chain === 'bsc' ? 'BNB Smart Chain' : 'Robinhood Chain',
+      chainId: hex, chainName: chain === 'bsc' ? 'BNB Smart Chain' : chain === 'ethereum' ? 'Ethereum' : 'Robinhood Chain',
       nativeCurrency: { name: NET[chain].native, symbol: NET[chain].native, decimals: 18 },
       rpcUrls: [NET[chain].rpc], blockExplorerUrls: [NET[chain].explorer],
     }] })

@@ -1,6 +1,6 @@
 /**
  * 浏览器直接读公开的链上行情接口，不经过我们的后端：DexScreener、GeckoTerminal 管行情，
- * Solana 的安全检查用 RugCheck 和 Jupiter，BSC 和 Robinhood Chain 用 GoPlus。
+ * Solana 的安全检查用 RugCheck 和 Jupiter，BSC 和 Robinhood Chain、ETH 用 GoPlus。
  * 都不需要 key，也都允许网页直接调用。每个访客用自己的调用额度。
  * 读不到的值保持 null，界面显示为未知：查不到权限不等于没有权限。
  * 和后端 tradingagents/meme/market.py 的换算一致。
@@ -15,9 +15,15 @@ const JUPITER = 'https://lite-api.jup.ag/swap/v1'
 const WSOL = 'So11111111111111111111111111111111111111112'
 const MINT = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 const EVM = /^0x[0-9a-fA-F]{40}$/
-/** DexScreener 和 GeckoTerminal 的网络名正好相同；goplus 是 GoPlus 的链 ID。 */
-const CHAINS: Record<Chain, { goplus: string | null }> = { solana: { goplus: null }, bsc: { goplus: '56' }, robinhood: { goplus: '4663' } }
-export const CHAIN_LABEL: Record<Chain, string> = { solana: 'Solana', bsc: 'BSC', robinhood: 'Robinhood' }
+/** 链的键用 DexScreener 的网络名；gecko 是 GeckoTerminal 的网络名，goplus 是 GoPlus 的链 ID。 */
+const CHAINS: Record<Chain, { gecko: string; goplus: string | null }> = {
+  solana: { gecko: 'solana', goplus: null },
+  bsc: { gecko: 'bsc', goplus: '56' },
+  robinhood: { gecko: 'robinhood', goplus: '4663' },
+  ethereum: { gecko: 'eth', goplus: '1' },
+}
+export const CHAIN_LABEL: Record<Chain, string> = { solana: 'Solana', bsc: 'BSC', robinhood: 'Robinhood', ethereum: 'ETH' }
+const EVM_CHAINS: Chain[] = ['bsc', 'robinhood', 'ethereum']
 const isChain = (c: string): c is Chain => c in CHAINS
 // EVM 上的「死地址」：打到这里的代币和 LP 就是销毁了
 const BURN = new Set(['0x000000000000000000000000000000000000dead', '0x0000000000000000000000000000000000000000'])
@@ -199,7 +205,7 @@ async function locate(addr: string): Promise<{ chain: Chain; pairs: Json[] } | n
   if (MINT.test(addr)) { const pairs = await pairsOf('solana', addr); return pairs.length ? { chain: 'solana', pairs } : null }
   if (!EVM.test(addr)) return null
   const known = chainOfAddress.get(addr.toLowerCase())
-  const tries: Chain[] = known ? [known] : ['bsc', 'robinhood']
+  const tries: Chain[] = known ? [known] : EVM_CHAINS
   const found = await Promise.all(tries.map(async (c) => ({ chain: c, pairs: await pairsOf(c, addr).catch(() => [] as Json[]) })))
   const best = found.filter((f) => f.pairs.length).sort((x, y) => liq(y.pairs[0]) - liq(x.pairs[0]))[0]
   return best ?? null
@@ -207,8 +213,8 @@ async function locate(addr: string): Promise<{ chain: Chain; pairs: Json[] } | n
 
 /** GeckoTerminal 每条链的热门池子，补上 DexScreener 推广榜里很少出现的 BSC 和 Robinhood。 */
 async function trending(chain: Chain): Promise<{ chain: Chain; address: string }[]> {
-  const body = await getJson(`${GECKO}/${chain}/trending_pools`).catch(() => null)
-  return (body?.data ?? []).map((p: Json) => String(p.relationships?.base_token?.data?.id ?? '').replace(`${chain}_`, ''))
+  const body = await getJson(`${GECKO}/${CHAINS[chain].gecko}/trending_pools`).catch(() => null)
+  return (body?.data ?? []).map((p: Json) => String(p.relationships?.base_token?.data?.id ?? '').replace(`${CHAINS[chain].gecko}_`, ''))
     .filter((a: string) => isAddress(a)).map((address: string) => ({ chain, address }))
 }
 
@@ -231,7 +237,7 @@ async function pool<T, R>(items: T[], n: number, f: (x: T) => Promise<R>): Promi
 export async function tokens(): Promise<Token[]> {
   return cached('list', async () => {
     const seen = new Set<string>()
-    const sources = await Promise.all([listed('/token-boosts/top/v1'), listed('/token-profiles/latest/v1'), trending('bsc'), trending('robinhood')])
+    const sources = await Promise.all([listed('/token-boosts/top/v1'), listed('/token-profiles/latest/v1'), ...EVM_CHAINS.map(trending)])
     const count: Record<string, number> = {}
     const picks = sources.flat()
       .filter((p) => { const k = `${p.chain}:${p.address.toLowerCase()}`; return !seen.has(k) && !!seen.add(k) })
@@ -302,7 +308,7 @@ async function secondCandles(addr: string, step: number): Promise<Candle[]> {
   const log = tradeLog.get(key) ?? new Map()
   tradeLog.set(key, log)
   try {
-    const body = await cached(`live-trades:${key}`, () => getJson(`${GECKO}/${p.chain}/pools/${p.pool}/trades`), 2_500)
+    const body = await cached(`live-trades:${key}`, () => getJson(`${GECKO}/${CHAINS[p.chain].gecko}/pools/${p.pool}/trades`), 2_500)
     for (const row of body?.data ?? []) {
       const a = row.attributes ?? {}
       const buyToken = same(a.to_token_address ?? '', addr)
@@ -336,7 +342,7 @@ export async function candles(mint: string, tf: ChartTf = '5m'): Promise<Candle[
   const p = await topPool(mint)
   if (!p) return []
   const [unit, agg] = GECKO_TF[tf]
-  const body = await cached(`ohlcv:${p.pool}:${tf}`, () => getJson(`${GECKO}/${p.chain}/pools/${p.pool}/ohlcv/${unit}?aggregate=${agg}&limit=300&currency=usd&token=${mint}`))
+  const body = await cached(`ohlcv:${p.pool}:${tf}`, () => getJson(`${GECKO}/${CHAINS[p.chain].gecko}/pools/${p.pool}/ohlcv/${unit}?aggregate=${agg}&limit=300&currency=usd&token=${mint}`))
   const rows: number[][] = body?.data?.attributes?.ohlcv_list ?? []
   // 按时间升序、去掉重复和不完整的 K 线：图表库遇到这些会直接报错
   const seen = new Set<number>()
@@ -348,7 +354,7 @@ export async function candles(mint: string, tf: ChartTf = '5m'): Promise<Candle[
 export async function trades(mint: string): Promise<Trade[]> {
   const p = await topPool(mint)
   if (!p) return []
-  const body = await cached(`trades:${p.pool}`, () => getJson(`${GECKO}/${p.chain}/pools/${p.pool}/trades`))
+  const body = await cached(`trades:${p.pool}`, () => getJson(`${GECKO}/${CHAINS[p.chain].gecko}/pools/${p.pool}/trades`))
   return (body?.data ?? []).map((row: Json, i: number) => {
     const t = row.attributes ?? {}
     const w: string = t.tx_from_address ?? ''
