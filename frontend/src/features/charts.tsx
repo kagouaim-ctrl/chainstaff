@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { createChart, ColorType, CrosshairMode, type IChartApi, type UTCTimestamp, type SeriesMarker, type Time } from 'lightweight-charts'
 import type { Candle, ChartMarker } from '@/domain/types'
 
+/** 价格保留 4 位有效数字；市值这类大数缩写成 K / M / B。 */
+const fp = (p: number) => {
+  const a = Math.abs(p)
+  if (a >= 1e9) return `${(p / 1e9).toFixed(2)}B`
+  if (a >= 1e6) return `${(p / 1e6).toFixed(2)}M`
+  if (a >= 1e4) return `${(p / 1e3).toFixed(1)}K`
+  return a >= 1 ? p.toFixed(4) : p.toPrecision(4)
+}
+
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'
 
 function baseChart(el: HTMLElement, height: number): IChartApi {
@@ -18,7 +27,7 @@ function baseChart(el: HTMLElement, height: number): IChartApi {
       horzLine: { color: 'rgba(152,153,163,0.5)', width: 1, style: 3, labelBackgroundColor: '#161522' },
     },
     handleScale: { axisPressedMouseMove: { time: true, price: true } },
-    localization: { priceFormatter: (p: number) => (p >= 1 ? p.toFixed(4) : p.toPrecision(4)) },
+    localization: { priceFormatter: (p: number) => fp(p) },
   })
 }
 
@@ -31,7 +40,7 @@ const MARKER_STYLE: Record<ChartMarker['kind'], { color: string; shape: SeriesMa
 }
 
 /** K 线 + Agent 决策点（发现、NO_TRADE、风控否决、买卖）。 */
-const fp = (p: number) => (p >= 1 ? p.toFixed(4) : p.toPrecision(4))
+
 const fv = (v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : v.toFixed(0))
 
 /** 左上角的开高低收图例：鼠标在哪根 K 线就显示哪根，移出图表回到最新一根（和 TradingView 一样）。 */
