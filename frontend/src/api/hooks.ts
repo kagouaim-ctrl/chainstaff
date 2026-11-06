@@ -5,7 +5,11 @@ import type { ChartTf } from '@/domain/types'
 const live = () => source().info.kind === 'live'
 export const useTokens = () => useQuery({ queryKey: ['tokens'], queryFn: () => source().tokens(), refetchInterval: live() ? 60_000 : false })
 export const useToken = (a: string) => useQuery({ queryKey: ['token', a], queryFn: () => source().token(a), refetchInterval: live() ? 30_000 : false })
-export const useCandles = (a: string, tf: ChartTf = '5m') => useQuery({ queryKey: ['candles', a, tf], queryFn: () => source().candles(a, tf), refetchInterval: source().info.kind === 'live' ? 60_000 : false })
+export const useCandles = (a: string, tf: ChartTf = '5m') => useQuery({
+  queryKey: ['candles', a, tf], queryFn: () => source().candles(a, tf),
+  // 秒级 K 线由成交合成，3 秒刷新一次；分钟以上 1 分钟刷新
+  refetchInterval: source().info.kind !== 'live' ? false : tf.endsWith('s') ? 3_000 : 60_000,
+})
 export const useHolders = (a: string) => useQuery({ queryKey: ['holders', a], queryFn: () => source().holders(a) })
 export const useChat = (a: string) => useQuery({ queryKey: ['chat', a], queryFn: () => source().chat(a) })
 export const useAgentDM = () => useQuery({ queryKey: ['agentDM'], queryFn: () => source().agentDM() })

@@ -77,8 +77,13 @@ export function ema(xs: number[], n: number): (number | null)[] {
 
 export interface Indicators { ma20: boolean; ema50: boolean }
 
-export function CandleChart({ candles, markers, height = 360, label, indicators = { ma20: false, ema50: false } }: { candles: Candle[]; markers: ChartMarker[]; height?: number; label?: string; indicators?: Indicators }) {
+/**
+ * 数据刷新时图表会重建；viewKey 不变（同一代币、同一周期）时保留用户拖动和缩放的位置，
+ * 秒级 K 线每 3 秒刷新也不会跳回去。
+ */
+export function CandleChart({ candles, markers, height = 360, label, indicators = { ma20: false, ema50: false }, viewKey }: { candles: Candle[]; markers: ChartMarker[]; height?: number; label?: string; indicators?: Indicators; viewKey?: string }) {
   const ref = useRef<HTMLDivElement>(null)
+  const view = useRef<{ key?: string; range: { from: number; to: number } | null; atEnd: boolean }>({ range: null, atEnd: true })
   const [hover, setHover] = useState<number | null>(null)
   useEffect(() => {
     if (!ref.current) return
@@ -99,11 +104,21 @@ export function CandleChart({ candles, markers, height = 360, label, indicators 
     if (indicators.ma20) line(sma(closes, 20), '#F5B544')
     if (indicators.ema50) line(ema(closes, 50), '#516AF6')
     s.setMarkers([...markers].sort((a, b) => a.time - b.time).map((m) => ({ time: m.time as UTCTimestamp, text: m.label, ...MARKER_STYLE[m.kind] })))
-    chart.timeScale().fitContent()
+    const saved = view.current
+    if (viewKey && saved.key === viewKey && saved.range && !saved.atEnd) chart.timeScale().setVisibleLogicalRange(saved.range)
+    else if (viewKey && saved.key === viewKey && saved.range) {
+      // 停在最新一根时，跟着新 K 线往右走，缩放比例不变
+      const width = saved.range.to - saved.range.from
+      chart.timeScale().setVisibleLogicalRange({ from: candles.length - 1 - width + 8, to: candles.length - 1 + 8 })
+    } else chart.timeScale().fitContent()
+    view.current = { key: viewKey, range: chart.timeScale().getVisibleLogicalRange(), atEnd: true }
+    chart.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+      if (r) view.current = { key: viewKey, range: { from: r.from, to: r.to }, atEnd: r.to >= candles.length - 1 }
+    })
     const index = new Map(candles.map((c, i) => [c.time, i]))
     chart.subscribeCrosshairMove((p) => setHover(p.time != null ? index.get(p.time as number) ?? null : null))
     return () => chart.remove()
-  }, [candles, markers, height, indicators.ma20, indicators.ema50])
+  }, [candles, markers, height, indicators.ma20, indicators.ema50, viewKey])
   const i = hover ?? candles.length - 1
   return (
     <div className="relative">

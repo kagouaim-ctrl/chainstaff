@@ -139,7 +139,7 @@ function Header({ t }: { t: Token }) {
   )
 }
 
-const TF: [ChartTf, string][] = [['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时'], ['4h', '4小时'], ['1d', '1天']]
+const TF: [ChartTf, string][] = [['1s', '1秒'], ['5s', '5秒'], ['15s', '15秒'], ['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时'], ['4h', '4小时'], ['1d', '1天']]
 const OVERLAY: Record<'mine' | 'research', MarkerKind[]> = { mine: ['buy', 'sell'], research: ['discovered', 'no_trade', 'risk_rejected'] }
 
 function ChartPanel({ t }: { t: Token }) {
@@ -168,6 +168,7 @@ function ChartPanel({ t }: { t: Token }) {
         <span className="text-mute">/</span>
         <button onClick={() => setUnit('mcap')} className={cx('rounded-md px-1 py-1', unit === 'mcap' ? 'text-fg' : 'text-sub hover:text-fg')}>市值</button>
         {!live && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">演示 K 线固定 5 分钟</span>}
+        {live && tf.endsWith('s') && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline" title="免费数据只有最近 300 笔成交，页面开着会一直累积；数据源本身有约半分钟延迟">秒级 K 线由最近成交合成，延迟约半分钟</span>}
       </div>
       <DataState q={q} rows={1} isEmpty={(d) => d.candles.length === 0} empty="这个周期还没有 K 线数据。">
         {(d) => {
@@ -182,7 +183,7 @@ function ChartPanel({ t }: { t: Token }) {
           return (
             <>
               <div className="px-1 pt-1">
-                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} />
+                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} viewKey={`${t.address}:${tf}:${unit}`} />
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
                 <span>图表叠加层</span>

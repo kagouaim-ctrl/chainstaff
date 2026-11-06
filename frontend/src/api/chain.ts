@@ -59,9 +59,9 @@ async function getJson(url: string, { quiet404 = false } = {}): Promise<Json> {
 
 /** 同一个地址的几个面板（代币、持有者、K 线）共用一次请求。 */
 const memo = new Map<string, { at: number; p: Promise<Json> }>()
-function cached(key: string, load: () => Promise<Json>): Promise<Json> {
+function cached(key: string, load: () => Promise<Json>, ttl = TTL): Promise<Json> {
   const hit = memo.get(key)
-  if (hit && Date.now() - hit.at < TTL) return hit.p
+  if (hit && Date.now() - hit.at < ttl) return hit.p
   const p = load().catch((e) => { memo.delete(key); throw e })
   memo.set(key, { at: Date.now(), p })
   return p
@@ -284,9 +284,55 @@ async function topPool(addr: string): Promise<{ chain: Chain; pool: string } | n
   return busiest?.pairAddress ? { chain: at!.chain, pool: busiest.pairAddress } : null
 }
 
-const GECKO_TF: Record<ChartTf, [string, number]> = { '1m': ['minute', 1], '5m': ['minute', 5], '15m': ['minute', 15], '1h': ['hour', 1], '4h': ['hour', 4], '1d': ['day', 1] }
+const GECKO_TF: Record<Exclude<ChartTf, SecondTf>, [string, number]> = { '1m': ['minute', 1], '5m': ['minute', 5], '15m': ['minute', 15], '1h': ['hour', 1], '4h': ['hour', 4], '1d': ['day', 1] }
+
+type SecondTf = '1s' | '5s' | '15s'
+const SECONDS: Record<SecondTf, number> = { '1s': 1, '5s': 5, '15s': 15 }
+const isSecondTf = (tf: ChartTf): tf is SecondTf => tf in SECONDS
+
+/**
+ * 秒级 K 线：GeckoTerminal 免费接口没有秒级 K 线，只有最近 300 笔成交，所以在浏览器里用成交合成。
+ * 每次拉到的成交都留下来，页面开着越久，能看到的秒级历史越长。
+ */
+const tradeLog = new Map<string, Map<string, { t: number; price: number; usd: number }>>()
+async function secondCandles(addr: string, step: number): Promise<Candle[]> {
+  const p = await topPool(addr)
+  if (!p) return []
+  const key = `${p.chain}:${p.pool}`
+  const log = tradeLog.get(key) ?? new Map()
+  tradeLog.set(key, log)
+  try {
+    const body = await cached(`live-trades:${key}`, () => getJson(`${GECKO}/${p.chain}/pools/${p.pool}/trades`), 2_500)
+    for (const row of body?.data ?? []) {
+      const a = row.attributes ?? {}
+      const buyToken = same(a.to_token_address ?? '', addr)
+      const price = num(buyToken ? a.price_to_in_usd : a.price_from_in_usd)
+      const t = Date.parse(a.block_timestamp)
+      if (price && Number.isFinite(t)) log.set(String(row.id), { t: Math.floor(t / 1000), price, usd: num(a.volume_in_usd) ?? 0 })
+    }
+  } catch (e) {
+    // 被限流时先用已经攒下的成交，一笔都没有才报错
+    if (!log.size) throw e
+  }
+  const bars = new Map<number, Candle>()
+  for (const x of [...log.values()].sort((a, b) => a.t - b.t)) {
+    const time = Math.floor(x.t / step) * step
+    const b = bars.get(time)
+    if (!b) bars.set(time, { time, open: x.price, high: x.price, low: x.price, close: x.price, volume: x.usd })
+    else { b.high = Math.max(b.high, x.price); b.low = Math.min(b.low, x.price); b.close = x.price; b.volume += x.usd }
+  }
+  const out = [...bars.values()].sort((a, b) => a.time - b.time)
+  // 和交易所一样，开盘价接上一根的收盘价，K 线才连续
+  for (let i = 1; i < out.length; i++) {
+    out[i].open = out[i - 1].close
+    out[i].high = Math.max(out[i].high, out[i].open)
+    out[i].low = Math.min(out[i].low, out[i].open)
+  }
+  return out
+}
 
 export async function candles(mint: string, tf: ChartTf = '5m'): Promise<Candle[]> {
+  if (isSecondTf(tf)) return secondCandles(mint, SECONDS[tf])
   const p = await topPool(mint)
   if (!p) return []
   const [unit, agg] = GECKO_TF[tf]
