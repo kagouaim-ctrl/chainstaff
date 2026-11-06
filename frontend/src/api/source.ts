@@ -7,7 +7,7 @@ import * as D from './demo'
 import { LIVE, liveSource } from './live'
 import type {
   AgentDM,
-  AgentEvent, AgentInfo, AuditEntry, ChatMessage, ClosedPosition, DataSourceStatus, DecisionStep, Holder, MainAgent,
+  AgentEvent, AgentInfo, AuditEntry, ChartTf, ChatMessage, ClosedPosition, DataSourceStatus, DecisionStep, Holder, MainAgent,
   Order, PipelineStage, Portfolio, Position, StrategyConfig, Thesis, Token, Trade, Candle, ChartMarker,
 } from '@/domain/types'
 
@@ -17,7 +17,7 @@ export interface DataSource {
   info: SourceInfo
   tokens(): Promise<Token[]>
   token(address: string): Promise<Token | null>
-  candles(address: string): Promise<{ candles: Candle[]; markers: ChartMarker[] }>
+  candles(address: string, tf?: ChartTf): Promise<{ candles: Candle[]; markers: ChartMarker[] }>
   holders(address: string): Promise<Holder[]>
   chat(address: string): Promise<ChatMessage[]>
   agentDM(): Promise<AgentDM[]>

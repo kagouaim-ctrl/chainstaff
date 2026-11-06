@@ -5,7 +5,7 @@
  * 读不到的值保持 null，界面显示为未知：查不到权限不等于没有权限。
  * 和后端 tradingagents/meme/market.py 的换算一致。
  */
-import type { Candle, Chain, Holder, SecurityCheck, Timeframe, Token, TokenLink, Trade, WindowStat } from '@/domain/types'
+import type { Candle, Chain, ChartTf, Holder, SecurityCheck, Timeframe, Token, TokenLink, Trade, WindowStat } from '@/domain/types'
 
 const DEX = 'https://api.dexscreener.com'
 const GECKO = 'https://api.geckoterminal.com/api/v2/networks'
@@ -42,7 +42,12 @@ async function getJson(url: string, { quiet404 = false } = {}): Promise<Json> {
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), 12_000)
     try {
-      const r = await fetch(url, { signal: ctl.signal })
+      // 限流时有的接口不带跨域头，浏览器只报「Failed to fetch」，所以网络错误也等一下再试一次
+      const r = await fetch(url, { signal: ctl.signal }).catch(async (e) => {
+        if (attempt === 0 && !ctl.signal.aborted) { await new Promise((ok) => setTimeout(ok, 2000)); return null }
+        throw e
+      })
+      if (!r) continue
       if (r.status === 429 && attempt === 0) { await new Promise((ok) => setTimeout(ok, 2000)); continue }
       if (quiet404 && (r.status === 404 || r.status === 400)) return null
       if (!r.ok) throw new Error(`${new URL(url).host} 返回 ${r.status}`)
@@ -272,17 +277,26 @@ export async function token(addr: string): Promise<Token | null> {
   return tokenView(at.chain, at.pairs, rep, sell)
 }
 
+/** K 线和成交用 24 小时成交额最大的池子：流动性数字有时是假的，成交很难造假。 */
 async function topPool(addr: string): Promise<{ chain: Chain; pool: string } | null> {
   const at = await locate(addr)
-  return at?.pairs[0]?.pairAddress ? { chain: at.chain, pool: at.pairs[0].pairAddress } : null
+  const busiest = [...(at?.pairs ?? [])].sort((x, y) => (y.volume?.h24 ?? 0) - (x.volume?.h24 ?? 0))[0]
+  return busiest?.pairAddress ? { chain: at!.chain, pool: busiest.pairAddress } : null
 }
 
-export async function candles(mint: string): Promise<Candle[]> {
+const GECKO_TF: Record<ChartTf, [string, number]> = { '1m': ['minute', 1], '5m': ['minute', 5], '15m': ['minute', 15], '1h': ['hour', 1], '4h': ['hour', 4], '1d': ['day', 1] }
+
+export async function candles(mint: string, tf: ChartTf = '5m'): Promise<Candle[]> {
   const p = await topPool(mint)
   if (!p) return []
-  const body = await cached(`ohlcv:${p.pool}`, () => getJson(`${GECKO}/${p.chain}/pools/${p.pool}/ohlcv/minute?aggregate=5&limit=288&currency=usd`))
+  const [unit, agg] = GECKO_TF[tf]
+  const body = await cached(`ohlcv:${p.pool}:${tf}`, () => getJson(`${GECKO}/${p.chain}/pools/${p.pool}/ohlcv/${unit}?aggregate=${agg}&limit=300&currency=usd&token=${mint}`))
   const rows: number[][] = body?.data?.attributes?.ohlcv_list ?? []
-  return rows.map(([time, open, high, low, close, volume]) => ({ time, open, high, low, close, volume })).reverse()
+  // 按时间升序、去掉重复和不完整的 K 线：图表库遇到这些会直接报错
+  const seen = new Set<number>()
+  return rows.map(([time, open, high, low, close, volume]) => ({ time, open, high, low, close, volume }))
+    .filter((c) => [c.time, c.open, c.high, c.low, c.close].every((v) => Number.isFinite(v)) && !seen.has(c.time) && !!seen.add(c.time))
+    .sort((a, b) => a.time - b.time)
 }
 
 export async function trades(mint: string): Promise<Trade[]> {

@@ -252,7 +252,7 @@ export const liveSource: DataSource = {
   info: { kind: 'live', label: '实时数据', now: () => new Date() },
   tokens: () => AGENTS_ONLINE ? get<Token[]>('/api/tokens') : chain.tokens(),
   token: (a) => AGENTS_ONLINE ? get<Token | null>(`/api/tokens/${encodeURIComponent(a)}`) : chain.token(a),
-  candles: async (a) => ({ candles: AGENTS_ONLINE ? await get<Candle[]>(`/api/tokens/${encodeURIComponent(a)}/candles`) : await chain.candles(a), markers: [] }),
+  candles: async (a, tf = '5m') => ({ candles: AGENTS_ONLINE && tf === '5m' ? await get<Candle[]>(`/api/tokens/${encodeURIComponent(a)}/candles`) : await chain.candles(a, tf), markers: [] }),
   holders: (a) => AGENTS_ONLINE ? get<Holder[]>(`/api/tokens/${encodeURIComponent(a)}/holders`) : chain.holders(a),
   trades: (a) => AGENTS_ONLINE ? get<Trade[]>(`/api/tokens/${encodeURIComponent(a)}/trades`) : chain.trades(a),
   chat: async (a) => { const run = await latestRun(a); return run ? runToChat(run) : [] },

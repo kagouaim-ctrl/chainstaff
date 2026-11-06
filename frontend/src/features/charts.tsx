@@ -51,7 +51,24 @@ function Legend({ c, prev, label }: { c?: Candle; prev?: Candle; label?: string 
   )
 }
 
-export function CandleChart({ candles, markers, height = 360, label }: { candles: Candle[]; markers: ChartMarker[]; height?: number; label?: string }) {
+/** 简单移动平均和指数移动平均，周期不够的地方不画。 */
+export function sma(xs: number[], n: number): (number | null)[] {
+  let sum = 0
+  return xs.map((x, i) => { sum += x; if (i >= n) sum -= xs[i - n]; return i >= n - 1 ? sum / n : null })
+}
+export function ema(xs: number[], n: number): (number | null)[] {
+  const k = 2 / (n + 1)
+  let prev: number | null = null
+  return xs.map((x, i) => {
+    if (i < n - 1) return null
+    prev = prev == null ? xs.slice(0, n).reduce((a, b) => a + b, 0) / n : x * k + prev * (1 - k)
+    return prev
+  })
+}
+
+export interface Indicators { ma20: boolean; ema50: boolean }
+
+export function CandleChart({ candles, markers, height = 360, label, indicators = { ma20: false, ema50: false } }: { candles: Candle[]; markers: ChartMarker[]; height?: number; label?: string; indicators?: Indicators }) {
   const ref = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
   useEffect(() => {
@@ -65,17 +82,24 @@ export function CandleChart({ candles, markers, height = 360, label }: { candles
     const v = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' } })
     chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } })
     v.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.volume, color: c.close >= c.open ? 'rgba(33,201,94,0.25)' : 'rgba(255,98,46,0.25)' })))
+    const closes = candles.map((c) => c.close)
+    const line = (vals: (number | null)[], color: string) => {
+      const l = chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false })
+      l.setData(candles.flatMap((c, i) => vals[i] == null ? [] : [{ time: c.time as UTCTimestamp, value: vals[i]! }]))
+    }
+    if (indicators.ma20) line(sma(closes, 20), '#F5B544')
+    if (indicators.ema50) line(ema(closes, 50), '#516AF6')
     s.setMarkers([...markers].sort((a, b) => a.time - b.time).map((m) => ({ time: m.time as UTCTimestamp, text: m.label, ...MARKER_STYLE[m.kind] })))
     chart.timeScale().fitContent()
     const index = new Map(candles.map((c, i) => [c.time, i]))
     chart.subscribeCrosshairMove((p) => setHover(p.time != null ? index.get(p.time as number) ?? null : null))
     return () => chart.remove()
-  }, [candles, markers, height])
+  }, [candles, markers, height, indicators.ma20, indicators.ema50])
   const i = hover ?? candles.length - 1
   return (
     <div className="relative">
       <Legend c={candles[i]} prev={candles[i - 1]} label={label} />
-      <div ref={ref} className="w-full" style={{ height }} role="img" aria-label="K 线图，标注了 Agent 的发现、决策和交易点" />
+      <div ref={ref} className="w-full" style={{ height }} role="img" aria-label="K 线图" />
     </div>
   )
 }

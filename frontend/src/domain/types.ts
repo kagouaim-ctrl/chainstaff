@@ -2,6 +2,8 @@
 
 export type Mode = 'backtest' | 'paper' | 'live'
 export type Timeframe = '5m' | '1h' | '6h' | '24h'
+/** K 线周期 */
+export type ChartTf = '1m' | '5m' | '15m' | '1h' | '4h' | '1d'
 
 export type AgentRole =
   | 'scout' | 'onchain' | 'security' | 'sentiment' | 'quant'

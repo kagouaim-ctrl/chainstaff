@@ -5,7 +5,8 @@ import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
-import { CandleChart } from '@/features/charts'
+import { CandleChart, type Indicators } from '@/features/charts'
+import { readTrades } from '@/wallet/history'
 import { TokenChat } from '@/features/TokenChat'
 import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
@@ -17,7 +18,7 @@ import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenB
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
-import type { Holder, MarkerKind, Token } from '@/domain/types'
+import type { ChartMarker, ChartTf, Holder, MarkerKind, Token } from '@/domain/types'
 
 type TabKey = 'holders' | 'trades' | 'research'
 
@@ -138,41 +139,59 @@ function Header({ t }: { t: Token }) {
   )
 }
 
-const TF = [['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时']] as const
+const TF: [ChartTf, string][] = [['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时'], ['4h', '4小时'], ['1d', '1天']]
 const OVERLAY: Record<'mine' | 'research', MarkerKind[]> = { mine: ['buy', 'sell'], research: ['discovered', 'no_trade', 'risk_rejected'] }
 
 function ChartPanel({ t }: { t: Token }) {
-  const q = useCandles(t.address)
-  const [tf, setTf] = useState('5m')
+  const [tf, setTf] = useState<ChartTf>('5m')
+  const q = useCandles(t.address, tf)
   const [unit, setUnit] = useState<'price' | 'mcap'>('price')
   const [ov, setOv] = useState({ mine: true, research: true })
+  const [ind, setInd] = useState<Indicators>({ ma20: false, ema50: false })
+  const live = !isDemo()
+  // 市值 = 价格 × 流通量，用当前市值和价格的比值换算整条 K 线
+  const factor = unit === 'mcap' && t.priceUsd > 0 ? t.mcapUsd / t.priceUsd : 1
+  const mine = live ? readTrades().filter((x) => x.chain === t.chain && x.address.toLowerCase() === t.address.toLowerCase()) : []
+  const tfLabel = TF.find(([v]) => v === tf)?.[1] ?? tf
   return (
     <section className="border-b border-line" aria-label="K 线">
       <div className="scrollbar-none flex h-10 items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-line px-2 text-[13px]">
-        {TF.map(([v, l]) => (
+        {(live ? TF : TF.filter(([v]) => v === '5m')).map(([v, l]) => (
           <button key={v} onClick={() => setTf(v)} aria-pressed={tf === v} className={cx('rounded-md px-2 py-1', tf === v ? 'text-fg' : 'text-sub hover:text-fg')}>{l}</button>
         ))}
         <span className="mx-1 h-4 w-px bg-line" />
-        <button className="rounded-md px-2 py-1 text-sub" title="指标：接入行情后可用" disabled>指标</button>
+        {([['ma20', 'MA20'], ['ema50', 'EMA50']] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setInd({ ...ind, [k]: !ind[k] })} aria-pressed={ind[k]} className={cx('rounded-md px-2 py-1', ind[k] ? (k === 'ma20' ? 'text-paper' : 'text-agent') : 'text-sub hover:text-fg')}>{l}</button>
+        ))}
         <span className="mx-1 h-4 w-px bg-line" />
         <button onClick={() => setUnit('price')} className={cx('rounded-md px-1 py-1', unit === 'price' ? 'text-fg' : 'text-sub hover:text-fg')}>价格</button>
         <span className="text-mute">/</span>
         <button onClick={() => setUnit('mcap')} className={cx('rounded-md px-1 py-1', unit === 'mcap' ? 'text-fg' : 'text-sub hover:text-fg')}>市值</button>
-        <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">{isDemo() ? '演示 K 线固定 5 分钟' : 'K 线固定 5 分钟'}</span>
+        {!live && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">演示 K 线固定 5 分钟</span>}
       </div>
-      <DataState q={q} rows={1}>
-        {(d) => (
-          <>
-            <div className="px-1 pt-1">
-              <CandleChart label={`${t.symbol}/USD · 5分`} candles={d.candles} markers={d.markers.filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))} />
-            </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
-              <span>图表叠加层</span>
-              <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.mine} onChange={(e) => setOv({ ...ov, mine: e.target.checked })} className="accent-[var(--c-agent)]" />我的 Agent 买卖</label>
-              <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.research} onChange={(e) => setOv({ ...ov, research: e.target.checked })} className="accent-[var(--c-agent)]" />Agent 研究</label>
-            </div>
-          </>
-        )}
+      <DataState q={q} rows={1} isEmpty={(d) => d.candles.length === 0} empty="这个周期还没有 K 线数据。">
+        {(d) => {
+          const series = factor === 1 ? d.candles : d.candles.map((c) => ({ ...c, open: c.open * factor, high: c.high * factor, low: c.low * factor, close: c.close * factor }))
+          const step = series.length > 1 ? series[1].time - series[0].time : 300
+          // 自己的成交时间对到所在的那根 K 线上
+          const myMarkers: ChartMarker[] = mine.map((x) => {
+            const bar = series.reduce((best, c) => (c.time <= x.time / 1000 && c.time > best ? c.time : best), series[0]?.time ?? 0)
+            return { time: bar, kind: (x.side === 'BUY' ? 'buy' : 'sell') as MarkerKind, label: x.side === 'BUY' ? '买' : '卖' }
+          }).filter((m) => m.time >= (series[0]?.time ?? 0) && m.time <= (series[series.length - 1]?.time ?? 0) + step)
+          const all = [...d.markers, ...myMarkers].filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))
+          return (
+            <>
+              <div className="px-1 pt-1">
+                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} />
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
+                <span>图表叠加层</span>
+                <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.mine} onChange={(e) => setOv({ ...ov, mine: e.target.checked })} className="accent-[var(--c-agent)]" />{live ? '我的买卖' : '我的 Agent 买卖'}</label>
+                {!live && <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.research} onChange={(e) => setOv({ ...ov, research: e.target.checked })} className="accent-[var(--c-agent)]" />Agent 研究</label>}
+              </div>
+            </>
+          )
+        }}
       </DataState>
     </section>
   )

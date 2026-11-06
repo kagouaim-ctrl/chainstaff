@@ -6,6 +6,7 @@ import { Button, Chg, Dialog, ModeTag, Signed, TokenAvatar, cx } from '@/compone
 import { IPause, IPlay, ISearch, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
 import { usd } from '@/lib/format'
 import { TERMINAL } from '@/domain/orderMachine'
+import { WalletButton } from '@/wallet/WalletUI'
 
 /** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。 */
 export const NAV = [
@@ -60,9 +61,11 @@ export function TopBar() {
         </button>
 
         <div className="flex shrink-0 items-center gap-2">
-          <ModeSwitchBadge />
-          <PauseButton />
-          <Balance />
+          {isDemo() ? <>
+            <ModeSwitchBadge />
+            <PauseButton />
+            <Balance />
+          </> : <WalletButton />}
           <span className="hidden sm:block" title="DI JIAHAO" aria-label="账户"><TokenAvatar symbol="u_dj" hue={160} size={36} /></span>
         </div>
       </div>
