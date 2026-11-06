@@ -1,7 +1,9 @@
 /** 前端领域类型。和后端（未实现）对齐用，字段名按计划第 7 节数据模型。 */
 
 export type Mode = 'backtest' | 'paper' | 'live'
-export type Timeframe = '5m' | '1h' | '4h' | '24h'
+export type Timeframe = '5m' | '1h' | '6h' | '24h'
+/** K 线周期 */
+export type ChartTf = '1s' | '5s' | '15s' | '1m' | '5m' | '15m' | '1h' | '4h' | '1d'
 
 export type AgentRole =
   | 'scout' | 'onchain' | 'security' | 'sentiment' | 'quant'
@@ -41,23 +43,28 @@ export interface MainAgent {
   chatIntervalHours: number
 }
 
-export type Verdict = 'unresearched' | 'researching' | 'security_veto' | 'no_trade' | 'bought'
+/** buy_signal：Agent 建议买入，但没有下单。bought 才是真的买了。 */
+export type Verdict = 'unresearched' | 'researching' | 'security_veto' | 'no_trade' | 'buy_signal' | 'bought'
 
+/** null 表示没查到，不等于安全。 */
 export interface SecurityCheck {
-  mintAuthority: boolean
-  freezeAuthority: boolean
+  mintAuthority: boolean | null
+  freezeAuthority: boolean | null
   lp: 'burned' | 'locked' | 'unlocked' | 'unknown'
   sellSimulation: 'pass' | 'fail' | 'unknown'
-  transferFeeBps: number
-  top10Pct: number
-  devHoldPct: number
+  transferFeeBps: number | null
+  top10Pct: number | null
+  devHoldPct: number | null
   checkedAt: string | null
 }
 
 export interface WindowStat { change: number; volume: number; txns: number; buyers: number; sellers: number }
 
+/** 行情支持的链。交易只计划支持 Solana。 */
+export type Chain = 'solana' | 'bsc' | 'robinhood' | 'ethereum'
+
 export interface Token {
-  chain: 'solana'
+  chain: Chain
   address: string
   symbol: string
   name: string
@@ -65,7 +72,7 @@ export interface Token {
   priceUsd: number
   mcapUsd: number
   liquidityUsd: number
-  holders: number
+  holders: number | null
   ageMinutes: number
   stats: Record<Timeframe, WindowStat>
   security: SecurityCheck
@@ -73,13 +80,20 @@ export interface Token {
   tags: string[]
   graduated: boolean
   /** 内盘（发射曲线）进度 0–100，已毕业为 100 */
-  bondingPct: number
+  bondingPct: number | null
   verified: boolean
-  launchpad: 'pump.fun' | 'bonk.fun' | 'Raydium'
+  launchpad: string
   watch?: boolean
   dataSource: string
   updatedAt: string
+  /** 代币图标，只收 https 链接；没有时用生成头像 */
+  image?: string | null
+  /** 项目方自己填的简介，陌生人写的，只当文本显示 */
+  description?: string | null
+  links?: TokenLink[]
 }
+
+export interface TokenLink { kind: 'website' | 'x' | 'telegram' | 'discord' | 'other'; label: string; url: string }
 
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
 
@@ -187,9 +201,9 @@ export interface Holder {
   ownerName?: string
   amountUsd: number
   pct: number
-  avgCost: number
-  pnlPct: number
-  heldMinutes: number
+  avgCost: number | null
+  pnlPct: number | null
+  heldMinutes: number | null
   hasThesis?: boolean
 }
 

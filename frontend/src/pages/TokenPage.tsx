@@ -1,20 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
-import { useCandles, useEvents, useHolders, useOrders, usePositions, useToken, useTrades, useTheses, useClosed, now } from '@/api/hooks'
+import { useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
-import { DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
+import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
-import { CandleChart } from '@/features/charts'
+import { CandleChart, type Indicators } from '@/features/charts'
+import { readTrades } from '@/wallet/history'
 import { TokenChat } from '@/features/TokenChat'
 import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
 import { DecisionChain } from '@/features/DecisionChain'
+import { useResearch } from '@/features/Research'
+import { AGENTS_ONLINE } from '@/api/live'
+import { CHAIN_LABEL } from '@/api/chain'
 import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
-import type { Holder, MarkerKind, Token } from '@/domain/types'
+import type { ChartMarker, ChartTf, Holder, MarkerKind, Token } from '@/domain/types'
 
 type TabKey = 'holders' | 'trades' | 'research'
 
@@ -45,7 +49,7 @@ function TokenView({ t }: { t: Token }) {
         <ChartPanel t={t} />
         <section>
           <Tabs label="代币信息" value={tab} onChange={setTab} options={[
-            { value: 'holders', label: <>持有者 <span className="text-sub">({compactCN(t.holders)})</span></> },
+            { value: 'holders', label: <>持有者 <span className="text-sub">({t.holders === null ? '--' : compactCN(t.holders)})</span></> },
             { value: 'trades', label: '交易' },
             { value: 'research', label: 'Agent 研究' },
           ]} />
@@ -105,10 +109,10 @@ function Header({ t }: { t: Token }) {
   return (
     <section className="border-b border-line px-4 py-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <TokenAvatar symbol={t.symbol} hue={t.hue} size={40} />
+        <TokenAvatar image={t.image} symbol={t.symbol} hue={t.hue} size={40} />
         <h1 className="text-[20px] font-bold leading-6 tracking-[-0.4px]">{t.symbol}</h1>
         <div className="flex items-center gap-1 text-sub">
-          <a href={`https://x.com/search?q=%24${t.symbol}`} target="_blank" rel="noreferrer" aria-label="在 X 上搜索" className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised hover:text-fg"><ISearch /></a>
+          <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" aria-label="在 X 上搜索" className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised hover:text-fg"><ISearch /></a>
           <button onClick={() => toggleWatch(t.address)} aria-pressed={!!w} aria-label={w ? '取消自选' : '加入自选'} className={cx('flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised', w ? 'text-paper' : 'hover:text-fg')}><IStar filled={!!w} /></button>
         </div>
         <span className="text-[14px] text-sub">{age(t.ageMinutes)}</span>
@@ -135,41 +139,60 @@ function Header({ t }: { t: Token }) {
   )
 }
 
-const TF = [['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时']] as const
+const TF: [ChartTf, string][] = [['1s', '1秒'], ['5s', '5秒'], ['15s', '15秒'], ['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时'], ['4h', '4小时'], ['1d', '1天']]
 const OVERLAY: Record<'mine' | 'research', MarkerKind[]> = { mine: ['buy', 'sell'], research: ['discovered', 'no_trade', 'risk_rejected'] }
 
 function ChartPanel({ t }: { t: Token }) {
-  const q = useCandles(t.address)
-  const [tf, setTf] = useState('5m')
+  const [tf, setTf] = useState<ChartTf>('5m')
+  const q = useCandles(t.address, tf)
   const [unit, setUnit] = useState<'price' | 'mcap'>('price')
   const [ov, setOv] = useState({ mine: true, research: true })
+  const [ind, setInd] = useState<Indicators>({ ma20: false, ema50: false })
+  const live = !isDemo()
+  // 市值 = 价格 × 流通量，用当前市值和价格的比值换算整条 K 线
+  const factor = unit === 'mcap' && t.priceUsd > 0 ? t.mcapUsd / t.priceUsd : 1
+  const mine = live ? readTrades().filter((x) => x.chain === t.chain && x.address.toLowerCase() === t.address.toLowerCase()) : []
+  const tfLabel = TF.find(([v]) => v === tf)?.[1] ?? tf
   return (
     <section className="border-b border-line" aria-label="K 线">
       <div className="scrollbar-none flex h-10 items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-line px-2 text-[13px]">
-        {TF.map(([v, l]) => (
+        {(live ? TF : TF.filter(([v]) => v === '5m')).map(([v, l]) => (
           <button key={v} onClick={() => setTf(v)} aria-pressed={tf === v} className={cx('rounded-md px-2 py-1', tf === v ? 'text-fg' : 'text-sub hover:text-fg')}>{l}</button>
         ))}
         <span className="mx-1 h-4 w-px bg-line" />
-        <button className="rounded-md px-2 py-1 text-sub" title="指标：接入行情后可用" disabled>指标</button>
+        {([['ma20', 'MA20'], ['ema50', 'EMA50']] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setInd({ ...ind, [k]: !ind[k] })} aria-pressed={ind[k]} className={cx('rounded-md px-2 py-1', ind[k] ? (k === 'ma20' ? 'text-paper' : 'text-agent') : 'text-sub hover:text-fg')}>{l}</button>
+        ))}
         <span className="mx-1 h-4 w-px bg-line" />
         <button onClick={() => setUnit('price')} className={cx('rounded-md px-1 py-1', unit === 'price' ? 'text-fg' : 'text-sub hover:text-fg')}>价格</button>
         <span className="text-mute">/</span>
         <button onClick={() => setUnit('mcap')} className={cx('rounded-md px-1 py-1', unit === 'mcap' ? 'text-fg' : 'text-sub hover:text-fg')}>市值</button>
-        <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">演示 K 线固定 5 分钟</span>
+        {!live && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">演示 K 线固定 5 分钟</span>}
+        {live && tf.endsWith('s') && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline" title="免费数据只有最近 300 笔成交，页面开着会一直累积；数据源本身有约半分钟延迟">秒级 K 线由最近成交合成，延迟约半分钟</span>}
       </div>
-      <DataState q={q} rows={1}>
-        {(d) => (
-          <>
-            <div className="px-1 pt-1">
-              <CandleChart label={`${t.symbol}/USD · 5分`} candles={d.candles} markers={d.markers.filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))} />
-            </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
-              <span>图表叠加层</span>
-              <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.mine} onChange={(e) => setOv({ ...ov, mine: e.target.checked })} className="accent-[var(--c-agent)]" />我的 Agent 买卖</label>
-              <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.research} onChange={(e) => setOv({ ...ov, research: e.target.checked })} className="accent-[var(--c-agent)]" />Agent 研究</label>
-            </div>
-          </>
-        )}
+      <DataState q={q} rows={1} isEmpty={(d) => d.candles.length === 0} empty="这个周期还没有 K 线数据。">
+        {(d) => {
+          const series = factor === 1 ? d.candles : d.candles.map((c) => ({ ...c, open: c.open * factor, high: c.high * factor, low: c.low * factor, close: c.close * factor }))
+          const step = series.length > 1 ? series[1].time - series[0].time : 300
+          // 自己的成交时间对到所在的那根 K 线上
+          const myMarkers: ChartMarker[] = mine.map((x) => {
+            const bar = series.reduce((best, c) => (c.time <= x.time / 1000 && c.time > best ? c.time : best), series[0]?.time ?? 0)
+            return { time: bar, kind: (x.side === 'BUY' ? 'buy' : 'sell') as MarkerKind, label: x.side === 'BUY' ? '买' : '卖' }
+          }).filter((m) => m.time >= (series[0]?.time ?? 0) && m.time <= (series[series.length - 1]?.time ?? 0) + step)
+          const all = [...d.markers, ...myMarkers].filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))
+          return (
+            <>
+              <div className="px-1 pt-1">
+                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} viewKey={`${t.address}:${tf}:${unit}`} />
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
+                <span>图表叠加层</span>
+                <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.mine} onChange={(e) => setOv({ ...ov, mine: e.target.checked })} className="accent-[var(--c-agent)]" />{live ? '我的买卖' : '我的 Agent 买卖'}</label>
+                {!live && <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.research} onChange={(e) => setOv({ ...ov, research: e.target.checked })} className="accent-[var(--c-agent)]" />Agent 研究</label>}
+              </div>
+            </>
+          )
+        }}
       </DataState>
     </section>
   )
@@ -208,14 +231,13 @@ function Bar({ l, r, lv, rv }: { l: string; r: string; lv: number; rv: number })
 
 function About({ t }: { t: Token }) {
   const s = t.stats['24h']
-  const bShare = s.buyers / (s.buyers + s.sellers)
-  const buys = Math.round(s.txns * bShare)
+  const bShare = s.buyers + s.sellers ? s.buyers / (s.buyers + s.sellers) : 0.5
   return (
     <section className="rounded-xl border border-line p-4" aria-label={`关于 ${t.symbol}`}>
       <h2 className="text-[16px]">关于 {t.symbol}</h2>
-      <p className="mt-1 text-[14px] font-normal text-sub">{t.name} · {t.launchpad} 发射 · {t.graduated ? '已毕业' : `内盘进度 ${t.bondingPct}%`}</p>
+      <p className="mt-1 text-[14px] font-normal text-sub">{t.name} · {CHAIN_LABEL[t.chain]} · {t.chain === 'solana' ? <>{t.launchpad} 发射 · {t.graduated ? '已毕业' : t.bondingPct === null ? '未毕业' : `内盘进度 ${t.bondingPct}%`}</> : `主要交易对在 ${t.launchpad}`}</p>
       <div className="mt-3 grid grid-cols-4 gap-2">
-        {([['5M', '5m'], ['1H', '1h'], ['4H', '4h'], ['1D', '24h']] as const).map(([l, k]) => (
+        {([['5M', '5m'], ['1H', '1h'], ['6H', '6h'], ['1D', '24h']] as const).map(([l, k]) => (
           <div key={k} className="rounded-lg border border-line px-2 py-2 text-center">
             <div className="text-[12px] font-normal text-sub">{l}</div>
             <Chg v={t.stats[k].change} className="text-[13px]" />
@@ -223,14 +245,19 @@ function About({ t }: { t: Token }) {
         ))}
       </div>
       <div className="mt-4 space-y-3">
-        <Bar l={`${buys} 买入`} r={`${s.txns - buys} 卖出`} lv={buys} rv={s.txns - buys} />
         <Bar l={`${usd(s.volume * bShare, { compact: true })} 交易量`} r={`${usd(s.volume * (1 - bShare), { compact: true })} 交易量`} lv={bShare} rv={1 - bShare} />
-        <Bar l={`${s.buyers} 买家`} r={`${s.sellers} 卖家`} lv={s.buyers} rv={s.sellers} />
+        <Bar l={`${s.buyers} 笔买入`} r={`${s.sellers} 笔卖出`} lv={s.buyers} rv={s.sellers} />
       </div>
+      {t.description && <p className="mt-4 line-clamp-4 whitespace-pre-line text-[13px] font-normal text-fg/80">{t.description}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
-        <a href={`https://x.com/search?q=%24${t.symbol}`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜索</a>
+        {(t.links ?? []).map((l) => (
+          <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" title={l.url} className="flex h-9 items-center rounded-lg bg-panel px-3 text-[14px] hover:bg-raised">{l.label}</a>
+        ))}
+        <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜 ${t.symbol}</a>
+        <a href={`https://x.com/search?q=${encodeURIComponent(t.address)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜合约地址</a>
       </div>
-      <p className="mt-3 text-[12px] font-normal text-mute">买入 / 卖出笔数和交易量按买家占比估算（演示）</p>
+      {!isDemo() && !(t.links ?? []).length && <p className="mt-2 text-[12px] font-normal text-sub">项目方没有在 DexScreener 登记官网或社交账号。</p>}
+      <p className="mt-3 text-[12px] font-normal text-mute">{isDemo() ? '买入 / 卖出笔数和交易量按买家占比估算（演示）' : '交易量按买卖笔数的比例估算，不是实际买卖金额。'}</p>
     </section>
   )
 }
@@ -283,10 +310,10 @@ function SecurityBlock({ t }: { t: Token }) {
             ))}
           </ul>
           <div className="mt-3 border-t border-line pt-2">
-            <KV k="前十持有占比" v={pct(s.top10Pct, 1).replace('+', '')} />
-            <KV k="开发者持有" v={pct(s.devHoldPct, 1).replace('+', '')} />
+            <KV k="前十持有占比" v={s.top10Pct === null ? '未知' : pct(s.top10Pct, 1).replace('+', '')} />
+            <KV k="开发者持有" v={s.devHoldPct === null ? '未知' : pct(s.devHoldPct, 1).replace('+', '')} />
           </div>
-          <p className="mt-2 text-[11px] text-sub">模拟盘的「可卖出」是近似结果：反向报价能否路由 + Token-2022 扩展检查，不是真实卖出模拟。RugCheck 未接入。</p>
+          <p className="mt-2 text-[11px] text-sub">{t.chain === 'solana' ? '「可卖出」只是近似结果：反向报价能否路由，不是真实卖出模拟。' : '安全检查来自 GoPlus：可卖出、税率、权限都是它的模拟和合约分析结果。'}{isDemo() ? 'RugCheck 未接入。' : ''}</p>
         </>
       )}
     </Panel>
@@ -326,7 +353,7 @@ function Holders({ t }: { t: Token }) {
                       <td className="num px-2 py-2.5 text-right">{usd(h.amountUsd)}</td>
                       <td className="num px-2 py-2.5 text-right">{h.pct.toFixed(2)}%</td>
                       <td className="px-2 py-2.5 text-right"><Pct v={h.pnlPct} digits={1} /></td>
-                      <td className="num px-4 py-2.5 text-right text-sub">{duration(h.heldMinutes * 60000)}</td>
+                      <td className="num px-4 py-2.5 text-right text-sub">{h.heldMinutes === null ? '--' : duration(h.heldMinutes * 60000)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -340,15 +367,15 @@ function Holders({ t }: { t: Token }) {
 }
 
 /** 持仓分布条：前十名各占多少，Agent 用强调色，一眼看出筹码是否集中。 */
-function HolderBar({ all, top10 }: { all: Holder[]; top10: number }) {
+function HolderBar({ all, top10 }: { all: Holder[]; top10: number | null }) {
   const top = all.slice(0, 10)
   return (
     <div className="px-4 pt-3">
       <div className="flex justify-between text-[12px] font-normal text-sub">
-        <span>前十持有 <span className="num text-fg">{top10.toFixed(1)}%</span></span>
+        <span>前十持有 <span className="num text-fg">{top10 === null ? '未知' : `${top10.toFixed(1)}%`}</span></span>
         <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>
       </div>
-      <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10.toFixed(1)}%`}>
+      <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10 === null ? '未知' : `${top10.toFixed(1)}%`}`}>
         {top.map((h) => <div key={h.rank} title={`#${h.rank} ${h.agentName ?? shortAddr(h.label)} ${h.pct.toFixed(2)}%`} className={h.kind === 'agent' ? 'bg-agent' : 'bg-sub/60'} style={{ width: `${h.pct}%` }} />)}
       </div>
     </div>
@@ -430,13 +457,17 @@ function Activity({ t }: { t: Token }) {
 
 function Research({ t }: { t: Token }) {
   const orders = useOrders()
+  const steps = useResearchSteps(t.address)
+  const research = useResearch()
   const o = (orders.data ?? []).find((x) => x.token.address === t.address)
-  if (t.verdict === 'unresearched') return <p className="p-6 text-center text-[13px] text-sub">还没有研究。点发现页的「交给 Agent」开始研究（后端未接入）。</p>
-  if (t.verdict === 'researching') return <p className="p-6 text-center text-[13px] text-sub">研究中：链上、安全、情绪、量化并行分析，完成后主 Agent 给出结论。</p>
+  const again = AGENTS_ONLINE && t.verdict !== 'researching' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{t.verdict === 'unresearched' ? '交给 Agent 研究' : '重新研究'}</Button>
+  if (t.verdict === 'unresearched') return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。{isDemo() ? '点发现页的「交给 Agent」开始研究（后端未接入）。' : AGENTS_ONLINE ? '' : 'Agent 分析还没上线。'}</p>{again}</div>
+  const live = steps.data ?? []
+  if (t.verdict === 'researching' && live.length === 0) return <p className="p-6 text-center text-[13px] text-sub">研究中：链上、安全、情绪、量化并行分析，完成后主 Agent 给出结论。</p>
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center gap-2 text-[13px]">主 Agent 结论：<VerdictTag v={t.verdict} /><span className="text-sub">{VERDICT[t.verdict].label === '不交易' ? '数据不足或结论冲突时输出 NO_TRADE' : ''}</span></div>
-      {o ? <DecisionChain steps={o.decisionChain} /> : <p className="text-[13px] text-sub">{t.verdict === 'security_veto' ? '安全检查一票否决，没有进入策略阶段。' : '没有生成交易方案。'}</p>}
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">主 Agent 结论：<VerdictTag v={t.verdict} /><span className="text-sub">{VERDICT[t.verdict].label === '不交易' ? '数据不足或结论冲突时输出 NO_TRADE' : ''}</span><span className="ml-auto">{again}</span></div>
+      {live.length > 0 ? <DecisionChain steps={live} /> : o ? <DecisionChain steps={o.decisionChain} /> : <p className="text-[13px] text-sub">{t.verdict === 'security_veto' ? '安全检查一票否决，没有进入策略阶段。' : '没有生成交易方案。'}</p>}
     </div>
   )
 }

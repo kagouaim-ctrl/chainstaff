@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode, useState } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import type { AgentStatus, Mode } from '@/domain/types'
 import { pct as fmtPct } from '@/lib/format'
@@ -61,14 +61,18 @@ export function Signed({ v, children, className }: { v: number; children: ReactN
 const hash = (str: string) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) } return h >>> 0 }
 
 /** 代币头像：没有真实 logo 时，按符号生成固定的渐变图形（同一个代币永远一样），不用首字母。 */
-export function TokenAvatar({ symbol, hue, size = 32 }: { symbol: string; hue: number; size?: number }) {
+export function TokenAvatar({ symbol, hue, size = 32, image }: { symbol: string; hue: number; size?: number; image?: string | null }) {
+  const [broken, setBroken] = useState(false)
+  const id = `ta${useId().replace(/:/g, '')}`
+  if (image && !broken && /^https:\/\//i.test(image)) {
+    return <img src={image} alt="" width={size} height={size} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} className="shrink-0 rounded-full bg-raised object-cover" style={{ width: size, height: size }} />
+  }
   const h = hash(symbol)
   const h2 = (hue + 40 + (h % 80)) % 360
   const h3 = (hue + 180 + ((h >> 8) % 60)) % 360
   const x1 = 20 + ((h >> 4) % 60), y1 = 20 + ((h >> 10) % 60)
   const x2 = 20 + ((h >> 16) % 60), y2 = 20 + ((h >> 22) % 60)
-  // 同一个头像可能在页面上出现多次（如桌面表格和手机列表），id 必须唯一，否则隐藏的那份会让可见的渐变失效
-  const id = `ta${useId().replace(/:/g, '')}`
+  // 同一个头像可能在页面上出现多次（如桌面表格和手机列表），id 必须唯一（上面的 useId），否则隐藏的那份会让可见的渐变失效
   return (
     <svg aria-hidden width={size} height={size} viewBox="0 0 100 100" className="shrink-0 rounded-full">
       <defs>

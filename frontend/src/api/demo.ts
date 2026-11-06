@@ -68,7 +68,7 @@ function makeTokens(): Token[] {
       buyers: Math.round(10 + r() * 400 * scale),
       sellers: Math.round(10 + r() * 380 * scale),
     })
-    const stats: Record<Timeframe, ReturnType<typeof mk>> = { '5m': mk(0.2), '1h': mk(0.6), '4h': mk(1.2), '24h': mk(2.4) }
+    const stats: Record<Timeframe, ReturnType<typeof mk>> = { '5m': mk(0.2), '1h': mk(0.6), '6h': mk(1.2), '24h': mk(2.4) }
     const veto = VETO.has(i)
     const researching = RESEARCHING.has(i)
     const security = {
