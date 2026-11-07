@@ -34,7 +34,8 @@ const isChain = (c: string): c is Chain => c in CHAINS
 const BURN = new Set(['0x000000000000000000000000000000000000dead', '0x0000000000000000000000000000000000000000'])
 const LP_LOCKED_MIN_PCT = 80
 const SELL_QUOTE_USD = 100
-const BONDING_DEXES = new Set(['pumpfun', 'launchlab', 'moonshot', 'boop'])
+/** 发射曲线（内盘）上的 DEX：DexScreener 和 GeckoTerminal 的叫法都收 */
+export const BONDING_DEXES = new Set(['pumpfun', 'launchlab', 'moonshot', 'boop', 'pump-fun', 'raydium-launchlab', 'meteora-dbc', 'boop-fun', 'four-meme', 'letsbonk-fun'])
 const WINDOWS: [Timeframe, string][] = [['5m', 'm5'], ['1h', 'h1'], ['6h', 'h6'], ['24h', 'h24']]
 const TTL = 30_000
 
@@ -45,7 +46,7 @@ const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
 /* eslint-disable @typescript-eslint/no-explicit-any -- 外部接口的原始 JSON */
 type Json = any
 
-async function getJson(url: string, { quiet404 = false } = {}): Promise<Json> {
+export async function getJson(url: string, { quiet404 = false } = {}): Promise<Json> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), 12_000)
@@ -67,7 +68,7 @@ async function getJson(url: string, { quiet404 = false } = {}): Promise<Json> {
 
 /** 同一个地址的几个面板（代币、持有者、K 线）共用一次请求。 */
 const memo = new Map<string, { at: number; p: Promise<Json> }>()
-function cached(key: string, load: () => Promise<Json>, ttl = TTL): Promise<Json> {
+export function cached(key: string, load: () => Promise<Json>, ttl = TTL): Promise<Json> {
   const hit = memo.get(key)
   if (hit && Date.now() - hit.at < ttl) return hit.p
   const p = load().catch((e) => { memo.delete(key); throw e })
@@ -168,7 +169,7 @@ function links(info: Json): TokenLink[] {
 /** 简介只在 DexScreener 的代币资料里有，列表加载时记下来。 */
 const descriptions = new Map<string, string>()
 
-function tokenView(chain: Chain, all: Json[], report: Json, sell?: Json): Token | null {
+export function tokenView(chain: Chain, all: Json[], report: Json, sell?: Json): Token | null {
   const pick = choosePair(all)
   const pairs = pick.pools
   const top = pick.main
@@ -223,7 +224,7 @@ const pairsOf = (chain: Chain, addr: string) => cached(`pairs:${chain}:${addr}`,
   ((await getJson(`${DEX}/token-pairs/v1/${chain}/${addr}`)) ?? []).filter((p: Json) => same(p.baseToken?.address ?? '', addr)))
 
 /** 列表里见过的代币记住它在哪条链上；EVM 地址在 BSC 和 Robinhood 上都试一下，取流动性大的。 */
-const chainOfAddress = new Map<string, Chain>()
+export const chainOfAddress = new Map<string, Chain>()
 async function locate(addr: string): Promise<{ chain: Chain; pairs: Json[] } | null> {
   if (MINT.test(addr)) { const pairs = await pairsOf('solana', addr); return pairs.length ? { chain: 'solana', pairs } : null }
   if (!EVM.test(addr)) return null

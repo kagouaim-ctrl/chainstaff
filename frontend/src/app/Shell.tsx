@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from './store'
 import { usePortfolio, usePositions, useOrders, isDemo } from '@/api/hooks'
 import { Button, Chg, Dialog, ModeTag, Signed, TokenAvatar, cx } from '@/components/ui'
-import { IPause, IPlay, ISearch, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
+import { IPause, IPlay, ISearch, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders, ISpark } from '@/components/icons'
 import { usd } from '@/lib/format'
 import { TERMINAL } from '@/domain/orderMachine'
 import { WalletButton } from '@/wallet/WalletUI'
@@ -15,6 +15,7 @@ import type { Chain } from '@/domain/types'
 /** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。演示模式的入口。 */
 const DEMO_NAV = [
   { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
+  { to: '/new', label: '新币', icon: ISpark, end: false, mobile: false },
   { to: '/agents', label: 'Agent', icon: IBot, mobile: true },
   { to: '/activity', label: '动态', icon: IPulse, mobile: true },
   { to: '/orders', label: '交易', icon: IList, mobile: false },
@@ -23,6 +24,7 @@ const DEMO_NAV = [
 /** 实时模式只放有真实数据的入口，桌面和手机完全一致。动态、订单、策略依赖未上线的后端，入口先关掉，路由保留。 */
 const LIVE_NAV = [
   { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
+  { to: '/new', label: '新币', icon: ISpark, end: false, mobile: true },
   { to: '/portfolio', label: '持仓', icon: IPie, end: false, mobile: true },
   { to: '/agents', label: 'AI Agent', icon: IBot, end: false, mobile: true },
   { to: '/legal/help', label: '帮助', icon: IList, end: false, mobile: true },
