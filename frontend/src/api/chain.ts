@@ -46,24 +46,48 @@ const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
 /* eslint-disable @typescript-eslint/no-explicit-any -- 外部接口的原始 JSON */
 type Json = any
 
+/**
+ * GeckoTerminal 免费接口对同一个 IP 的突发请求很严：几个请求同时发出去，后面的就会收到 429，
+ * 而且 429 不带跨域头，浏览器只报「Failed to fetch」。所以发往它的请求排队，两次之间至少隔一段时间；
+ * 被限流时按 3 秒、6 秒退避再试。
+ */
+const SPACED: Record<string, number> = { 'api.geckoterminal.com': 2_000 }
+const nextSlot = new Map<string, number>()
+export const spacing = { enabled: import.meta.env.MODE !== 'test' }
+async function waitSlot(host: string): Promise<void> {
+  const gap = SPACED[host]
+  if (!gap || !spacing.enabled) return
+  const now = Date.now()
+  const at = Math.max(now, nextSlot.get(host) ?? 0)
+  nextSlot.set(host, at + gap)
+  if (at > now) await new Promise((ok) => setTimeout(ok, at - now))
+}
+const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, spacing.enabled ? ms : 0))
+
 export async function getJson(url: string, { quiet404 = false } = {}): Promise<Json> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const host = new URL(url).host
+  const tries = SPACED[host] ? 3 : 2
+  for (let attempt = 0; attempt < tries; attempt++) {
+    const last = attempt === tries - 1
+    const backoff = SPACED[host] ? 3_000 * 2 ** attempt : 2_000
+    await waitSlot(host)
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), 12_000)
     try {
-      // 限流时有的接口不带跨域头，浏览器只报「Failed to fetch」，所以网络错误也等一下再试一次
+      // 限流时有的接口不带跨域头，浏览器只报「Failed to fetch」，所以网络错误也等一下再试
       const r = await fetch(url, { signal: ctl.signal }).catch(async (e) => {
-        if (attempt === 0 && !ctl.signal.aborted) { await new Promise((ok) => setTimeout(ok, 2000)); return null }
+        if (!last && !ctl.signal.aborted) { await sleep(backoff); return null }
         throw e
       })
       if (!r) continue
-      if (r.status === 429 && attempt === 0) { await new Promise((ok) => setTimeout(ok, 2000)); continue }
+      if (r.status === 429 && !last) { await sleep(backoff); continue }
       if (quiet404 && (r.status === 404 || r.status === 400)) return null
-      if (!r.ok) throw new Error(`${new URL(url).host} 返回 ${r.status}`)
+      if (r.status === 429) throw new Error(`${host} 限流了，请稍后再试`)
+      if (!r.ok) throw new Error(`${host} 返回 ${r.status}`)
       return await r.json()
     } finally { clearTimeout(timer) }
   }
-  throw new Error(`${new URL(url).host} 限流了，请稍后再试`)
+  throw new Error(`${host} 限流了，请稍后再试`)
 }
 
 /** 同一个地址的几个面板（代币、持有者、K 线）共用一次请求。 */

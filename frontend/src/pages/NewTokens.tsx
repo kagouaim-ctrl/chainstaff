@@ -11,7 +11,7 @@ import { ChangeCell, Masked, QualityBadge, dataBad } from '@/features/tokenBits'
 import type { Token } from '@/domain/types'
 
 /**
- * 新币页：三列并排，刚创建 / 快毕业 / 刚毕业。数据每 30 秒刷新一次。
+ * 新币页：三列并排，刚创建 / 快毕业 / 刚毕业。数据每 60 秒刷新一次。
  * 列表不查安全报告（每个代币都查会把免费接口打满），点进代币页才查。
  */
 type ColKey = 'fresh' | 'soon' | 'graduated'
@@ -39,9 +39,12 @@ export function NewTokens() {
   const [minTxns1h, setMinTxns1h] = useState(0)
   const [hideBad, setHideBad] = useState(true)
   const demoQ = useTokens()
-  const liveQ = useQuery({ queryKey: ['launches', chain], queryFn: () => launches(chain), refetchInterval: 30_000, enabled: !demo })
+  const liveQ = useQuery({ queryKey: ['launches', chain], queryFn: () => launches(chain), refetchInterval: 60_000, enabled: !demo })
   const q = demo ? { ...demoQ, data: demoQ.data ? fromDemo(demoQ.data.filter((t) => t.chain === chain)) : undefined } as typeof liveQ : liveQ
   const f = { minLiq, hideBad, minTxns1h }
+  // 刷新失败但有上次的数据时，继续显示上次的数据，并说明没刷新成功
+  const stale = q.isError && !!q.data
+  const shown = stale ? { ...q, isError: false } as unknown as typeof q : q
 
   const cols: { key: ColKey; title: string; note: string }[] = useMemo(() => [
     { key: 'fresh', title: '新创建', note: '刚在发射平台上创建、还在内盘上的代币，最新的在前。' },
@@ -74,11 +77,16 @@ export function NewTokens() {
         </div>
       </div>
 
+      {(stale || q.data?.partial) && (
+        <p role="status" className="mb-3 rounded-lg border border-line bg-panel px-3 py-2 text-[12px] text-sub">
+          {stale ? `刷新失败（${(q.error as Error).message}），下面是上次读到的数据。` : '部分数据源这次没读到（公开接口限流），列表可能不全，稍后会自动刷新。'}
+        </p>
+      )}
       <div className="mb-3 lg:hidden">
         <Segmented size="sm" label="新币分栏" value={mobileCol} onChange={setMobileCol} options={cols.map((c) => ({ value: c.key, label: c.title }))} />
       </div>
 
-      <DataState q={q} rows={8}>
+      <DataState q={shown} rows={8}>
         {(d) => (
           <div className="grid gap-3 lg:grid-cols-3">
             {cols.map((c) => {
