@@ -3,6 +3,8 @@ import { Link, useParams, useLocation } from 'react-router-dom'
 import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
+import { TopTraders } from '@/features/WalletIntel'
+import { WALLETS_ONLINE } from '@/api/wallets'
 import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
 import { CandleChart, type Indicators } from '@/features/charts'
@@ -20,7 +22,7 @@ import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
 import type { ChartMarker, ChartTf, Holder, MarkerKind, Token } from '@/domain/types'
 
-type TabKey = 'holders' | 'trades' | 'research'
+type TabKey = 'holders' | 'trades' | 'traders' | 'research'
 
 export function TokenPage() {
   const { address = '' } = useParams()
@@ -51,11 +53,14 @@ function TokenView({ t }: { t: Token }) {
           <Tabs label="代币信息" value={tab} onChange={setTab} options={[
             { value: 'holders', label: <>持有者 <span className="text-sub">({t.holders === null ? '--' : compactCN(t.holders)})</span></> },
             { value: 'trades', label: '交易' },
+            // 交易员和钱包标签来自 Birdeye，只有 Solana，要后端
+            ...(WALLETS_ONLINE && t.chain === 'solana' ? [{ value: 'traders' as const, label: '交易员' }] : []),
             // 没有 Agent 后端时不显示空的「Agent 研究」
             ...(isDemo() || AGENTS_ONLINE ? [{ value: 'research' as const, label: 'Agent 研究' }] : []),
           ]} />
           {tab === 'holders' && <Holders t={t} />}
           {tab === 'trades' && <Trades t={t} />}
+          {tab === 'traders' && <TopTraders mint={t.address} />}
           {tab === 'research' && <><Research t={t} /><Activity t={t} /></>}
         </section>
       </div>

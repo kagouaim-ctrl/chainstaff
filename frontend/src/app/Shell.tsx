@@ -11,6 +11,7 @@ import { LEGAL_LINKS } from '@/pages/Legal'
 import { useQuery } from '@tanstack/react-query'
 import { prices } from '@/api/chain'
 import type { Chain } from '@/domain/types'
+import { WALLETS_ONLINE } from '@/api/wallets'
 
 /** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。演示模式的入口。 */
 const DEMO_NAV = [
@@ -25,6 +26,8 @@ const DEMO_NAV = [
 const LIVE_NAV = [
   { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
   { to: '/new', label: '新币', icon: ISpark, end: false, mobile: true },
+  // 钱包情报要后端和 Birdeye 密钥，没有后端时不放入口
+  ...(WALLETS_ONLINE ? [{ to: '/smart-money', label: '聪明钱', icon: IPulse, end: false, mobile: false }] : []),
   { to: '/portfolio', label: '持仓', icon: IPie, end: false, mobile: true },
   { to: '/agents', label: 'AI Agent', icon: IBot, end: false, mobile: true },
   { to: '/legal/help', label: '帮助', icon: IList, end: false, mobile: true },

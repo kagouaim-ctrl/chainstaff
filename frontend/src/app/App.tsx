@@ -14,6 +14,7 @@ import { MyWallet } from '@/pages/MyWallet'
 import { AgentBeta } from '@/pages/AgentBeta'
 import { Legal } from '@/pages/Legal'
 import { NewTokens } from '@/pages/NewTokens'
+import { SmartMoney, WalletPage } from '@/features/WalletIntel'
 import { LIVE, AGENTS_ONLINE } from '@/api/live'
 
 export const routes: RouteObject[] = [
@@ -24,6 +25,8 @@ export const routes: RouteObject[] = [
       { path: 'discover', element: <Discover /> },
       { path: 'token/:address', element: <TokenPage /> },
       { path: 'new', element: <NewTokens /> },
+      { path: 'smart-money', element: <SmartMoney /> },
+      { path: 'wallet/:address', element: <WalletPage /> },
       // 实时模式下没有 Agent 后端时不展示空的角色列表，改成说明页；持仓显示真实钱包而不是模拟盘
       { path: 'agents', element: LIVE && !AGENTS_ONLINE ? <AgentBeta /> : <Agents /> },
       { path: 'activity', element: <Activity /> },
