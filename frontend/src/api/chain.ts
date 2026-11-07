@@ -176,6 +176,9 @@ function tokenView(chain: Chain, all: Json[], report: Json, sell?: Json): Token 
   const mint: string = top.baseToken.address
   const launchpad = chain === 'solana' && mint.endsWith('pump') ? 'pump.fun' : chain === 'solana' && mint.endsWith('bonk') ? 'bonk.fun' : (top.dexId ?? '未知')
   const evm = chain !== 'solana'
+  const security = evm ? evmSecurity(report) : solanaSecurity(report, sell)
+  const na = lpNotApplicable(top, !BONDING_DEXES.has(top.dexId))
+  if (na) Object.assign(security, { lp: 'na', lpNote: na })
   return {
     chain, address: mint, symbol: top.baseToken.symbol || mint.slice(0, 6), name: top.baseToken.name ?? '', hue: hue(mint),
     priceUsd: num(top.priceUsd) ?? 0, mcapUsd: num(top.marketCap) ?? num(top.fdv) ?? 0, fdvUsd: num(top.fdv),
@@ -185,13 +188,24 @@ function tokenView(chain: Chain, all: Json[], report: Json, sell?: Json): Token 
     quality: pick.quality,
     holders: evm ? num(report?.holder_count) : report?.totalHolders ?? null,
     ageMinutes: top.pairCreatedAt ? (Date.now() - top.pairCreatedAt) / 60_000 : 0,
-    stats: stats(top), security: evm ? evmSecurity(report) : solanaSecurity(report, sell), verdict: 'unresearched', tags: [],
+    stats: stats(top), security, verdict: 'unresearched', tags: [],
     graduated: !BONDING_DEXES.has(top.dexId), bondingPct: null, verified: false, launchpad,
     dataSource: `DexScreener、${evm ? 'GoPlus' : 'RugCheck'}（浏览器直接读取）`, updatedAt: new Date().toISOString(),
     image: https(pairs.find((p) => p.info?.imageUrl)?.info?.imageUrl),
     description: descriptions.get(`${chain}:${mint.toLowerCase()}`) ?? null,
     links: links(pairs.find((p) => p.info?.websites?.length || p.info?.socials?.length)?.info),
   }
+}
+
+/**
+ * 主交易对是集中流动性池（Orca Whirlpool、Raydium CLMM、Meteora DLMM、Uniswap v3 等）或还在发射曲线上时，
+ * 没有可以锁定或销毁的 LP 代币，「LP 未锁定」对它没有意义，不能算成风险。
+ */
+function lpNotApplicable(top: Json, graduated: boolean): string | null {
+  if (!graduated) return '还在发射曲线上，没有 LP'
+  const labels: string[] = (top.labels ?? []).map((l: unknown) => String(l).toUpperCase())
+  if (top.dexId === 'orca' || labels.some((l) => ['CLMM', 'DLMM', 'V3', 'V4', 'WHIRLPOOL'].includes(l))) return '集中流动性池，没有可锁定的 LP 代币'
+  return null
 }
 
 /** 代币的安全报告：Solana 用 RugCheck，EVM 用 GoPlus。失败时是 null（未知），失败不缓存，下次再查。 */

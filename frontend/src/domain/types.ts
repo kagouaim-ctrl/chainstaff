@@ -50,7 +50,10 @@ export type Verdict = 'unresearched' | 'researching' | 'security_veto' | 'no_tra
 export interface SecurityCheck {
   mintAuthority: boolean | null
   freezeAuthority: boolean | null
-  lp: 'burned' | 'locked' | 'unlocked' | 'unknown'
+  /** na：这类池子没有可锁定的 LP 代币（集中流动性池、发射曲线），不算风险 */
+  lp: 'burned' | 'locked' | 'unlocked' | 'unknown' | 'na'
+  /** lp 为 na 时的原因 */
+  lpNote?: string
   sellSimulation: 'pass' | 'fail' | 'unknown'
   transferFeeBps: number | null
   top10Pct: number | null

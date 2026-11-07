@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
-import { useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
+import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
@@ -14,7 +14,7 @@ import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
 import { AGENTS_ONLINE } from '@/api/live'
 import { CHAIN_LABEL } from '@/api/chain'
-import { VerdictTag, securityFlags, VERDICT, RiskStrip, QualityBadge, Masked, dataBad, qualityTitle } from '@/features/tokenBits'
+import { VerdictTag, securityFlags, riskItems, riskLevel, VERDICT, RiskStrip, QualityBadge, Masked, dataBad, qualityTitle, rugLike, ChangeCell } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
@@ -41,8 +41,8 @@ function TokenView({ t }: { t: Token }) {
   const [tab, setTab] = useState<TabKey>('holders')
   useEffect(() => { document.title = `${t.symbol} ${dataBad(t) ? "" : price(t.priceUsd) + " "}· KAGOUAI` }, [t])
   return (
-    <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[400px_minmax(0,1fr)_380px]">
-      <SocialPanel t={t} />
+    <div className={cx("-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px]", isDemo() ? "xl:grid-cols-[400px_minmax(0,1fr)_380px]" : "xl:grid-cols-[260px_minmax(0,1fr)_380px]")}>
+      {isDemo() ? <SocialPanel t={t} /> : <SideList t={t} />}
 
       <div className="min-w-0 border-line lg:border-r">
         <Header t={t} />
@@ -205,6 +205,39 @@ function ChartPanel({ t }: { t: Token }) {
 }
 
 /** 选中代币后左栏：群聊 / 观点，可以切换（替代 fomo 的代币列表）。 */
+/** 实时模式的左栏（参考 GMGN）：自选和热门代币列表，点一下切换代币。没有社区数据时不放空群聊。 */
+function SideList({ t }: { t: Token }) {
+  const q = useTokens()
+  const { watch } = useApp()
+  const [k, setK] = useState<'watch' | 'hot'>(() => Object.values(watch).some(Boolean) ? 'watch' : 'hot')
+  const list = (q.data ?? []).filter((x) => k === 'hot' ? !rugLike(x) : watch[x.address]).slice(0, 40)
+  return (
+    <aside aria-label="代币列表" className="order-last hidden border-line xl:order-none xl:flex xl:h-[calc(100vh-64px-33px-32px)] xl:flex-col xl:border-r">
+      <div role="tablist" aria-label="自选或热门" className="flex gap-1 border-b border-line p-2">
+        {([['watch', '自选'], ['hot', '热门']] as const).map(([v, l]) => (
+          <button key={v} role="tab" aria-selected={k === v} onClick={() => setK(v)}
+            className={cx('h-8 flex-1 rounded-lg text-[13px]', k === v ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>{l}</button>
+        ))}
+      </div>
+      <ul className="min-h-0 flex-1 overflow-y-auto">
+        {list.length === 0 && <li className="p-4 text-center text-[12px] text-sub">{k === 'watch' ? '还没有自选。点代币名旁边的星标加入。' : q.isLoading ? '加载中…' : '暂时没有数据'}</li>}
+        {list.map((x) => (
+          <li key={x.address}>
+            <Link to={`/token/${x.address}`} className={cx('flex h-11 items-center gap-2 px-3 text-[13px] hover:bg-raised', x.address === t.address && 'bg-raised')}>
+              <TokenAvatar image={x.image} symbol={x.symbol} hue={x.hue} size={24} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{x.symbol} <span className="text-[10px] text-sub">{CHAIN_LABEL[x.chain]}</span></span>
+                <span className="num block text-[11px] font-normal text-sub"><Masked t={x}>{usd(x.mcapUsd, { compact: true })}</Masked></span>
+              </span>
+              <ChangeCell t={x} v={x.stats['24h'].change} className="text-[12px]" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  )
+}
+
 function SocialPanel({ t }: { t: Token }) {
   const [k, setK] = useState<'chat' | 'thesis'>('chat')
   const th = useTheses(t.address)
@@ -308,10 +341,11 @@ function SecurityBlock({ t }: { t: Token }) {
         <p className="flex items-start gap-2 text-[13px] text-warn"><IAlert className="mt-0.5 shrink-0" />安全检查还没完成。结果无法确认时，风控默认拒绝买入。</p>
       ) : (
         <>
+          <RiskSummary s={s} />
           <ul className="grid grid-cols-1 gap-1.5">
             {flags.map((f) => (
               <li key={f.label} className={cx('flex items-center gap-2 text-[13px]', f.ok === false ? 'text-down' : f.ok === null ? 'text-warn' : 'text-fg/90')}>
-                <span className={f.ok === false ? 'text-down' : f.ok === null ? 'text-warn' : 'text-up'}>{f.ok === false ? <IX /> : f.ok === null ? <IAlert /> : <ICheck />}</span>{f.label}
+                <span className={f.ok === false ? 'text-down' : f.ok === null ? 'text-warn' : 'text-up'}>{f.ok === false ? <IX /> : f.ok === null ? <IAlert /> : <ICheck />}</span>{f.label}{f.note && <span className="text-[12px] text-sub">· {f.note}</span>}
               </li>
             ))}
           </ul>
@@ -323,6 +357,19 @@ function SecurityBlock({ t }: { t: Token }) {
         </>
       )}
     </Panel>
+  )
+}
+
+/** 安全结论：三档之一，加上得出结论的每一条依据。 */
+function RiskSummary({ s }: { s: Token['security'] }) {
+  const lv = riskLevel(s)
+  const items = riskItems(s)
+  const head = { high: ['高危', 'border-down/40 bg-down/10 text-down'], warn: ['需要注意', 'border-warn/40 bg-warn/10 text-warn'], pass: ['查到的项目都通过', 'border-up/30 bg-up/10 text-up'], unknown: ['未检查', 'border-line text-sub'] }[lv]
+  return (
+    <div className={cx('mb-3 rounded-lg border px-3 py-2 text-[13px]', head[1])}>
+      <div className="font-medium">{head[0]}</div>
+      {items.length > 0 && <ul className="mt-1 space-y-0.5 text-[12px]">{items.map((i) => <li key={i.label}>{i.level === 'high' ? '高危' : '注意'}：{i.label}</li>)}</ul>}
+    </div>
   )
 }
 
@@ -379,7 +426,7 @@ function HolderBar({ all, top10 }: { all: Holder[]; top10: number | null }) {
     <div className="px-4 pt-3">
       <div className="flex justify-between text-[12px] font-normal text-sub">
         <span>前十持有 <span className="num text-fg">{top10 === null ? '未知' : `${top10.toFixed(1)}%`}</span></span>
-        <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>
+        {isDemo() && <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>}
       </div>
       <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10 === null ? '未知' : `${top10.toFixed(1)}%`}`}>
         {top.map((h) => <div key={h.rank} title={`#${h.rank} ${h.agentName ?? shortAddr(h.label)} ${h.pct.toFixed(2)}%`} className={h.kind === 'agent' ? 'bg-agent' : 'bg-sub/60'} style={{ width: `${h.pct}%` }} />)}
