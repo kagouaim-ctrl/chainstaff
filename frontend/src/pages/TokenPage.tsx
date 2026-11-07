@@ -1,9 +1,11 @@
+import { useWatched } from '@/features/watch'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
 import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { TopTraders } from '@/features/WalletIntel'
+import { AlertButton } from '@/features/alerts'
 import { WALLETS_ONLINE } from '@/api/wallets'
 import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
@@ -122,6 +124,7 @@ function Header({ t }: { t: Token }) {
         <div className="flex items-center gap-1 text-sub">
           <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" aria-label="在 X 上搜索" className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised hover:text-fg"><ISearch /></a>
           <button onClick={() => toggleWatch(t.address)} aria-pressed={!!w} aria-label={w ? '取消自选' : '加入自选'} className={cx('flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised', w ? 'text-paper' : 'hover:text-fg')}><IStar filled={!!w} /></button>
+          {!isDemo() && <AlertButton t={t} />}
         </div>
         <span className="text-[14px] text-sub">{age(t.ageMinutes)}</span>
         <button className="flex items-center gap-1 rounded-md px-1 text-[14px] text-sub hover:bg-raised hover:text-fg" title={t.address}
@@ -215,7 +218,8 @@ function SideList({ t }: { t: Token }) {
   const q = useTokens()
   const { watch } = useApp()
   const [k, setK] = useState<'watch' | 'hot'>(() => Object.values(watch).some(Boolean) ? 'watch' : 'hot')
-  const list = (q.data ?? []).filter((x) => k === 'hot' ? !rugLike(x) : watch[x.address]).slice(0, 40)
+  const watched = useWatched(q.data)
+  const list = (k === 'hot' ? (q.data ?? []).filter((x) => !rugLike(x)) : watched).slice(0, 40)
   return (
     <aside aria-label="代币列表" className="order-last hidden border-line xl:order-none xl:flex xl:h-[calc(100vh-64px-33px-32px)] xl:flex-col xl:border-r">
       <div role="tablist" aria-label="自选或热门" className="flex gap-1 border-b border-line p-2">

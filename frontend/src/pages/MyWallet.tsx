@@ -8,6 +8,7 @@ import { NET, txUrl } from '@/wallet/chains'
 import { readTrades } from '@/wallet/history'
 import { nativeHolding, solanaHoldings } from '@/wallet/holdings'
 import type { Chain } from '@/domain/types'
+import { AlertList } from '@/features/alerts'
 
 /**
  * 实时模式的「持仓」：连接钱包在链上的真实资产，不是模拟盘。
@@ -24,6 +25,7 @@ export function MyWallet() {
           <Button variant="primary" className="h-11 px-5" onClick={() => openPicker('solana')}>连接 Solana 钱包</Button>
           <Button variant="outline" className="h-11 px-5" onClick={() => openPicker('evm')}>连接 EVM 钱包</Button>
         </div>
+        <div className="mt-10 text-left"><AlertList /></div>
       </div>
     )
   }
@@ -33,6 +35,7 @@ export function MyWallet() {
       {solana && <SolanaSection owner={solana.address} />}
       {evm && <EvmSection owner={evm.address} />}
       <MyTrades />
+      <AlertList />
     </div>
   )
 }

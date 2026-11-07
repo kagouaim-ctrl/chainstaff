@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useWatched } from '@/features/watch'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTokens, isDemo, now } from '@/api/hooks'
 import { useApp, useToast } from '@/app/store'
@@ -80,8 +81,7 @@ export function Discover() {
 function WatchStrip() {
   const q = useTokens()
   const nav = useNavigate()
-  const { watch } = useApp()
-  const list = (q.data ?? []).filter((t) => watch[t.address] ?? t.watch)
+  const list = useWatched(q.data)
   // 实时模式没有自选时不占位置；演示模式保留引导文案
   if (!q.data || (!isDemo() && list.length === 0)) return null
   return (
@@ -114,7 +114,10 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const [chain, setChain] = useState('all')
   const [sort, setSort] = useState<SortKey>(DEFAULT_SORT[initial])
   const [dir, setDir] = useState<1 | -1>(1)
-  const rows = useMemo(() => filterTokens(q.data ?? [], { tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir }), [q.data, tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir])
+  const watched = useWatched(q.data)
+  // 自选页签用合并后的自选列表（包括不在热门列表里的代币）
+  const base = tab === 'watch' ? watched : q.data ?? []
+  const rows = filterTokens(base, { tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir })
   const demo = isDemo()
   const demoBuy = (t: Token) => toast(`演示数据不能交易：${t.symbol} 是样例代币。`)
   // 实时模式只显示有数据的分类：没有 Agent 后端就没有「Agent 在买」，没有认证数据就没有「蓝筹币」

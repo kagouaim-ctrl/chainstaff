@@ -9,8 +9,9 @@ import { Toast } from './Toast'
 import { AgentDrawer } from '@/features/AgentDrawer'
 import { OrderDrawer } from '@/features/OrderDrawer'
 import { QuickBuyDialog } from '@/features/QuickBuy'
+import { AlertRunner } from '@/features/alerts'
 
-const TITLES: Record<string, string> = { '/': '发现', '/overview': '总览', '/agents': 'AI Agent', '/activity': '动态', '/portfolio': '持仓', '/orders': '订单', '/strategy': '策略' }
+const TITLES: Record<string, string> = { '/': '发现', '/overview': '总览', '/agents': 'AI Agent', '/activity': '动态', '/portfolio': '持仓', '/orders': '订单', '/strategy': '策略', '/new': '新币', '/smart-money': '聪明钱' }
 
 export function Layout() {
   const { pathname } = useLocation()
@@ -38,6 +39,7 @@ export function Layout() {
       {!pathname.startsWith('/token/') && <BottomNav />}
       <SearchPalette />
       <QuickBuyDialog />
+      <AlertRunner />
       <Toast />
       <AgentDrawer role={agent} onClose={close('agent')} />
       <OrderDrawer id={order} onClose={close('order')} />

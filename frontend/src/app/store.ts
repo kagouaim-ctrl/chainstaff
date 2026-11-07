@@ -12,6 +12,11 @@ interface AppState {
   toggleWatch: (a: string) => void
 }
 
+const WATCH_KEY = 'kagouai.watch.v1'
+function readWatch(): Record<string, boolean> {
+  try { const v = JSON.parse(localStorage.getItem(WATCH_KEY) ?? '{}'); return v && typeof v === 'object' ? v : {} } catch { return {} }
+}
+
 export const useApp = create<AppState>((set) => ({
   paused: false,
   pausedAt: null,
@@ -19,8 +24,14 @@ export const useApp = create<AppState>((set) => ({
   resume: () => set({ paused: false, pausedAt: null }),
   searchOpen: false,
   setSearchOpen: (v) => set({ searchOpen: v }),
-  watch: {},
-  toggleWatch: (a) => set((s) => ({ watch: { ...s.watch, [a]: !s.watch[a] } })),
+  // 自选存在浏览器本地，刷新和下次打开都还在
+  watch: readWatch(),
+  toggleWatch: (a) => set((s) => {
+    const watch = { ...s.watch }
+    if (watch[a]) delete watch[a]; else watch[a] = true
+    try { localStorage.setItem(WATCH_KEY, JSON.stringify(watch)) } catch { /* 隐私模式不记 */ }
+    return { watch }
+  }),
 }))
 
 interface ToastState { msg: string | null; show: (m: string) => void; clear: () => void }
