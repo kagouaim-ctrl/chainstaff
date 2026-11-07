@@ -5,6 +5,7 @@
  * 读不到的值保持 null，界面显示为未知：查不到权限不等于没有权限。
  * 和后端 tradingagents/meme/market.py 的换算一致。
  */
+import { choosePair, pairScore } from './pairs'
 import type { Candle, Chain, ChartTf, Holder, SecurityCheck, Timeframe, Token, TokenLink, Trade, WindowStat } from '@/domain/types'
 
 const DEX = 'https://api.dexscreener.com'
@@ -77,7 +78,8 @@ function cached(key: string, load: () => Promise<Json>, ttl = TTL): Promise<Json
 const num = (v: unknown): number | null => { const n = Number(v); return v == null || v === '' || !Number.isFinite(n) ? null : n }
 const hue = (s: string) => [...s].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 360, 7)
 const liq = (p: Json) => p?.liquidity?.usd ?? 0
-const byDepth = (ps: Json[]) => [...ps].sort((a, b) => liq(b) - liq(a))
+/** 主交易对排在最前；价格和共识冲突的池子被排除（见 pairs.ts）。 */
+const mainOf = (ps: Json[]) => choosePair(ps).main
 
 function stats(p: Json): Record<Timeframe, WindowStat> {
   const out = {} as Record<Timeframe, WindowStat>
@@ -166,15 +168,21 @@ function links(info: Json): TokenLink[] {
 /** 简介只在 DexScreener 的代币资料里有，列表加载时记下来。 */
 const descriptions = new Map<string, string>()
 
-function tokenView(chain: Chain, pairs: Json[], report: Json, sell?: Json): Token {
-  const top = pairs[0]
+function tokenView(chain: Chain, all: Json[], report: Json, sell?: Json): Token | null {
+  const pick = choosePair(all)
+  const pairs = pick.pools
+  const top = pick.main
+  if (!top) return null
   const mint: string = top.baseToken.address
   const launchpad = chain === 'solana' && mint.endsWith('pump') ? 'pump.fun' : chain === 'solana' && mint.endsWith('bonk') ? 'bonk.fun' : (top.dexId ?? '未知')
   const evm = chain !== 'solana'
   return {
     chain, address: mint, symbol: top.baseToken.symbol || mint.slice(0, 6), name: top.baseToken.name ?? '', hue: hue(mint),
-    priceUsd: num(top.priceUsd) ?? 0, mcapUsd: top.marketCap ?? top.fdv ?? 0,
+    priceUsd: num(top.priceUsd) ?? 0, mcapUsd: num(top.marketCap) ?? num(top.fdv) ?? 0, fdvUsd: num(top.fdv),
+    // 只算价格可信的池子，冲突池子报的流动性不算
     liquidityUsd: pairs.reduce((s, p) => s + liq(p), 0),
+    pair: top.pairAddress ? { address: top.pairAddress, dex: String(top.dexId ?? '未知'), quote: String(top.quoteToken?.symbol ?? '') } : null,
+    quality: pick.quality,
     holders: evm ? num(report?.holder_count) : report?.totalHolders ?? null,
     ageMinutes: top.pairCreatedAt ? (Date.now() - top.pairCreatedAt) / 60_000 : 0,
     stats: stats(top), security: evm ? evmSecurity(report) : solanaSecurity(report, sell), verdict: 'unresearched', tags: [],
@@ -198,7 +206,7 @@ function report(chain: Chain, addr: string): Promise<Json> {
   }).catch(() => null)
 }
 const pairsOf = (chain: Chain, addr: string) => cached(`pairs:${chain}:${addr}`, async () =>
-  byDepth(((await getJson(`${DEX}/token-pairs/v1/${chain}/${addr}`)) ?? []).filter((p: Json) => same(p.baseToken?.address ?? '', addr))))
+  ((await getJson(`${DEX}/token-pairs/v1/${chain}/${addr}`)) ?? []).filter((p: Json) => same(p.baseToken?.address ?? '', addr)))
 
 /** 列表里见过的代币记住它在哪条链上；EVM 地址在 BSC 和 Robinhood 上都试一下，取流动性大的。 */
 const chainOfAddress = new Map<string, Chain>()
@@ -208,7 +216,8 @@ async function locate(addr: string): Promise<{ chain: Chain; pairs: Json[] } | n
   const known = chainOfAddress.get(addr.toLowerCase())
   const tries: Chain[] = known ? [known] : EVM_CHAINS
   const found = await Promise.all(tries.map(async (c) => ({ chain: c, pairs: await pairsOf(c, addr).catch(() => [] as Json[]) })))
-  const best = found.filter((f) => f.pairs.length).sort((x, y) => liq(y.pairs[0]) - liq(x.pairs[0]))[0]
+  const best = found.map((f) => ({ ...f, main: mainOf(f.pairs) })).filter((f) => f.main)
+    .sort((x, y) => pairScore(y.main) - pairScore(x.main))[0]
   return best ?? null
 }
 
@@ -258,7 +267,11 @@ export async function tokens(): Promise<Token[]> {
       const found = addrs.filter((a) => by.has(a))
       // GoPlus 免费档一次只查一个地址、频率很低，所以 EVM 代币的安全检查留到打开代币页时再查
       const reports = chain === 'solana' ? await pool(found, 4, (a) => report(chain, a)) : found.map(() => null)
-      found.forEach((a, i) => { chainOfAddress.set(a.toLowerCase(), chain); out.push(tokenView(chain, byDepth(by.get(a)!), reports[i])) })
+      found.forEach((a, i) => {
+        chainOfAddress.set(a.toLowerCase(), chain)
+        const t = tokenView(chain, by.get(a)!, reports[i])
+        if (t) out.push(t)
+      })
     }
     // 保持 DexScreener 的顺序
     const order = new Map(picks.map((p, i) => [`${p.chain}:${p.address.toLowerCase()}`, i]))
@@ -279,16 +292,16 @@ export async function token(addr: string): Promise<Token | null> {
   if (!at) return null
   const rep = await report(at.chain, addr)
   const sell = at.chain === 'solana'
-    ? await cached(`sell:${addr}`, () => sellRoute(addr, num(at.pairs[0].priceUsd), num(rep?.token?.decimals)))
+    ? await cached(`sell:${addr}`, () => sellRoute(addr, num(mainOf(at.pairs)?.priceUsd), num(rep?.token?.decimals)))
     : undefined
   return tokenView(at.chain, at.pairs, rep, sell)
 }
 
-/** K 线和成交用 24 小时成交额最大的池子：流动性数字有时是假的，成交很难造假。 */
+/** K 线和成交用主交易对，和代币页显示的价格、市值来自同一个池子。 */
 async function topPool(addr: string): Promise<{ chain: Chain; pool: string } | null> {
   const at = await locate(addr)
-  const busiest = [...(at?.pairs ?? [])].sort((x, y) => (y.volume?.h24 ?? 0) - (x.volume?.h24 ?? 0))[0]
-  return busiest?.pairAddress ? { chain: at!.chain, pool: busiest.pairAddress } : null
+  const main = at ? mainOf(at.pairs) : null
+  return main?.pairAddress ? { chain: at!.chain, pool: main.pairAddress } : null
 }
 
 const GECKO_TF: Record<Exclude<ChartTf, SecondTf>, [string, number]> = { '1m': ['minute', 1], '5m': ['minute', 5], '15m': ['minute', 15], '1h': ['hour', 1], '4h': ['hour', 4], '1d': ['day', 1] }
@@ -373,7 +386,7 @@ export async function holders(addr: string): Promise<Holder[]> {
   const at = await locate(addr)
   if (!at) return []
   const rep = await report(at.chain, addr)
-  const price = num(at.pairs[0]?.priceUsd) ?? 0
+  const price = num(mainOf(at.pairs)?.priceUsd) ?? 0
   const label = (o: string) => `${o.slice(0, 4)}…${o.slice(-4)}`
   if (at.chain !== 'solana') {
     return (rep?.holders ?? []).filter((h: Json) => h.is_contract !== 1 && !BURN.has(String(h.address).toLowerCase())).map((h: Json, i: number) => ({
@@ -397,17 +410,46 @@ export async function search(q: string): Promise<SearchHit[]> {
   const term = q.trim()
   if (term.length < 2) return []
   const body = await getJson(`${DEX}/latest/dex/search?q=${encodeURIComponent(term)}`)
-  const by = new Map<string, { p: Json; volume: number }>()
+  const groups = new Map<string, Json[]>()
   for (const p of body?.pairs ?? []) {
     const a = p.baseToken?.address
     if (!isChain(p.chainId) || !a || !isAddress(a)) continue
     const k = `${p.chainId}:${a.toLowerCase()}`
-    const cur = by.get(k)
-    const volume = (cur?.volume ?? 0) + (p.volume?.h24 ?? 0)
-    by.set(k, { p: !cur || liq(p) > liq(cur.p) ? p : cur.p, volume })
+    groups.set(k, [...(groups.get(k) ?? []), p])
   }
-  return [...by.values()].sort((x, y) => y.volume - x.volume).slice(0, 15).map(({ p, volume }) => {
-    chainOfAddress.set(p.baseToken.address.toLowerCase(), p.chainId)
-    return { chain: p.chainId, address: p.baseToken.address, symbol: p.baseToken.symbol ?? '', name: p.baseToken.name ?? '', liquidityUsd: liq(p), volumeH24: volume, priceUsd: num(p.priceUsd) }
+  const hits = [...groups.values()].flatMap((ps) => {
+    const pick = choosePair(ps)
+    if (!pick.main) return []
+    // 价格冲突的池子不算成交额，免得刷量的假池子把仿盘顶到前面
+    const volume = pick.pools.reduce((s, p) => s + (p.volume?.h24 ?? 0), 0)
+    return [{ p: pick.main, pools: pick.pools, volume, bad: pick.quality.level === 'bad' }]
   })
+  return hits.sort((x, y) => Number(x.bad) - Number(y.bad) || y.volume - x.volume).slice(0, 15).map(({ p, pools, volume, bad }) => {
+    chainOfAddress.set(p.baseToken.address.toLowerCase(), p.chainId)
+    return {
+      chain: p.chainId, address: p.baseToken.address, symbol: p.baseToken.symbol ?? '', name: p.baseToken.name ?? '',
+      liquidityUsd: pools.reduce((s: number, x: Json) => s + liq(x), 0), volumeH24: volume, priceUsd: bad ? null : num(p.priceUsd),
+    }
+  })
+}
+
+export interface PriceRow { chain: Chain; address: string; symbol: string; name: string; image: string | null; priceUsd: number | null; bad: boolean }
+
+/** 一批代币的参考价（主交易对的价格）。数据异常的代币 priceUsd 为 null，不拿来算资产。 */
+export async function prices(chain: Chain, addrs: string[]): Promise<Map<string, PriceRow>> {
+  const out = new Map<string, PriceRow>()
+  for (let i = 0; i < addrs.length; i += 30) {
+    const batch = addrs.slice(i, i + 30)
+    const pairs: Json[] = (await getJson(`${DEX}/tokens/v1/${chain}/${batch.join(',')}`).catch(() => [])) ?? []
+    for (const a of batch) {
+      const pick = choosePair(pairs.filter((p) => same(p.baseToken?.address ?? '', a)))
+      if (!pick.main) continue
+      const bad = pick.quality.level === 'bad'
+      out.set(a, {
+        chain, address: a, symbol: pick.main.baseToken.symbol ?? a.slice(0, 6), name: pick.main.baseToken.name ?? '',
+        image: https(pick.pools.find((p) => p.info?.imageUrl)?.info?.imageUrl), priceUsd: bad ? null : num(pick.main.priceUsd), bad,
+      })
+    }
+  }
+  return out
 }

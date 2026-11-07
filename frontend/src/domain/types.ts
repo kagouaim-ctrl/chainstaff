@@ -63,6 +63,12 @@ export interface WindowStat { change: number; volume: number; txns: number; buye
 /** 行情支持的链。交易只计划支持 Solana。 */
 export type Chain = 'solana' | 'bsc' | 'robinhood' | 'ethereum'
 
+/** 数据可信度：bad 不展示数值、不能交易、不能进 AI 研究；suspect 照常展示但加警告。 */
+export type QualityFlag =
+  | 'conflicting_pools' | 'mcap_above_fdv' | 'implied_supply_mismatch' | 'extreme_change'
+  | 'move_without_volume' | 'mcap_liquidity_gap' | 'no_activity' | 'no_price'
+export interface DataQuality { level: 'ok' | 'suspect' | 'bad'; flags: QualityFlag[] }
+
 export interface Token {
   chain: Chain
   address: string
@@ -71,7 +77,13 @@ export interface Token {
   hue: number
   priceUsd: number
   mcapUsd: number
+  /** 完全稀释估值。和市值不是一回事，查不到时为 null */
+  fdvUsd?: number | null
   liquidityUsd: number
+  /** 主交易对：池子地址和 DEX。价格、涨跌、K 线、成交都来自它 */
+  pair?: { address: string; dex: string; quote: string } | null
+  /** 演示数据没有这个字段，按可信处理 */
+  quality?: DataQuality
   holders: number | null
   ageMinutes: number
   stats: Record<Timeframe, WindowStat>

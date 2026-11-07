@@ -10,7 +10,7 @@ import { nativeBalance, tokenBalance } from '@/wallet/actions'
 import { execute, getQuote, type Step } from '@/wallet/swap'
 import { useWallet } from '@/wallet/store'
 import { saveTrade } from '@/wallet/history'
-import { securityPass } from './tokenBits'
+import { dataBad, qualityTitle, securityPass } from './tokenBits'
 
 const BUY_PRESETS: Record<string, string[]> = { SOL: ['0.1', '0.5', '1', '2'], BNB: ['0.05', '0.1', '0.5', '1'], ETH: ['0.01', '0.05', '0.1', '0.5'] }
 const SELL_PRESETS = [25, 50, 100]
@@ -24,12 +24,12 @@ const STAGE: Record<Step['stage'], string> = {
 }
 
 /** 真实交易面板：用户自己的钱包签名，平台不经手资金。 */
-export function LiveTradePanel({ token, initialSide = 'BUY', bare }: { token: Token; initialSide?: 'BUY' | 'SELL'; bare?: boolean }) {
+export function LiveTradePanel({ token, initialSide = 'BUY', bare, initialAmount = '' }: { token: Token; initialSide?: 'BUY' | 'SELL'; bare?: boolean; initialAmount?: string }) {
   const net = NET[token.chain]
   const wallet = useWallet()
   const owner = net.family === 'solana' ? wallet.solana?.address ?? null : wallet.evm?.address ?? null
   const [side, setSide] = useState<'BUY' | 'SELL'>(initialSide)
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState(initialAmount)
   const [slip, setSlip] = useState(500)
   const [settings, setSettings] = useState(false)
   const [ack, setAck] = useState(false)
@@ -67,11 +67,15 @@ export function LiveTradePanel({ token, initialSide = 'BUY', bare }: { token: To
   const needsAck = buy && severe
   const tooMuch = buy && nat.data != null && inRaw > (token.chain === 'solana' ? nat.data - SOL_RESERVE : nat.data)
   const running = step != null && ['approve', 'sign', 'sent'].includes(step.stage)
-  const outDecimals = buy ? bal.data?.decimals ?? null : net.decimals
+  // 没连钱包时读不到余额里的小数位，用聚合器报价里带的（LI.FI 有，Jupiter 没有）
+  const outDecimals = buy ? bal.data?.decimals ?? quote.data?.raw?.action?.toToken?.decimals ?? null : net.decimals
   const fmtOut = (raw: bigint) => outDecimals == null ? '…' : Number(fromUnits(raw, outDecimals, 6)).toLocaleString('en-US', { maximumFractionDigits: 6 })
 
+  // 价格或市值数据异常时不允许下单：参考价可能是错的，用户无法判断自己买到了什么
+  const blocked = dataBad(token)
   const submit = async () => {
     setError('')
+    if (blocked) return setError(`这个代币的行情数据异常，暂停交易：${qualityTitle(token)}`)
     if (!owner) return wallet.openPicker(net.family)
     if (!inRaw) return setError(buy ? '先输入金额' : '先选择卖出比例')
     if (!buy && !bal.data?.raw) return setError(`你的钱包里没有 ${token.symbol}`)
@@ -96,6 +100,13 @@ export function LiveTradePanel({ token, initialSide = 'BUY', bare }: { token: To
 
   return (
     <form id={bare ? undefined : 'trade'} aria-label="买卖" className={bare ? '' : 'rounded-xl border border-line p-4'} onSubmit={(e) => { e.preventDefault(); void submit() }}>
+      <div className="mb-3 flex items-center justify-between text-[12px]">
+        <span className="flex items-center gap-1.5 rounded-md bg-up/10 px-2 py-1 font-medium text-up" title="不是模拟盘：成交会花掉你钱包里的真实资产">
+          <span className="h-1.5 w-1.5 rounded-full bg-up" />真实钱包交易
+        </span>
+        <span className="text-sub">{CHAIN_LABEL[token.chain]} · {net.native}</span>
+      </div>
+      {blocked && <p role="alert" className="mb-3 rounded-lg border border-warn/40 bg-warn/10 p-2.5 text-[12px] text-warn">行情数据异常，已暂停交易：{qualityTitle(token)}</p>}
       <div className="flex items-center gap-2">
         <div role="tablist" aria-label="买卖方向" className="flex flex-1 gap-1 rounded-lg bg-panel p-1">
           {(['BUY', 'SELL'] as const).map((s) => (
@@ -149,9 +160,9 @@ export function LiveTradePanel({ token, initialSide = 'BUY', bare }: { token: To
       )}
       {buy && !needsAck && sec === false && <p className="mt-3 text-[12px] text-warn">安全检查有未通过的项目，详见右侧「安全检查」。</p>}
 
-      <button type="submit" disabled={running}
+      <button type="submit" disabled={running || blocked}
         className={cx('mt-4 h-11 w-full rounded-full text-[14px] disabled:opacity-60', !owner ? 'bg-agent text-white' : inRaw > 0n ? (buy ? 'bg-up text-[#060510]' : 'bg-down text-[#060510]') : 'bg-raised text-sub')}>
-        {!owner ? `连接${net.family === 'solana' ? ' Solana ' : ' '}钱包` : running ? '处理中…' : `${buy ? '买入' : '卖出'} ${token.symbol}`}
+        {!owner ? `连接${net.family === 'solana' ? ' Solana ' : ''}钱包` : running ? '处理中…' : `${buy ? '买入' : '卖出'} ${token.symbol}`}
       </button>
 
       {error && <p role="alert" className="mt-2 text-[12px] text-down">{error}</p>}

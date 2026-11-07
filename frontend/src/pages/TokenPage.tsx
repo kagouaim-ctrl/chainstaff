@@ -14,7 +14,7 @@ import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
 import { AGENTS_ONLINE } from '@/api/live'
 import { CHAIN_LABEL } from '@/api/chain'
-import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenBits'
+import { VerdictTag, securityFlags, VERDICT, RiskStrip, QualityBadge, Masked, dataBad, qualityTitle } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
@@ -39,7 +39,7 @@ export function TokenPage() {
 
 function TokenView({ t }: { t: Token }) {
   const [tab, setTab] = useState<TabKey>('holders')
-  useEffect(() => { document.title = `${t.symbol} ${price(t.priceUsd)} · memeagent` }, [t])
+  useEffect(() => { document.title = `${t.symbol} ${dataBad(t) ? "" : price(t.priceUsd) + " "}· KAGOUAI` }, [t])
   return (
     <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[400px_minmax(0,1fr)_380px]">
       <SocialPanel t={t} />
@@ -51,7 +51,8 @@ function TokenView({ t }: { t: Token }) {
           <Tabs label="代币信息" value={tab} onChange={setTab} options={[
             { value: 'holders', label: <>持有者 <span className="text-sub">({t.holders === null ? '--' : compactCN(t.holders)})</span></> },
             { value: 'trades', label: '交易' },
-            { value: 'research', label: 'Agent 研究' },
+            // 没有 Agent 后端时不显示空的「Agent 研究」
+            ...(isDemo() || AGENTS_ONLINE ? [{ value: 'research' as const, label: 'Agent 研究' }] : []),
           ]} />
           {tab === 'holders' && <Holders t={t} />}
           {tab === 'trades' && <Trades t={t} />}
@@ -103,8 +104,10 @@ function Header({ t }: { t: Token }) {
   const [copied, setCopied] = useState(false)
   const w = watch[t.address] ?? t.watch
   const s = t.stats['24h']
+  const m = (v: React.ReactNode) => <Masked t={t}>{v}</Masked>
   const boxes: [string, React.ReactNode][] = [
-    ['价格', price(t.priceUsd)], ['24小时涨跌', <Chg key="c" v={s.change} />], ['24小时交易量', usd(s.volume, { compact: true })], ['流动性', usd(t.liquidityUsd, { compact: true })],
+    ['价格', m(price(t.priceUsd))], ['24小时涨跌', m(<Chg key="c" v={s.change} />)], ['24小时交易量', usd(s.volume, { compact: true })], ['流动性', usd(t.liquidityUsd, { compact: true })],
+    ...(t.fdvUsd != null && Math.abs(t.fdvUsd - t.mcapUsd) > t.mcapUsd * 0.01 ? [['完全稀释估值', m(usd(t.fdvUsd, { compact: true }))] as [string, React.ReactNode]] : []),
   ]
   return (
     <section className="border-b border-line px-4 py-4">
@@ -120,12 +123,14 @@ function Header({ t }: { t: Token }) {
           onClick={() => { navigator.clipboard?.writeText(t.address).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500) }} aria-label="复制合约地址">
           {shortAddr(t.address, 4, 4)}{copied ? <ICheck className="text-up" /> : <ICopy />}
         </button>
-        <VerdictTag v={t.verdict} />
+        {(isDemo() || AGENTS_ONLINE) && <VerdictTag v={t.verdict} />}
+        <QualityBadge t={t} />
       </div>
+      {dataBad(t) && <p role="alert" className="mt-3 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[12px] text-warn">行情数据异常，价格、市值和涨跌暂不展示，也不能交易：{qualityTitle(t)}</p>}
       <div className="mt-4 flex flex-wrap items-end gap-2">
         <div className="mr-4">
           <div className="text-[12px] font-normal text-sub">市值</div>
-          <div className="num text-[32px] font-medium leading-9 tracking-[-1.5px]">{usd(t.mcapUsd, { compact: true })}</div>
+          <div className="num text-[32px] font-medium leading-9 tracking-[-1.5px]">{m(usd(t.mcapUsd, { compact: true }))}</div>
         </div>
         {boxes.map(([k, v]) => (
           <div key={k} className="rounded-lg border border-line px-3 py-2">
@@ -134,6 +139,7 @@ function Header({ t }: { t: Token }) {
           </div>
         ))}
       </div>
+      {t.pair && <p className="mt-2 text-[12px] font-normal text-sub" title={`价格、K 线和成交都来自这个池子：${t.pair.address}`}>主交易对：{t.pair.dex} · {t.symbol}/{t.pair.quote || '?'} · <span className="num">{shortAddr(t.pair.address, 4, 4)}</span></p>}
       <div className="mt-3"><RiskStrip s={t.security} /></div>
     </section>
   )
@@ -331,10 +337,10 @@ function Holders({ t }: { t: Token }) {
         return (
           <div>
             <HolderBar all={all} top10={t.security.top10Pct} />
-            <div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
+            {isDemo() && <div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看 Agent</label>
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={thesisOnly} onChange={(e) => setThesisOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看有观点的</label>
-            </div>
+            </div>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px] text-[13px]">
                 <thead className="text-xs text-sub"><tr className="border-y border-line">
@@ -394,7 +400,7 @@ function Trades({ t }: { t: Token }) {
         <div className="overflow-x-auto">
           <div className="flex items-center gap-3 px-4 py-2.5">
             <Segmented label="成交方向" size="sm" value={side} onChange={setSide} options={[{ value: 'all', label: '全部' }, { value: 'BUY', label: '买入' }, { value: 'SELL', label: '卖出' }]} />
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-sub"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} />只看 Agent</label>
+            {isDemo() && <label className="flex cursor-pointer items-center gap-1.5 text-xs text-sub"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} />只看 Agent</label>}
             <span className="ml-auto text-[12px] font-normal text-sub">{rows.length} 笔</span>
           </div>
           <table className="w-full min-w-[560px] text-[13px]">

@@ -6,7 +6,9 @@ import { useResearch } from '@/features/Research'
 import { CHAIN_LABEL } from '@/api/chain'
 import { DataState, Segmented, TokenAvatar, Chg, cx } from '@/components/ui'
 import { IStar, IBot } from '@/components/icons'
-import { VerdictTag, SecurityBadge, securityPass } from '@/features/tokenBits'
+import { VerdictTag, SecurityBadge, securityPass, QualityBadge, Masked, dataBad } from '@/features/tokenBits'
+import { QuickBuyButton } from '@/features/QuickBuy'
+import { AGENTS_ONLINE } from '@/api/live'
 import { usd, price, age, compactCN, relTime } from '@/lib/format'
 import type { Timeframe, Token, Chain } from '@/domain/types'
 
@@ -43,7 +45,8 @@ export function filterTokens(list: Token[], o: Filter) {
     mcap: t.mcapUsd, change: t.stats[o.tf].change, volume: t.stats[o.tf].volume, liquidity: t.liquidityUsd,
     holders: t.holders ?? 0, age: -t.ageMinutes, bonding: t.bondingPct ?? 0,
   })[o.sort]
-  r.sort((a, b) => (key(b) - key(a)) * o.dir)
+  // 数据异常的代币数值不可信，不参与排序，统一放到最后
+  r.sort((a, b) => Number(dataBad(a)) - Number(dataBad(b)) || (key(b) - key(a)) * o.dir)
   return r
 }
 
@@ -59,7 +62,7 @@ export function Discover() {
       </div>
       <div className={cx('grid gap-4', split && '2xl:grid-cols-2')}>
         <TokenTable initial="trending" compact={split} />
-        {split && <div className="hidden 2xl:block"><TokenTable initial="agent" compact /></div>}
+        {split && <div className="hidden 2xl:block"><TokenTable initial={AGENTS_ONLINE ? 'agent' : 'graduated'} compact /></div>}
       </div>
     </div>
   )
@@ -80,9 +83,9 @@ function WatchStrip() {
           <TokenAvatar image={t.image} symbol={t.symbol} hue={t.hue} size={30} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1 text-[14px]">{t.symbol}<IStar filled className="text-paper" width={11} height={11} /></span>
-            <span className="num block whitespace-nowrap text-[12px] font-normal text-sub">市值 {usd(t.mcapUsd, { compact: true })}</span>
+            <span className="num block whitespace-nowrap text-[12px] font-normal text-sub">市值 <Masked t={t}>{usd(t.mcapUsd, { compact: true })}</Masked></span>
           </span>
-          <Chg v={t.stats['24h'].change} className="text-[12px]" />
+          <Masked t={t}><Chg v={t.stats['24h'].change} className="text-[12px]" /></Masked>
         </button>
       ))}
     </section>
@@ -103,7 +106,11 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const [sort, setSort] = useState<SortKey>(DEFAULT_SORT[initial])
   const [dir, setDir] = useState<1 | -1>(1)
   const rows = useMemo(() => filterTokens(q.data ?? [], { tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir }), [q.data, tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir])
-  const quickBuy = (t: Token) => toast(`后端未接入：没有下单。接入后「+ $10」会把 ${t.symbol} 的模拟买入交给风控审批。`)
+  const demo = isDemo()
+  const demoBuy = (t: Token) => toast(`演示数据不能交易：${t.symbol} 是样例代币。`)
+  // 实时模式只显示有数据的分类：没有 Agent 后端就没有「Agent 在买」，没有认证数据就没有「蓝筹币」
+  const tabs = demo ? TABS : TABS.filter((x) => x.value === 'trending' || x.value === 'watch' || (x.value === 'agent' ? AGENTS_ONLINE : filterTokens(q.data ?? [], { tab: x.value, tf, safeOnly: false, minMcap: 0, launchpad: 'all', chain: 'all', watch, sort: 'mcap', dir: 1 }).length > 0))
+  const showAgent = demo || AGENTS_ONLINE
   const research = useResearch()
   const switchTab = (v: TabKey) => { setTab(v); setSort(DEFAULT_SORT[v]); setDir(1) }
   const th = (k: SortKey, label: string, cls = '') => (
@@ -118,7 +125,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   return (
     <section className="min-w-0">
       <div role="tablist" aria-label="代币分类" className="scrollbar-none flex gap-2 overflow-x-auto">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button key={t.value} role="tab" aria-selected={tab === t.value} onClick={() => switchTab(t.value)}
             className={cx('h-9 shrink-0 whitespace-nowrap rounded-lg border px-3 text-[14px]', tab === t.value ? 'border-transparent bg-raised text-fg' : 'border-line text-sub hover:text-fg')}>
             {t.label}
@@ -159,7 +166,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                     {!compact && th('volume', `${tf} 成交额`)}
                     {!compact && th('liquidity', '流动性')}
                     {th('holders', '持有者')}
-                    <th className="px-3 py-3 text-left font-normal">Agent</th>
+                    {showAgent && <th className="px-3 py-3 text-left font-normal">Agent</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -179,6 +186,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                                 {t.symbol}
                                 {t.verified && <span title="已认证" className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-agent text-[9px] text-white">✓</span>}
                                 <SecurityBadge s={t.security} />
+                                <QualityBadge t={t} />
                               </div>
                               <div className="truncate text-[12px] font-normal text-sub">{t.chain !== 'solana' && <span className="mr-1 rounded bg-raised px-1 text-[11px] text-fg/80">{CHAIN_LABEL[t.chain]}</span>}{t.name} · {age(t.ageMinutes)}</div>
                             </div>
@@ -186,20 +194,22 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                         </td>
                         <td className="px-1" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                            <button onClick={() => quickBuy(t)} className="h-11 w-[65px] whitespace-nowrap rounded-full bg-agent text-[14px] text-white hover:bg-agent/90">+ $10</button>
-                            <button onClick={() => research(t)} aria-label={`交给 Agent 研究 ${t.symbol}`} title="交给 Agent 研究" className="flex h-11 w-11 items-center justify-center rounded-full border border-line text-sub hover:text-fg"><IBot /></button>
+                            {demo
+                              ? <button onClick={() => demoBuy(t)} className="h-11 w-[65px] whitespace-nowrap rounded-full bg-agent text-[14px] text-white hover:bg-agent/90">+ $10</button>
+                              : <QuickBuyButton t={t} className="h-11 min-w-[72px] whitespace-nowrap rounded-full bg-agent px-2 text-[13px] text-white hover:bg-agent/90" />}
+                            {showAgent && <button onClick={() => research(t)} aria-label={`交给 Agent 研究 ${t.symbol}`} title="交给 Agent 研究" className="flex h-11 w-11 items-center justify-center rounded-full border border-line text-sub hover:text-fg"><IBot /></button>}
                           </div>
                         </td>
                         {tab === 'bonding' ? (
                           <td className="px-3 text-right">
                             <div className="ml-auto flex w-28 items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-raised"><div className="h-full rounded-full bg-up" style={{ width: `${t.bondingPct ?? 0}%` }} /></div><span className="num w-9 text-xs">{t.bondingPct ?? '--'}%</span></div>
                           </td>
-                        ) : <td className="num px-3 text-right">{usd(t.mcapUsd, { compact: true })}</td>}
-                        <td className="px-3 text-right"><Chg v={s.change} /></td>
+                        ) : <td className="num px-3 text-right"><Masked t={t}>{usd(t.mcapUsd, { compact: true })}</Masked></td>}
+                        <td className="px-3 text-right"><Masked t={t}><Chg v={s.change} /></Masked></td>
                         {!compact && <td className="num px-3 text-right">{usd(s.volume, { compact: true })}</td>}
                         {!compact && <td className="num px-3 text-right">{usd(t.liquidityUsd, { compact: true })}</td>}
                         <td className="num px-3 text-right">{t.holders === null ? '--' : compactCN(t.holders)}</td>
-                        <td className="px-3"><VerdictTag v={t.verdict} /></td>
+                        {showAgent && <td className="px-3"><VerdictTag v={t.verdict} /></td>}
                       </tr>
                     )
                   })}
@@ -212,15 +222,17 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                   <button onClick={() => nav(`/token/${t.address}`)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <TokenAvatar image={t.image} symbol={t.symbol} hue={t.hue} size={38} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 text-[14px]">{t.symbol}{t.verified && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-agent text-[9px] text-white">✓</span>}<SecurityBadge s={t.security} /></div>
-                      <div className="num truncate text-[12px] font-normal text-sub">{t.chain !== 'solana' && <>{CHAIN_LABEL[t.chain]} · </>}{usd(t.mcapUsd, { compact: true })} · <VerdictInline t={t} /></div>
+                      <div className="flex items-center gap-1.5 text-[14px]">{t.symbol}{t.verified && <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-agent text-[9px] text-white">✓</span>}<SecurityBadge s={t.security} /><QualityBadge t={t} /></div>
+                      <div className="num truncate text-[12px] font-normal text-sub">{CHAIN_LABEL[t.chain]} · <Masked t={t}>{usd(t.mcapUsd, { compact: true })}</Masked>{showAgent && <> · <VerdictInline t={t} /></>}</div>
                     </div>
                     <div className="text-right">
-                      <div className="num text-[14px] font-medium">{price(t.priceUsd)}</div>
-                      <Chg v={t.stats[tf].change} className="text-[12px]" />
+                      <div className="num text-[14px] font-medium"><Masked t={t}>{price(t.priceUsd)}</Masked></div>
+                      <Masked t={t}><Chg v={t.stats[tf].change} className="text-[12px]" /></Masked>
                     </div>
                   </button>
-                  <button onClick={() => quickBuy(t)} className="h-9 shrink-0 rounded-full bg-agent px-3 text-[14px] text-white">+ $10</button>
+                  {demo
+                    ? <button onClick={() => demoBuy(t)} className="h-9 shrink-0 rounded-full bg-agent px-3 text-[14px] text-white">+ $10</button>
+                    : <QuickBuyButton t={t} className="h-9 shrink-0 whitespace-nowrap rounded-full border border-agent/50 px-3 text-[13px] text-agent" />}
                 </li>
               ))}
             </ul>

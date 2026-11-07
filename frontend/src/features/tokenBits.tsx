@@ -1,4 +1,5 @@
-import type { SecurityCheck, Verdict } from '@/domain/types'
+import type { SecurityCheck, Token, Verdict } from '@/domain/types'
+import { qualityText } from '@/api/pairs'
 import { Tag } from '@/components/ui'
 import { IShield } from '@/components/icons'
 
@@ -63,4 +64,26 @@ export function RiskStrip({ s }: { s: SecurityCheck }) {
       ))}
     </ul>
   )
+}
+
+/** 数据可信度。bad：数值不展示、不能交易、不能交给 AI 研究。 */
+export const dataBad = (t: Token) => t.quality?.level === 'bad'
+export const qualityTitle = (t: Token) => (t.quality?.flags ?? []).map(qualityText).join('；')
+
+/** 数据异常或可疑时的标记；可信时不显示。悬停看具体原因。 */
+export function QualityBadge({ t }: { t: Token }) {
+  const q = t.quality
+  if (!q || q.level === 'ok') return null
+  const bad = q.level === 'bad'
+  return (
+    <span title={qualityTitle(t)} aria-label={`${bad ? '数据异常' : '数据可疑'}：${qualityTitle(t)}`}
+      className={`inline-flex h-[18px] shrink-0 items-center rounded px-1 text-[11px] font-medium ${bad ? 'bg-warn/15 text-warn' : 'bg-raised text-warn'}`}>
+      {bad ? '数据异常' : '可疑'}
+    </span>
+  )
+}
+
+/** 数据异常时，数值位置显示「异常」而不是可能错误的数字。 */
+export function Masked({ t, children }: { t: Token; children: React.ReactNode }) {
+  return dataBad(t) ? <span className="text-warn" title={qualityTitle(t)}>异常</span> : <>{children}</>
 }

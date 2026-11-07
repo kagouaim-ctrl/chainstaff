@@ -10,6 +10,10 @@ import { Portfolio } from '@/pages/Portfolio'
 import { Orders } from '@/pages/Orders'
 import { Strategy } from '@/pages/Strategy'
 import { NotFound } from '@/pages/NotFound'
+import { MyWallet } from '@/pages/MyWallet'
+import { AgentBeta } from '@/pages/AgentBeta'
+import { Legal } from '@/pages/Legal'
+import { LIVE, AGENTS_ONLINE } from '@/api/live'
 
 export const routes: RouteObject[] = [
   {
@@ -18,9 +22,11 @@ export const routes: RouteObject[] = [
       { path: 'overview', element: <Overview /> },
       { path: 'discover', element: <Discover /> },
       { path: 'token/:address', element: <TokenPage /> },
-      { path: 'agents', element: <Agents /> },
+      // 实时模式下没有 Agent 后端时不展示空的角色列表，改成说明页；持仓显示真实钱包而不是模拟盘
+      { path: 'agents', element: LIVE && !AGENTS_ONLINE ? <AgentBeta /> : <Agents /> },
       { path: 'activity', element: <Activity /> },
-      { path: 'portfolio', element: <Portfolio /> },
+      { path: 'portfolio', element: LIVE ? <MyWallet /> : <Portfolio /> },
+      { path: 'legal/:doc', element: <Legal /> },
       { path: 'orders', element: <Orders /> },
       { path: 'strategy', element: <Strategy /> },
       { path: '*', element: <NotFound /> },
