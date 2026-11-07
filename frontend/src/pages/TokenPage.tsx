@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useWatched } from '@/features/watch'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
@@ -6,6 +7,8 @@ import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { TopTraders } from '@/features/WalletIntel'
 import { AlertButton } from '@/features/alerts'
+import { CommunityChat, CommunityTheses } from '@/features/Community'
+import { COMMUNITY_ONLINE, theses as communityTheses } from '@/api/social'
 import { WALLETS_ONLINE } from '@/api/wallets'
 import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
@@ -250,16 +253,21 @@ function SideList({ t }: { t: Token }) {
 function SocialPanel({ t }: { t: Token }) {
   const [k, setK] = useState<'chat' | 'thesis' | 'list'>('chat')
   const th = useTheses(t.address)
+  const live = useQuery({ queryKey: ['social-theses', t.chain, t.address], queryFn: () => communityTheses(t.chain, t.address), enabled: COMMUNITY_ONLINE })
+  const count = COMMUNITY_ONLINE ? live.data?.length ?? 0 : th.data?.length ?? 0
   return (
     <aside aria-label="群聊和观点" className="order-last flex flex-col border-t border-line lg:col-span-2 xl:order-none xl:col-span-1 xl:h-[calc(100vh-64px-33px-32px)] xl:border-r xl:border-t-0">
       <div role="tablist" aria-label="群聊、观点或代币列表" className="flex gap-1 border-b border-line p-2">
-        {([['chat', '群聊'], ['thesis', `观点 (${th.data?.length ?? 0})`], ['list', '自选 / 热门']] as const).map(([v, l]) => (
+        {([['chat', '群聊'], ['thesis', `观点 (${count})`], ['list', '自选 / 热门']] as const).map(([v, l]) => (
           <button key={v} role="tab" aria-selected={k === v} onClick={() => setK(v)}
             className={cx('h-9 flex-1 rounded-lg text-[14px]', k === v ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>{l}</button>
         ))}
       </div>
       <div className={cx('min-h-0 flex-1', k !== 'chat' && 'overflow-y-auto')}>
-        {k === 'chat' ? <TokenChat token={t} /> : k === 'thesis' ? <Theses token={t} /> : <SideList t={t} />}
+        {/* 接了社区后端时用真实群聊和观点；否则保持原来的组件 */}
+        {k === 'chat' ? (COMMUNITY_ONLINE ? <CommunityChat t={t} /> : <TokenChat token={t} />)
+          : k === 'thesis' ? (COMMUNITY_ONLINE ? <CommunityTheses t={t} /> : <Theses token={t} />)
+            : <SideList t={t} />}
       </div>
     </aside>
   )
