@@ -34,3 +34,20 @@ describe('指标', () => {
     expect(e[3]).toBeCloseTo(3.5, 1)
   })
 })
+
+import { explainFailure } from '@/features/LiveTradePanel'
+import { effectiveSlippageBps } from './settings'
+describe('交易失败的原因', () => {
+  it('翻译常见报错', () => {
+    expect(explainFailure('User rejected the request')).toContain('取消')
+    expect(explainFailure('Program error: 0x1771')).toContain('滑点')
+    expect(explainFailure('insufficient funds for gas')).toContain('余额不够')
+    expect(explainFailure('奇怪的错误')).toBe('没有完成：奇怪的错误')
+  })
+  it('自动滑点按流动性，不超过上限', () => {
+    const s = { slippage: 'auto' as const, maxSlippageBps: 800, speed: 'fast' as const, maxTradeNative: 0, minLiquidityUsd: 0 }
+    expect(effectiveSlippageBps(s, 10_000)).toBe(800)
+    expect(effectiveSlippageBps(s, 1_000_000)).toBe(200)
+    expect(effectiveSlippageBps({ ...s, slippage: 3000 }, 1)).toBe(800)
+  })
+})

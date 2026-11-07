@@ -7,6 +7,10 @@ import { evmWallets, onWalletsChanged, solanaWallets, startDiscovery } from './d
 import { connectEvm, connectSolana, disconnect, nativeBalance } from './actions'
 import { fromUnits } from './chains'
 import { useWallet } from './store'
+import { Link } from 'react-router-dom'
+
+const TERMS_KEY = 'kagouai.terms.v1'
+const readAccepted = () => { try { return localStorage.getItem(TERMS_KEY) === '1' } catch { return false } }
 
 const INSTALL = {
   solana: [['Phantom', 'https://phantom.com/download'], ['OKX Wallet', 'https://web3.okx.com/download'], ['Backpack', 'https://backpack.app/download']],
@@ -25,20 +29,31 @@ export function WalletPicker() {
   const toast = useToast((s) => s.show)
   const found = useDetected()
   const [busy, setBusy] = useState('')
+  const [accepted, setAccepted] = useState(readAccepted)
   if (!pickerOpen) return null
   const family = pickerOpen
   const list = family === 'solana' ? found.solana : found.evm
   const pick = async (name: string, connect: () => Promise<void>) => {
+    if (!accepted) return toast('请先勾选同意条款和风险披露')
+    try { localStorage.setItem(TERMS_KEY, '1') } catch { /* 隐私模式下每次都要勾选 */ }
     setBusy(name)
     try { await connect(); openPicker(null); toast(`已连接 ${name}`) } catch (e) { toast(e instanceof Error ? `没有连上：${e.message}` : '没有连上') } finally { setBusy('') }
   }
   return (
     <Dialog open onClose={() => openPicker(null)} title={family === 'solana' ? '连接 Solana 钱包' : '连接 BSC / ETH / Robinhood 钱包'} footer={<Button onClick={() => openPicker(null)}>取消</Button>}>
+      <div role="tablist" aria-label="钱包类型" className="mb-3 flex gap-1 rounded-lg bg-bg p-1">
+        {(['solana', 'evm'] as const).map((f) => (
+          <button key={f} role="tab" aria-selected={family === f} onClick={() => openPicker(f)}
+            className={cx('h-8 flex-1 rounded-md text-[13px]', family === f ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
+            {f === 'solana' ? 'Solana' : 'BSC / ETH / Robinhood'}
+          </button>
+        ))}
+      </div>
       <p className="text-sub">资金一直在你自己的钱包里。每笔交易都要你在钱包里确认，平台拿不到你的私钥，也动不了你的钱。</p>
       <ul className="mt-3 space-y-2">
         {list.map((w) => (
           <li key={w.name}>
-            <button disabled={!!busy} onClick={() => pick(w.name, () => family === 'solana' ? connectSolana(w as never) : connectEvm(w as never))}
+            <button disabled={!!busy || !accepted} onClick={() => pick(w.name, () => family === 'solana' ? connectSolana(w as never) : connectEvm(w as never))}
               className="flex h-12 w-full items-center gap-3 rounded-lg border border-line px-3 text-left hover:bg-raised disabled:opacity-50">
               {w.icon ? <img src={w.icon} alt="" width={24} height={24} className="rounded" /> : <span className="h-6 w-6 rounded bg-raised" />}
               <span className="flex-1 text-[14px]">{w.name}</span>
@@ -47,6 +62,10 @@ export function WalletPicker() {
           </li>
         ))}
       </ul>
+      <label className="mt-3 flex items-start gap-2 text-[12px] text-sub">
+        <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-0.5" />
+        <span>我已阅读并同意 <Link to="/legal/terms" onClick={() => openPicker(null)} className="text-agent hover:underline">服务条款</Link> 和 <Link to="/legal/risk" onClick={() => openPicker(null)} className="text-agent hover:underline">风险披露</Link>，明白在这里的买卖是真实链上交易。</span>
+      </label>
       {!list.length && (
         <div className="mt-3 text-[13px]">
           <p className="text-sub">这个浏览器里没有找到钱包。装一个再刷新页面：</p>
