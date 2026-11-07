@@ -1,4 +1,5 @@
 import { useWatched } from '@/features/watch'
+import { securityPass } from '@/features/tokenBits'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTokens, isDemo, now } from '@/api/hooks'
@@ -30,7 +31,7 @@ export const TABS: { value: TabKey; label: string }[] = [
 
 const DEFAULT_SORT: Record<TabKey, SortKey> = { trending: 'volume', agent: 'volume', blue: 'mcap', held: 'holders', graduated: 'age', bonding: 'bonding', watch: 'mcap' }
 
-export interface Filter { tab: TabKey; tf: Timeframe; safeOnly: boolean; minMcap: number; launchpad: string; chain?: string; watch: Record<string, boolean>; sort: SortKey; dir: 1 | -1 }
+export interface Filter { tab: TabKey; tf: Timeframe; safeOnly: boolean; strictSafe?: boolean; minMcap: number; launchpad: string; chain?: string; watch: Record<string, boolean>; sort: SortKey; dir: 1 | -1 }
 
 export function filterTokens(list: Token[], o: Filter) {
   let r = list.slice()
@@ -41,6 +42,8 @@ export function filterTokens(list: Token[], o: Filter) {
   if (o.tab === 'watch') r = r.filter((t) => o.watch[t.address] ?? t.watch)
   // 「排除高危」：去掉有高危项的代币；还没检查的保留，界面上标为未检查
   if (o.safeOnly) r = r.filter((t) => riskLevel(t.security) !== 'high')
+  // 「只看安全」（原有）：只留全部安全项都通过的代币
+  if (o.strictSafe) r = r.filter((t) => securityPass(t.security) === true)
   if (o.minMcap) r = r.filter((t) => t.mcapUsd >= o.minMcap)
   if (o.launchpad !== 'all') r = r.filter((t) => t.launchpad === o.launchpad)
   if (o.chain && o.chain !== 'all') r = r.filter((t) => t.chain === o.chain)
@@ -109,6 +112,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const [tab, setTab] = useState<TabKey>(initial)
   const [tf, setTf] = useState<Timeframe>('24h')
   const [safeOnly, setSafeOnly] = useState(false)
+  const [strictSafe, setStrictSafe] = useState(false)
   const [minMcap, setMinMcap] = useState(0)
   const [launchpad, setLaunchpad] = useState('all')
   const [chain, setChain] = useState('all')
@@ -117,9 +121,9 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const watched = useWatched(q.data)
   // 自选页签用合并后的自选列表（包括不在热门列表里的代币）
   const base = tab === 'watch' ? watched : q.data ?? []
-  const rows = filterTokens(base, { tab, tf, safeOnly, minMcap, launchpad, chain, watch, sort, dir })
+  const rows = filterTokens(base, { tab, tf, safeOnly, strictSafe, minMcap, launchpad, chain, watch, sort, dir })
   const demo = isDemo()
-  const demoBuy = (t: Token) => toast(`演示数据不能交易：${t.symbol} 是样例代币。`)
+  const demoBuy = (t: Token) => toast(`后端未接入：没有下单。接入后「+ $10」会把 ${t.symbol} 的模拟买入交给风控审批。`)
   // 实时模式只显示有数据的分类：没有 Agent 后端就没有「Agent 在买」，没有认证数据就没有「蓝筹币」
   // 所有分类都保留；当前没有数据的分类显示空状态说明，不隐藏入口
   const tabs = TABS
@@ -163,6 +167,9 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
             </select>}
         <ColumnMenu />
         <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[14px] text-sub">
+          <input type="checkbox" checked={strictSafe} onChange={(e) => setStrictSafe(e.target.checked)} className="accent-[var(--c-agent)]" />只看安全
+        </label>
+        <label className="flex cursor-pointer items-center gap-1.5 text-[14px] text-sub">
           <input type="checkbox" checked={safeOnly} onChange={(e) => setSafeOnly(e.target.checked)} className="accent-[var(--c-agent)]" />排除高危
         </label>
       </div>
