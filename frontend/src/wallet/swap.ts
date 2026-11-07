@@ -59,13 +59,13 @@ export async function getQuote(chain: Chain, side: 'BUY' | 'SELL', token: string
 export type Step = { stage: 'approve' | 'sign' | 'sent' | 'confirmed' | 'failed' | 'pending'; id?: string }
 
 /** 执行一笔报价。每一步都要用户在钱包里确认；onStep 报告进度。 */
-export async function execute(q: Quote, owner: string, onStep: (s: Step) => void): Promise<Step> {
+export async function execute(q: Quote, owner: string, onStep: (s: Step) => void, opts: { priority?: { level: string; maxLamports: number } } = {}): Promise<Step> {
   if (q.chain === 'solana') {
     const body = await json(await fetch(`${JUP}/swap`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         quoteResponse: q.raw, userPublicKey: owner, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true,
-        prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 1_000_000, priorityLevel: 'high' } },
+        prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: opts.priority?.maxLamports ?? 1_000_000, priorityLevel: opts.priority?.level ?? 'high' } },
       }),
     }))
     if (body.simulationError) throw new Error(`交易模拟失败：${body.simulationError.error ?? '未知原因'}`)

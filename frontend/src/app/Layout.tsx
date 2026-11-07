@@ -8,14 +8,16 @@ import { SearchPalette } from './Search'
 import { Toast } from './Toast'
 import { AgentDrawer } from '@/features/AgentDrawer'
 import { OrderDrawer } from '@/features/OrderDrawer'
+import { QuickBuyDialog } from '@/features/QuickBuy'
+import { AlertRunner } from '@/features/alerts'
 
-const TITLES: Record<string, string> = { '/': '发现', '/overview': '总览', '/agents': 'Agent', '/activity': '动态', '/portfolio': '持仓', '/orders': '交易', '/strategy': '策略' }
+const TITLES: Record<string, string> = { '/': '发现', '/overview': '总览', '/agents': 'AI Agent', '/activity': '动态', '/portfolio': '持仓', '/orders': '订单', '/strategy': '策略', '/new': '新币', '/smart-money': '聪明钱' }
 
 export function Layout() {
   const { pathname } = useLocation()
   useEffect(() => {
     // 代币页自己设置标题（带价格）
-    if (!pathname.startsWith('/token/')) document.title = `${TITLES[pathname] ?? '页面不存在'} · memeagent`
+    if (!pathname.startsWith('/token/')) document.title = `${pathname.startsWith('/legal/') ? '说明' : TITLES[pathname] ?? '页面不存在'} · KAGOUAI`
   }, [pathname])
   const [params, setParams] = useSearchParams()
   const agent = params.get('agent')
@@ -36,6 +38,8 @@ export function Layout() {
       <FooterBar />
       {!pathname.startsWith('/token/') && <BottomNav />}
       <SearchPalette />
+      <QuickBuyDialog />
+      <AlertRunner />
       <Toast />
       <AgentDrawer role={agent} onClose={close('agent')} />
       <OrderDrawer id={order} onClose={close('order')} />

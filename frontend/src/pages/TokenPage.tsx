@@ -1,8 +1,12 @@
+import { useWatched } from '@/features/watch'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
-import { useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
+import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
+import { TopTraders } from '@/features/WalletIntel'
+import { AlertButton } from '@/features/alerts'
+import { WALLETS_ONLINE } from '@/api/wallets'
 import { Button, DataState, Panel, Segmented, Tabs, TokenAvatar, Pct, Tag, KV, Chg, cx } from '@/components/ui'
 import { ICopy, IStar, ICheck, IX, IAlert, ISearch } from '@/components/icons'
 import { CandleChart, type Indicators } from '@/features/charts'
@@ -14,13 +18,13 @@ import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
 import { AGENTS_ONLINE } from '@/api/live'
 import { CHAIN_LABEL } from '@/api/chain'
-import { VerdictTag, securityFlags, VERDICT, RiskStrip } from '@/features/tokenBits'
+import { VerdictTag, securityFlags, riskItems, riskLevel, VERDICT, RiskStrip, QualityBadge, Masked, dataBad, qualityTitle, rugLike, ChangeCell } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
 import type { ChartMarker, ChartTf, Holder, MarkerKind, Token } from '@/domain/types'
 
-type TabKey = 'holders' | 'trades' | 'research'
+type TabKey = 'holders' | 'trades' | 'traders' | 'research'
 
 export function TokenPage() {
   const { address = '' } = useParams()
@@ -39,7 +43,7 @@ export function TokenPage() {
 
 function TokenView({ t }: { t: Token }) {
   const [tab, setTab] = useState<TabKey>('holders')
-  useEffect(() => { document.title = `${t.symbol} ${price(t.priceUsd)} · memeagent` }, [t])
+  useEffect(() => { document.title = `${t.symbol} ${dataBad(t) ? "" : price(t.priceUsd) + " "}· KAGOUAI` }, [t])
   return (
     <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[400px_minmax(0,1fr)_380px]">
       <SocialPanel t={t} />
@@ -51,10 +55,14 @@ function TokenView({ t }: { t: Token }) {
           <Tabs label="代币信息" value={tab} onChange={setTab} options={[
             { value: 'holders', label: <>持有者 <span className="text-sub">({t.holders === null ? '--' : compactCN(t.holders)})</span></> },
             { value: 'trades', label: '交易' },
-            { value: 'research', label: 'Agent 研究' },
+            // 交易员和钱包标签来自 Birdeye，只有 Solana，要后端
+            ...(WALLETS_ONLINE && t.chain === 'solana' ? [{ value: 'traders' as const, label: '交易员' }] : []),
+            // 没有 Agent 后端时不显示空的「Agent 研究」
+            { value: 'research' as const, label: 'Agent 研究' },
           ]} />
           {tab === 'holders' && <Holders t={t} />}
           {tab === 'trades' && <Trades t={t} />}
+          {tab === 'traders' && <TopTraders mint={t.address} />}
           {tab === 'research' && <><Research t={t} /><Activity t={t} /></>}
         </section>
       </div>
@@ -103,8 +111,10 @@ function Header({ t }: { t: Token }) {
   const [copied, setCopied] = useState(false)
   const w = watch[t.address] ?? t.watch
   const s = t.stats['24h']
+  const m = (v: React.ReactNode) => <Masked t={t}>{v}</Masked>
   const boxes: [string, React.ReactNode][] = [
-    ['价格', price(t.priceUsd)], ['24小时涨跌', <Chg key="c" v={s.change} />], ['24小时交易量', usd(s.volume, { compact: true })], ['流动性', usd(t.liquidityUsd, { compact: true })],
+    ['价格', m(price(t.priceUsd))], ['24小时涨跌', m(<Chg key="c" v={s.change} />)], ['24小时交易量', usd(s.volume, { compact: true })], ['流动性', usd(t.liquidityUsd, { compact: true })],
+    ...(t.fdvUsd != null && Math.abs(t.fdvUsd - t.mcapUsd) > t.mcapUsd * 0.01 ? [['完全稀释估值', m(usd(t.fdvUsd, { compact: true }))] as [string, React.ReactNode]] : []),
   ]
   return (
     <section className="border-b border-line px-4 py-4">
@@ -114,6 +124,7 @@ function Header({ t }: { t: Token }) {
         <div className="flex items-center gap-1 text-sub">
           <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" aria-label="在 X 上搜索" className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised hover:text-fg"><ISearch /></a>
           <button onClick={() => toggleWatch(t.address)} aria-pressed={!!w} aria-label={w ? '取消自选' : '加入自选'} className={cx('flex h-7 w-7 items-center justify-center rounded-md hover:bg-raised', w ? 'text-paper' : 'hover:text-fg')}><IStar filled={!!w} /></button>
+          {!isDemo() && <AlertButton t={t} />}
         </div>
         <span className="text-[14px] text-sub">{age(t.ageMinutes)}</span>
         <button className="flex items-center gap-1 rounded-md px-1 text-[14px] text-sub hover:bg-raised hover:text-fg" title={t.address}
@@ -121,11 +132,13 @@ function Header({ t }: { t: Token }) {
           {shortAddr(t.address, 4, 4)}{copied ? <ICheck className="text-up" /> : <ICopy />}
         </button>
         <VerdictTag v={t.verdict} />
+        <QualityBadge t={t} />
       </div>
+      {dataBad(t) && <p role="alert" className="mt-3 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[12px] text-warn">行情数据异常，价格、市值和涨跌暂不展示，也不能交易：{qualityTitle(t)}</p>}
       <div className="mt-4 flex flex-wrap items-end gap-2">
         <div className="mr-4">
           <div className="text-[12px] font-normal text-sub">市值</div>
-          <div className="num text-[32px] font-medium leading-9 tracking-[-1.5px]">{usd(t.mcapUsd, { compact: true })}</div>
+          <div className="num text-[32px] font-medium leading-9 tracking-[-1.5px]">{m(usd(t.mcapUsd, { compact: true }))}</div>
         </div>
         {boxes.map(([k, v]) => (
           <div key={k} className="rounded-lg border border-line px-3 py-2">
@@ -134,6 +147,7 @@ function Header({ t }: { t: Token }) {
           </div>
         ))}
       </div>
+      {t.pair && <p className="mt-2 text-[12px] font-normal text-sub" title={`价格、K 线和成交都来自这个池子：${t.pair.address}`}>主交易对：{t.pair.dex} · {t.symbol}/{t.pair.quote || '?'} · <span className="num">{shortAddr(t.pair.address, 4, 4)}</span></p>}
       <div className="mt-3"><RiskStrip s={t.security} /></div>
     </section>
   )
@@ -199,19 +213,53 @@ function ChartPanel({ t }: { t: Token }) {
 }
 
 /** 选中代币后左栏：群聊 / 观点，可以切换（替代 fomo 的代币列表）。 */
+/** 实时模式的左栏（参考 GMGN）：自选和热门代币列表，点一下切换代币。没有社区数据时不放空群聊。 */
+function SideList({ t }: { t: Token }) {
+  const q = useTokens()
+  const { watch } = useApp()
+  const [k, setK] = useState<'watch' | 'hot'>(() => Object.values(watch).some(Boolean) ? 'watch' : 'hot')
+  const watched = useWatched(q.data)
+  const list = (k === 'hot' ? (q.data ?? []).filter((x) => !rugLike(x)) : watched).slice(0, 40)
+  return (
+    <div aria-label="代币列表" className="flex h-full flex-col">
+      <div role="tablist" aria-label="自选或热门" className="flex gap-1 border-b border-line p-2">
+        {([['watch', '自选'], ['hot', '热门']] as const).map(([v, l]) => (
+          <button key={v} role="tab" aria-selected={k === v} onClick={() => setK(v)}
+            className={cx('h-8 flex-1 rounded-lg text-[13px]', k === v ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>{l}</button>
+        ))}
+      </div>
+      <ul className="min-h-0 flex-1 overflow-y-auto">
+        {list.length === 0 && <li className="p-4 text-center text-[12px] text-sub">{k === 'watch' ? '还没有自选。点代币名旁边的星标加入。' : q.isLoading ? '加载中…' : '暂时没有数据'}</li>}
+        {list.map((x) => (
+          <li key={x.address}>
+            <Link to={`/token/${x.address}`} className={cx('flex h-11 items-center gap-2 px-3 text-[13px] hover:bg-raised', x.address === t.address && 'bg-raised')}>
+              <TokenAvatar image={x.image} symbol={x.symbol} hue={x.hue} size={24} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{x.symbol} <span className="text-[10px] text-sub">{CHAIN_LABEL[x.chain]}</span></span>
+                <span className="num block text-[11px] font-normal text-sub"><Masked t={x}>{usd(x.mcapUsd, { compact: true })}</Masked></span>
+              </span>
+              <ChangeCell t={x} v={x.stats['24h'].change} className="text-[12px]" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function SocialPanel({ t }: { t: Token }) {
-  const [k, setK] = useState<'chat' | 'thesis'>('chat')
+  const [k, setK] = useState<'chat' | 'thesis' | 'list'>('chat')
   const th = useTheses(t.address)
   return (
     <aside aria-label="群聊和观点" className="order-last flex flex-col border-t border-line lg:col-span-2 xl:order-none xl:col-span-1 xl:h-[calc(100vh-64px-33px-32px)] xl:border-r xl:border-t-0">
-      <div role="tablist" aria-label="群聊或观点" className="flex gap-1 border-b border-line p-2">
-        {([['chat', '群聊'], ['thesis', `观点 (${th.data?.length ?? 0})`]] as const).map(([v, l]) => (
+      <div role="tablist" aria-label="群聊、观点或代币列表" className="flex gap-1 border-b border-line p-2">
+        {([['chat', '群聊'], ['thesis', `观点 (${th.data?.length ?? 0})`], ['list', '自选 / 热门']] as const).map(([v, l]) => (
           <button key={v} role="tab" aria-selected={k === v} onClick={() => setK(v)}
             className={cx('h-9 flex-1 rounded-lg text-[14px]', k === v ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>{l}</button>
         ))}
       </div>
-      <div className={cx('min-h-0 flex-1', k === 'thesis' && 'overflow-y-auto')}>
-        {k === 'chat' ? <TokenChat token={t} /> : <Theses token={t} />}
+      <div className={cx('min-h-0 flex-1', k !== 'chat' && 'overflow-y-auto')}>
+        {k === 'chat' ? <TokenChat token={t} /> : k === 'thesis' ? <Theses token={t} /> : <SideList t={t} />}
       </div>
     </aside>
   )
@@ -302,10 +350,11 @@ function SecurityBlock({ t }: { t: Token }) {
         <p className="flex items-start gap-2 text-[13px] text-warn"><IAlert className="mt-0.5 shrink-0" />安全检查还没完成。结果无法确认时，风控默认拒绝买入。</p>
       ) : (
         <>
+          <RiskSummary s={s} />
           <ul className="grid grid-cols-1 gap-1.5">
             {flags.map((f) => (
               <li key={f.label} className={cx('flex items-center gap-2 text-[13px]', f.ok === false ? 'text-down' : f.ok === null ? 'text-warn' : 'text-fg/90')}>
-                <span className={f.ok === false ? 'text-down' : f.ok === null ? 'text-warn' : 'text-up'}>{f.ok === false ? <IX /> : f.ok === null ? <IAlert /> : <ICheck />}</span>{f.label}
+                <span className={f.ok === false ? 'text-down' : f.ok === null ? 'text-warn' : 'text-up'}>{f.ok === false ? <IX /> : f.ok === null ? <IAlert /> : <ICheck />}</span>{f.label}{f.note && <span className="text-[12px] text-sub">· {f.note}</span>}
               </li>
             ))}
           </ul>
@@ -320,6 +369,19 @@ function SecurityBlock({ t }: { t: Token }) {
   )
 }
 
+/** 安全结论：三档之一，加上得出结论的每一条依据。 */
+function RiskSummary({ s }: { s: Token['security'] }) {
+  const lv = riskLevel(s)
+  const items = riskItems(s)
+  const head = { high: ['高危', 'border-down/40 bg-down/10 text-down'], warn: ['需要注意', 'border-warn/40 bg-warn/10 text-warn'], pass: ['查到的项目都通过', 'border-up/30 bg-up/10 text-up'], unknown: ['未检查', 'border-line text-sub'] }[lv]
+  return (
+    <div className={cx('mb-3 rounded-lg border px-3 py-2 text-[13px]', head[1])}>
+      <div className="font-medium">{head[0]}</div>
+      {items.length > 0 && <ul className="mt-1 space-y-0.5 text-[12px]">{items.map((i) => <li key={i.label}>{i.level === 'high' ? '高危' : '注意'}：{i.label}</li>)}</ul>}
+    </div>
+  )
+}
+
 function Holders({ t }: { t: Token }) {
   const q = useHolders(t.address)
   const [agentOnly, setAgentOnly] = useState(false)
@@ -331,10 +393,10 @@ function Holders({ t }: { t: Token }) {
         return (
           <div>
             <HolderBar all={all} top10={t.security.top10Pct} />
-            <div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
+            {<div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看 Agent</label>
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={thesisOnly} onChange={(e) => setThesisOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看有观点的</label>
-            </div>
+            </div>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px] text-[13px]">
                 <thead className="text-xs text-sub"><tr className="border-y border-line">
@@ -373,7 +435,7 @@ function HolderBar({ all, top10 }: { all: Holder[]; top10: number | null }) {
     <div className="px-4 pt-3">
       <div className="flex justify-between text-[12px] font-normal text-sub">
         <span>前十持有 <span className="num text-fg">{top10 === null ? '未知' : `${top10.toFixed(1)}%`}</span></span>
-        <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>
+        {<span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>}
       </div>
       <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10 === null ? '未知' : `${top10.toFixed(1)}%`}`}>
         {top.map((h) => <div key={h.rank} title={`#${h.rank} ${h.agentName ?? shortAddr(h.label)} ${h.pct.toFixed(2)}%`} className={h.kind === 'agent' ? 'bg-agent' : 'bg-sub/60'} style={{ width: `${h.pct}%` }} />)}
@@ -394,7 +456,7 @@ function Trades({ t }: { t: Token }) {
         <div className="overflow-x-auto">
           <div className="flex items-center gap-3 px-4 py-2.5">
             <Segmented label="成交方向" size="sm" value={side} onChange={setSide} options={[{ value: 'all', label: '全部' }, { value: 'BUY', label: '买入' }, { value: 'SELL', label: '卖出' }]} />
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-sub"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} />只看 Agent</label>
+            {<label className="flex cursor-pointer items-center gap-1.5 text-xs text-sub"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} />只看 Agent</label>}
             <span className="ml-auto text-[12px] font-normal text-sub">{rows.length} 笔</span>
           </div>
           <table className="w-full min-w-[560px] text-[13px]">
