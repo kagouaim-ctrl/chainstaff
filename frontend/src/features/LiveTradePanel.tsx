@@ -105,7 +105,16 @@ export function LiveTradePanel({ token, initialSide = 'BUY', bare, initialAmount
       // 用钱包地址和当前金额重新报价，免得用了过期的价格
       const fresh = await getQuote(token.chain, side, token.address, inRaw, slip, owner)
       const done = await execute(fresh, owner, setStep, { priority: token.chain === 'solana' ? SOL_PRIORITY[cfg.speed] : undefined })
-      if (done.stage === 'confirmed' && done.id) saveTrade({ chain: token.chain, address: token.address, side, time: Date.now(), id: done.id })
+      if (done.stage === 'confirmed' && done.id) {
+        const tokenDecimals = bal.data?.decimals ?? fresh.raw?.action?.toToken?.decimals ?? null
+        const ui = (raw: bigint, d: number | null) => d == null ? undefined : fromUnits(raw, d, 6)
+        saveTrade({
+          chain: token.chain, address: token.address, side, time: Date.now(), id: done.id, symbol: token.symbol,
+          inAmount: ui(fresh.inRaw, buy ? net.decimals : tokenDecimals), inSymbol: buy ? net.native : token.symbol,
+          outAmount: ui(fresh.outRaw, buy ? tokenDecimals : net.decimals), outSymbol: buy ? token.symbol : net.native,
+          usd: fresh.inUsd ?? fresh.outUsd ?? null,
+        })
+      }
       if (done.stage === 'confirmed') { setAmount(''); qc.invalidateQueries({ queryKey: ['native'] }); qc.invalidateQueries({ queryKey: ['tokenBal'] }) }
     } catch (e) {
       setStep(null)
