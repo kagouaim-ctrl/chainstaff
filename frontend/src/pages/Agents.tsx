@@ -7,6 +7,7 @@ import { DataState, StatusDot, AGENT_STATUS, ModeTag, cx } from '@/components/ui
 import { IBot, ICheck, ICopy } from '@/components/icons'
 import { relTime, duration } from '@/lib/format'
 import type { AgentDM } from '@/domain/types'
+import { LIVE, AGENTS_ONLINE } from '@/api/live'
 
 const SUGGEST = ['今天买了什么？', '现在持仓风险大吗？', '帮我研究一个合约地址', '为什么没买热门第一？']
 
@@ -32,6 +33,9 @@ export function Agents() {
           </div>
           {ma.data && <span className="ml-auto flex items-center gap-1.5 text-[12px] text-sub"><StatusDot status={ma.data.status} pulse />{AGENT_STATUS[ma.data.status].label}<ModeTag mode={ma.data.mode} className="ml-1" /></span>}
         </header>
+        {LIVE && !AGENTS_ONLINE && (
+          <p className="border-b border-line bg-agent/10 px-4 py-2 text-[12px] text-fg/90">AI Agent 内测中，后端上线前不能对话，也不会下单。<Link to="/agents/about" className="ml-1 text-agent hover:underline">了解 Agent 怎么工作、风控怎么保证</Link></p>
+        )}
 
         <div ref={listRef} className="flex-1 overflow-y-auto">
           <DataState q={dm} isEmpty={(d) => d.length === 0} empty={`还没有和${name}聊过。`}>

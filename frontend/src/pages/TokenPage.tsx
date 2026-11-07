@@ -45,8 +45,8 @@ function TokenView({ t }: { t: Token }) {
   const [tab, setTab] = useState<TabKey>('holders')
   useEffect(() => { document.title = `${t.symbol} ${dataBad(t) ? "" : price(t.priceUsd) + " "}· KAGOUAI` }, [t])
   return (
-    <div className={cx("-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px]", isDemo() ? "xl:grid-cols-[400px_minmax(0,1fr)_380px]" : "xl:grid-cols-[260px_minmax(0,1fr)_380px]")}>
-      {isDemo() ? <SocialPanel t={t} /> : <SideList t={t} />}
+    <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[400px_minmax(0,1fr)_380px]">
+      <SocialPanel t={t} />
 
       <div className="min-w-0 border-line lg:border-r">
         <Header t={t} />
@@ -58,7 +58,7 @@ function TokenView({ t }: { t: Token }) {
             // 交易员和钱包标签来自 Birdeye，只有 Solana，要后端
             ...(WALLETS_ONLINE && t.chain === 'solana' ? [{ value: 'traders' as const, label: '交易员' }] : []),
             // 没有 Agent 后端时不显示空的「Agent 研究」
-            ...(isDemo() || AGENTS_ONLINE ? [{ value: 'research' as const, label: 'Agent 研究' }] : []),
+            { value: 'research' as const, label: 'Agent 研究' },
           ]} />
           {tab === 'holders' && <Holders t={t} />}
           {tab === 'trades' && <Trades t={t} />}
@@ -131,7 +131,7 @@ function Header({ t }: { t: Token }) {
           onClick={() => { navigator.clipboard?.writeText(t.address).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500) }} aria-label="复制合约地址">
           {shortAddr(t.address, 4, 4)}{copied ? <ICheck className="text-up" /> : <ICopy />}
         </button>
-        {(isDemo() || AGENTS_ONLINE) && <VerdictTag v={t.verdict} />}
+        <VerdictTag v={t.verdict} />
         <QualityBadge t={t} />
       </div>
       {dataBad(t) && <p role="alert" className="mt-3 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[12px] text-warn">行情数据异常，价格、市值和涨跌暂不展示，也不能交易：{qualityTitle(t)}</p>}
@@ -221,7 +221,7 @@ function SideList({ t }: { t: Token }) {
   const watched = useWatched(q.data)
   const list = (k === 'hot' ? (q.data ?? []).filter((x) => !rugLike(x)) : watched).slice(0, 40)
   return (
-    <aside aria-label="代币列表" className="order-last hidden border-line xl:order-none xl:flex xl:h-[calc(100vh-64px-33px-32px)] xl:flex-col xl:border-r">
+    <div aria-label="代币列表" className="flex h-full flex-col">
       <div role="tablist" aria-label="自选或热门" className="flex gap-1 border-b border-line p-2">
         {([['watch', '自选'], ['hot', '热门']] as const).map(([v, l]) => (
           <button key={v} role="tab" aria-selected={k === v} onClick={() => setK(v)}
@@ -243,23 +243,23 @@ function SideList({ t }: { t: Token }) {
           </li>
         ))}
       </ul>
-    </aside>
+    </div>
   )
 }
 
 function SocialPanel({ t }: { t: Token }) {
-  const [k, setK] = useState<'chat' | 'thesis'>('chat')
+  const [k, setK] = useState<'chat' | 'thesis' | 'list'>('chat')
   const th = useTheses(t.address)
   return (
     <aside aria-label="群聊和观点" className="order-last flex flex-col border-t border-line lg:col-span-2 xl:order-none xl:col-span-1 xl:h-[calc(100vh-64px-33px-32px)] xl:border-r xl:border-t-0">
-      <div role="tablist" aria-label="群聊或观点" className="flex gap-1 border-b border-line p-2">
-        {([['chat', '群聊'], ['thesis', `观点 (${th.data?.length ?? 0})`]] as const).map(([v, l]) => (
+      <div role="tablist" aria-label="群聊、观点或代币列表" className="flex gap-1 border-b border-line p-2">
+        {([['chat', '群聊'], ['thesis', `观点 (${th.data?.length ?? 0})`], ['list', '自选 / 热门']] as const).map(([v, l]) => (
           <button key={v} role="tab" aria-selected={k === v} onClick={() => setK(v)}
             className={cx('h-9 flex-1 rounded-lg text-[14px]', k === v ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>{l}</button>
         ))}
       </div>
-      <div className={cx('min-h-0 flex-1', k === 'thesis' && 'overflow-y-auto')}>
-        {k === 'chat' ? <TokenChat token={t} /> : <Theses token={t} />}
+      <div className={cx('min-h-0 flex-1', k !== 'chat' && 'overflow-y-auto')}>
+        {k === 'chat' ? <TokenChat token={t} /> : k === 'thesis' ? <Theses token={t} /> : <SideList t={t} />}
       </div>
     </aside>
   )
@@ -393,7 +393,7 @@ function Holders({ t }: { t: Token }) {
         return (
           <div>
             <HolderBar all={all} top10={t.security.top10Pct} />
-            {isDemo() && <div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
+            {<div className="flex gap-4 px-4 py-2.5 text-xs text-sub">
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看 Agent</label>
               <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" checked={thesisOnly} onChange={(e) => setThesisOnly(e.target.checked)} className="accent-[var(--c-agent)]" />只看有观点的</label>
             </div>}
@@ -435,7 +435,7 @@ function HolderBar({ all, top10 }: { all: Holder[]; top10: number | null }) {
     <div className="px-4 pt-3">
       <div className="flex justify-between text-[12px] font-normal text-sub">
         <span>前十持有 <span className="num text-fg">{top10 === null ? '未知' : `${top10.toFixed(1)}%`}</span></span>
-        {isDemo() && <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>}
+        {<span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-agent" />Agent</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sub/60" />钱包</span></span>}
       </div>
       <div className="mt-1.5 flex h-2 gap-px overflow-hidden rounded-full bg-raised" role="img" aria-label={`前十持有 ${top10 === null ? '未知' : `${top10.toFixed(1)}%`}`}>
         {top.map((h) => <div key={h.rank} title={`#${h.rank} ${h.agentName ?? shortAddr(h.label)} ${h.pct.toFixed(2)}%`} className={h.kind === 'agent' ? 'bg-agent' : 'bg-sub/60'} style={{ width: `${h.pct}%` }} />)}
@@ -456,7 +456,7 @@ function Trades({ t }: { t: Token }) {
         <div className="overflow-x-auto">
           <div className="flex items-center gap-3 px-4 py-2.5">
             <Segmented label="成交方向" size="sm" value={side} onChange={setSide} options={[{ value: 'all', label: '全部' }, { value: 'BUY', label: '买入' }, { value: 'SELL', label: '卖出' }]} />
-            {isDemo() && <label className="flex cursor-pointer items-center gap-1.5 text-xs text-sub"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} />只看 Agent</label>}
+            {<label className="flex cursor-pointer items-center gap-1.5 text-xs text-sub"><input type="checkbox" checked={agentOnly} onChange={(e) => setAgentOnly(e.target.checked)} />只看 Agent</label>}
             <span className="ml-auto text-[12px] font-normal text-sub">{rows.length} 笔</span>
           </div>
           <table className="w-full min-w-[560px] text-[13px]">

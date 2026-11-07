@@ -22,15 +22,18 @@ const DEMO_NAV = [
   { to: '/orders', label: '交易', icon: IList, mobile: false },
   { to: '/strategy', label: '策略', icon: ISliders, mobile: true },
 ]
-/** 实时模式只放有真实数据的入口，桌面和手机完全一致。动态、订单、策略依赖未上线的后端，入口先关掉，路由保留。 */
+/** 实时模式：保留原来的全部入口（Agent、动态、交易、策略），加上新币、持仓和帮助。没有后端数据的页面显示空状态说明。 */
 const LIVE_NAV = [
   { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
   { to: '/new', label: '新币', icon: ISpark, end: false, mobile: true },
+  { to: '/agents', label: 'Agent', icon: IBot, end: false, mobile: true },
+  { to: '/activity', label: '动态', icon: IPulse, end: false, mobile: true },
+  { to: '/orders', label: '交易', icon: IList, end: false, mobile: false },
+  { to: '/strategy', label: '策略', icon: ISliders, end: false, mobile: true },
   // 钱包情报要后端和 Birdeye 密钥，没有后端时不放入口
   ...(WALLETS_ONLINE ? [{ to: '/smart-money', label: '聪明钱', icon: IPulse, end: false, mobile: false }] : []),
   { to: '/portfolio', label: '持仓', icon: IPie, end: false, mobile: true },
-  { to: '/agents', label: 'AI Agent', icon: IBot, end: false, mobile: true },
-  { to: '/legal/help', label: '帮助', icon: IList, end: false, mobile: true },
+  { to: '/legal/help', label: '帮助', icon: IList, end: false, mobile: false },
 ]
 export const NAV = isDemo() ? DEMO_NAV : LIVE_NAV
 /** 演示模式：总览和持仓不在导航里，从顶栏金额进入（手机上是底部导航的「资产」）。 */

@@ -83,7 +83,7 @@ function WatchStrip() {
   const nav = useNavigate()
   const list = useWatched(q.data)
   // 实时模式没有自选时不占位置；演示模式保留引导文案
-  if (!q.data || (!isDemo() && list.length === 0)) return null
+  if (!q.data) return null
   return (
     <section aria-label="自选" className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4">
       {list.length === 0 && <p className="text-xs text-sub">还没有自选。点代币左边的星标加入。</p>}
@@ -121,8 +121,9 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const demo = isDemo()
   const demoBuy = (t: Token) => toast(`演示数据不能交易：${t.symbol} 是样例代币。`)
   // 实时模式只显示有数据的分类：没有 Agent 后端就没有「Agent 在买」，没有认证数据就没有「蓝筹币」
-  const tabs = demo ? TABS : TABS.filter((x) => x.value === 'trending' || x.value === 'watch' || (x.value === 'agent' ? AGENTS_ONLINE : filterTokens(q.data ?? [], { tab: x.value, tf, safeOnly: false, minMcap: 0, launchpad: 'all', chain: 'all', watch, sort: 'mcap', dir: 1 }).length > 0))
-  const showAgent = demo || AGENTS_ONLINE
+  // 所有分类都保留；当前没有数据的分类显示空状态说明，不隐藏入口
+  const tabs = TABS
+  const showAgent = true
   const research = useResearch()
   const switchTab = (v: TabKey) => { setTab(v); setSort(DEFAULT_SORT[v]); setDir(1) }
   const th = (k: SortKey, label: string, cls = '') => (
@@ -167,7 +168,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
       </div>
       {tab === 'bonding' && <p className="mb-3 rounded-lg bg-panel px-3 py-2 text-[12px] font-normal text-sub">内盘代币还在发射曲线上，没有 LP，Agent 按风控规则不会交易，只能手动关注。</p>}
 
-      <DataState q={q} rows={8} isEmpty={() => rows.length === 0} empty={tab === 'watch' ? '还没有自选代币。点代币左侧的星标加入自选。' : '当前筛选条件下没有代币。'}>
+      <DataState q={q} rows={8} isEmpty={() => rows.length === 0} empty={tab === 'watch' ? '还没有自选代币。点代币左侧的星标加入自选。' : tab === 'agent' && !demo && !AGENTS_ONLINE ? 'Agent 分析后端上线后，这里会列出 Agent 正在买的代币。' : '当前这个分类没有符合条件的代币。'}>
         {() => (
           <>
             <div className="hidden overflow-x-auto md:block">
