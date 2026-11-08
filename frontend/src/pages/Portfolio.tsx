@@ -20,7 +20,7 @@ export function Portfolio() {
               </div>
               <div className="min-w-0">
                 <div className="mb-1 flex items-center gap-2 text-xs text-sub">资金曲线 <ModeTag mode="paper" /> <span>近 6 天 · 只含模拟盘，不与实盘、回测合并</span></div>
-                <EquityChart data={p.equity} />
+                {p.equity.length ? <EquityChart data={p.equity} /> : <p className="flex h-40 items-center justify-center rounded-lg border border-dashed border-line text-center text-xs text-sub">Agent 还没有模拟成交，没有资金曲线。手动练习的记录在「模拟盘」页。</p>}
               </div>
             </div>
           )}

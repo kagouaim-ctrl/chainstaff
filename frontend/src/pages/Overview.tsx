@@ -36,6 +36,11 @@ export function Overview() {
                   </div>
                   <div className="mt-1 text-xs text-sub">{hasLimit ? `已用 ${(used * 100).toFixed(0)}%，到上限当日自动暂停` : '未设置每日亏损上限，不会自动暂停'}</div>
                 </div>
+                {p.totalUsd === 0 && p.equity.length === 0 && (
+                  <p className="col-span-full text-xs text-sub">
+                    Agent 只出建议、不会下单，所以这里没有资产。想用真实行情练习，去 <Link to="/paper" className="text-agent hover:underline">模拟盘</Link>；真实持仓在 <Link to="/portfolio" className="text-agent hover:underline">持仓</Link> 页连接钱包查看。
+                  </p>
+                )}
               </div>
             )
           }}
@@ -57,7 +62,8 @@ function Pipeline() {
   const open = useDrawerLink()
   return (
     <Panel demo title="Agent 流水线" right={<span className="hidden text-xs text-sub sm:inline">每一环：当前处理数 · 最近一个代币</span>} bodyClass="p-0">
-      <DataState q={q} rows={1}>
+      <DataState q={q} rows={1} isEmpty={(st) => st.length === 0}
+        empty={<>还没有正在进行的 Agent 分析。到任意代币页的「Agent 研究」发起一次，这里会显示每一环处理到哪里。</>}>
         {(stages) => (
           <ol className="scrollbar-none flex overflow-x-auto">
             {stages.map((s, i) => (

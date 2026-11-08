@@ -7,6 +7,7 @@ import { evmWallets, onWalletsChanged, solanaWallets, startDiscovery } from './d
 import { connectEvm, connectSolana, disconnect, nativeBalance } from './actions'
 import { fromUnits } from './chains'
 import { useWallet } from './store'
+import { copyText } from '@/lib/copy'
 import { Link } from 'react-router-dom'
 
 const TERMS_KEY = 'kagouai.terms.v1'
@@ -101,7 +102,7 @@ export function WalletButton() {
       <span className="w-20 text-[12px] text-sub">{label}</span>
       {addr ? <>
         <span className="flex-1"><span className="num block text-[13px]">{shortAddr(addr, 4, 4)}</span>{family === 'solana' ? <NativeBalance chain="solana" address={addr} /> : <NativeBalance chain="bsc" address={addr} />}</span>
-        <button onClick={() => navigator.clipboard?.writeText(addr).catch(() => {})} className="text-xs text-sub hover:text-fg">复制</button>
+        <button onClick={() => void copyText(addr)} className="text-xs text-sub hover:text-fg">复制</button>
         <button onClick={() => disconnect(family)} className="text-xs text-down hover:underline">断开</button>
       </> : <button onClick={() => { setOpen(false); openPicker(family) }} className="flex-1 text-left text-[13px] text-agent hover:underline">连接</button>}
     </li>

@@ -7,7 +7,10 @@ import { DataState, StatusDot, AGENT_STATUS, ModeTag, cx } from '@/components/ui
 import { IBot, ICheck, ICopy } from '@/components/icons'
 import { relTime, duration } from '@/lib/format'
 import type { AgentDM } from '@/domain/types'
-import { LIVE, AGENTS_ONLINE } from '@/api/live'
+import { copyText } from '@/lib/copy'
+import { LIVE, AGENTS_ONLINE, chatWithAgent } from '@/api/live'
+import { readCode, saveCode } from '@/features/Research'
+import { isDemo } from '@/api/hooks'
 
 const SUGGEST = ['今天买了什么？', '现在持仓风险大吗？', '帮我研究一个合约地址', '为什么没买热门第一？']
 
@@ -20,7 +23,32 @@ export function Agents() {
   const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [dm.data])
   const name = ma.data?.name ?? '主 Agent'
-  const send = (t: string) => { if (!t.trim()) return; toast('演示模式：消息没有发送，Agent 也不会执行任何操作。'); setText('') }
+  // 实时模式：对话发到后端，只根据分析记录回答；记录只留在这个标签页
+  const online = !isDemo() && AGENTS_ONLINE
+  const [live, setLive] = useState<AgentDM[]>(() => { try { return JSON.parse(sessionStorage.getItem('kagouai.chat') ?? '[]') } catch { return [] } })
+  const [busy, setBusy] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [code, setCode] = useState(readCode)
+  useEffect(() => { try { sessionStorage.setItem('kagouai.chat', JSON.stringify(live.slice(-40))) } catch { /* 隐私模式不记 */ } }, [live])
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [live, busy])
+  const send = async (t: string) => {
+    if (!t.trim() || busy) return
+    if (!online) { toast(LIVE ? 'Agent 后端还没上线，消息没有发送。' : '演示模式：消息没有发送，Agent 也不会执行任何操作。'); setText(''); return }
+    if (!code) { setAsking(true); return }
+    const mine: AgentDM = { id: `u${Date.now()}`, at: new Date().toISOString(), role: 'user', text: t.trim() }
+    const history = live.map((m) => ({ role: m.role, text: m.text }))
+    setLive((l) => [...l, mine]); setText(''); setBusy(true)
+    try {
+      const answer = await chatWithAgent(mine.text, history, code)
+      const mint = /[1-9A-HJ-NP-Za-km-z]{32,44}/.exec(mine.text)?.[0]
+      setLive((l) => [...l, { id: `a${Date.now()}`, at: new Date().toISOString(), role: 'agent', text: answer, links: mint ? [{ label: '打开这个代币并交给 Agent 研究', to: `/token/${mint}` }] : undefined }])
+    } catch (e) {
+      const msg = (e as Error).message
+      if (msg === '访问码不对') { saveCode(''); setCode(''); setAsking(true) }
+      setLive((l) => [...l, { id: `e${Date.now()}`, at: new Date().toISOString(), role: 'agent', text: `没能回答：${msg}` }])
+    } finally { setBusy(false) }
+  }
+  const msgsQ = online ? { ...dm, data: live, isLoading: false, isError: false, isSuccess: true } as typeof dm : dm
 
   return (
     <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -38,26 +66,36 @@ export function Agents() {
         )}
 
         <div ref={listRef} className="flex-1 overflow-y-auto">
-          <DataState q={dm} isEmpty={(d) => d.length === 0} empty={`还没有和${name}聊过。`}>
+          <DataState q={msgsQ} isEmpty={(d) => d.length === 0} empty={online ? `问${name}最近分析过哪些代币、为什么不买，或者发一个 Solana 合约地址。它只根据分析记录回答，不会下单。` : `还没有和${name}聊过。`}>
             {(msgs) => (
               <ol className="mx-auto max-w-[760px] space-y-6 px-4 py-6" aria-label="对话记录">
                 {msgs.map((m) => <Msg key={m.id} m={m} name={name} />)}
+                {busy && <li className="text-[13px] text-sub">{name} 正在想…</li>}
               </ol>
             )}
           </DataState>
         </div>
 
-        <div className="mx-auto w-full max-w-[760px] px-4 pb-24 md:pb-4">
+        <div className="mx-auto w-full max-w-[760px] px-4 pb-24 lg:pb-4">
           <div className="scrollbar-none mb-2 flex gap-2 overflow-x-auto">
             {SUGGEST.map((s) => (
-              <button key={s} onClick={() => send(s)} className="h-8 shrink-0 rounded-full border border-line px-3 text-[12px] text-sub hover:text-fg">{s}</button>
+              <button key={s} onClick={() => void send(s)} className="h-8 shrink-0 rounded-full border border-line px-3 text-[12px] text-sub hover:text-fg">{s}</button>
             ))}
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); send(text) }} className="flex items-end gap-2 rounded-2xl border border-line bg-panel p-2 focus-within:border-agent">
+          {asking && (
+            <form className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-3 text-[13px]"
+              onSubmit={(e) => { e.preventDefault(); const v = (new FormData(e.currentTarget).get('code') as string ?? '').trim(); if (v) { saveCode(v); setCode(v); setAsking(false) } }}>
+              <span className="text-sub">对话会调用模型，需要和「Agent 研究」一样的访问码：</span>
+              <input name="code" type="password" autoComplete="off" aria-label="访问码" className="h-8 flex-1 rounded-lg border border-line bg-bg px-2" />
+              <button type="submit" className="h-8 rounded-lg bg-agent px-3 text-white">确定</button>
+              <button type="button" onClick={() => setAsking(false)} className="h-8 rounded-lg px-2 text-sub hover:text-fg">取消</button>
+            </form>
+          )}
+          <form onSubmit={(e) => { e.preventDefault(); void send(text) }} className="flex items-end gap-2 rounded-2xl border border-line bg-panel p-2 focus-within:border-agent">
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1} aria-label={`给${name}发消息`} placeholder={`给${name}发消息…`}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(text) } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(text) } }}
               className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-[14px] font-normal outline-none placeholder:text-sub" />
-            <button type="submit" aria-label="发送" disabled={!text.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-agent text-white disabled:bg-raised disabled:text-sub">
+            <button type="submit" aria-label="发送" disabled={!text.trim() || busy} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-agent text-white disabled:bg-raised disabled:text-sub">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M12 19V5M5 12l7-7 7 7" /></svg>
             </button>
           </form>
@@ -83,7 +121,7 @@ function Msg({ m, name }: { m: AgentDM; name: string }) {
       <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-agent text-white"><IBot width={14} height={14} /></span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-[12px] text-sub">{name} · {relTime(m.at, now())}
-          <button onClick={() => { navigator.clipboard?.writeText(m.text).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+          <button onClick={() => { void copyText(m.text); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
             aria-label="复制回答" className="ml-auto rounded p-1 opacity-0 hover:bg-raised hover:text-fg focus:opacity-100 group-hover:opacity-100">
             {copied ? <ICheck width={14} height={14} className="text-up" /> : <ICopy width={14} height={14} />}
           </button>

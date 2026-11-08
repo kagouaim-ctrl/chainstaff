@@ -75,7 +75,10 @@ export function SearchPalette() {
       sub: `${r.name} · ${CHAIN_LABEL[r.chain]} · 流动性 ${usd(r.liquidityUsd, { compact: true })} · 24h 成交 ${usd(r.volumeH24, { compact: true })}${r.ageMinutes != null ? ` · ${age(r.ageMinutes)}` : ''} · ${shortAddr(r.address)}`,
       token: { address: r.address, symbol: r.symbol, name: r.name, hue: 0, chain: r.chain } as Token,
     }))
-    return [...local.filter((h) => h.kind === 'token'), ...extra, ...local.filter((h) => h.kind !== 'token')].slice(0, 20)
+    // 本地列表里的和 DexScreener 搜到的放在一起按 24h 成交额排，免得发现页里的同名仿盘排在正主前面
+    const vol = (h: Hit) => h.kind !== 'token' ? 0 : (h.token.stats?.['24h']?.volume ?? remote.data?.find((r) => r.address === h.token.address)?.volumeH24 ?? 0)
+    const tokensFirst = [...local.filter((h) => h.kind === 'token'), ...extra].sort((x, y) => vol(y) - vol(x))
+    return [...tokensFirst, ...local.filter((h) => h.kind !== 'token')].slice(0, 20)
   }, [local, remote.data, term, q])
   // 同一个符号对应多个合约时提醒核对，仿盘常用同名
   const dupes = useMemo(() => {

@@ -64,8 +64,35 @@ async function waitSlot(host: string): Promise<void> {
 }
 const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, spacing.enabled ? ms : 0))
 
+/**
+ * GeckoTerminal 先走我们后端的缓存中转（/api/gt/…）：所有访客共用一份缓存，被限流时后端给上一次的结果。
+ * 后端连不上就直接请求 GeckoTerminal，并在一分钟内不再试后端。
+ */
+const RELAY = (import.meta.env.VITE_MEME_API_URL ?? '').replace(/\/+$/, '')
+const GECKO_ROOT = 'https://api.geckoterminal.com/api/v2/'
+export const relay = { enabled: !!RELAY && import.meta.env.MODE !== 'test', downUntil: 0 }
+async function viaRelay(url: string): Promise<Json | undefined> {
+  if (!relay.enabled || !url.startsWith(GECKO_ROOT) || Date.now() < relay.downUntil) return undefined
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), 10_000)
+  try {
+    const r = await fetch(`${RELAY}/api/gt/${url.slice(GECKO_ROOT.length)}`, { signal: ctl.signal })
+    if (r.status === 404) return null
+    if (!r.ok) return undefined
+    return await r.json()
+  } catch {
+    relay.downUntil = Date.now() + 60_000
+    return undefined
+  } finally { clearTimeout(timer) }
+}
+
 export async function getJson(url: string, { quiet404 = false } = {}): Promise<Json> {
   const host = new URL(url).host
+  const relayed = await viaRelay(url)
+  if (relayed !== undefined) {
+    if (relayed === null && !quiet404) throw new Error(`${host} 返回 404`)
+    return relayed
+  }
   const tries = SPACED[host] ? 3 : 2
   for (let attempt = 0; attempt < tries; attempt++) {
     const last = attempt === tries - 1
@@ -288,7 +315,9 @@ async function pool<T, R>(items: T[], n: number, f: (x: T) => Promise<R>): Promi
 export async function tokens(): Promise<Token[]> {
   return cached('list', async () => {
     const seen = new Set<string>()
-    const sources = await Promise.all([listed('/token-boosts/top/v1'), listed('/token-profiles/latest/v1'), ...EVM_CHAINS.map(trending)])
+    // GeckoTerminal 的热门池子最多等 4 秒：被限流时先出 DexScreener 的结果，下次刷新再补上
+    const soon = <T,>(p: Promise<T[]>) => Promise.race([p, new Promise<T[]>((ok) => setTimeout(() => ok([]), 4_000))])
+    const sources = await Promise.all([listed('/token-boosts/top/v1'), listed('/token-profiles/latest/v1'), ...EVM_CHAINS.map((c) => soon(trending(c)))])
     const count: Record<string, number> = {}
     const picks = sources.flat()
       .filter((p) => { const k = `${p.chain}:${p.address.toLowerCase()}`; return !seen.has(k) && !!seen.add(k) })
@@ -363,7 +392,7 @@ async function secondCandles(addr: string, step: number): Promise<Candle[]> {
   const log = tradeLog.get(key) ?? new Map()
   tradeLog.set(key, log)
   try {
-    const body = await cached(`live-trades:${key}`, () => getJson(`${GECKO}/${CHAINS[p.chain].gecko}/pools/${p.pool}/trades`), 2_500)
+    const body = await cached(`live-trades:${key}`, () => getJson(`${GECKO}/${CHAINS[p.chain].gecko}/pools/${p.pool}/trades`), 8_000)
     for (const row of body?.data ?? []) {
       const a = row.attributes ?? {}
       const buyToken = same(a.to_token_address ?? '', addr)

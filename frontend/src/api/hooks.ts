@@ -9,7 +9,7 @@ export const useToken = (a: string) => useQuery({ queryKey: ['token', a], queryF
 export const useCandles = (a: string, tf: ChartTf = '5m') => useQuery({
   queryKey: ['candles', a, tf], queryFn: () => source().candles(a, tf),
   // 秒级 K 线由成交合成，3 秒刷新一次；分钟以上 1 分钟刷新
-  refetchInterval: source().info.kind !== 'live' ? false : tf.endsWith('s') ? 3_000 : 60_000,
+  refetchInterval: source().info.kind !== 'live' ? false : tf.endsWith('s') ? 4_000 : 60_000,
 })
 export const useHolders = (a: string) => useQuery({ queryKey: ['holders', a], queryFn: () => source().holders(a) })
 export const useChat = (a: string) => useQuery({ queryKey: ['chat', a], queryFn: () => source().chat(a) })

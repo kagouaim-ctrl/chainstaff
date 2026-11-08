@@ -221,9 +221,23 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function latestRun(mint: string): Promise<Run | null> {
-  if (!AGENTS_ONLINE) return null
+  // Agent 只分析 Solana 代币，EVM 地址不用问后端
+  if (!AGENTS_ONLINE || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return null
   const rows = await get<Run[]>(`/api/analyses?mint=${encodeURIComponent(mint)}&limit=1`)
   return rows[0] ? get<Run>(`/api/analyses/${encodeURIComponent(rows[0].id)}`) : null
+}
+
+/** 和主 Agent 对话：后端只根据分析记录回答，不会下单。要访问码。 */
+export async function chatWithAgent(message: string, history: { role: 'user' | 'agent'; text: string }[], code: string): Promise<string> {
+  const r = await fetch(`${API_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${code}` },
+    body: JSON.stringify({ message, history: history.slice(-10).map((h) => ({ role: h.role, text: h.text.slice(0, 2000) })) }),
+  })
+  if (r.status === 401) throw new Error('访问码不对')
+  const body = await r.json().catch(() => null)
+  if (!r.ok) throw new Error(body?.detail ?? `后端返回 ${r.status}`)
+  return String(body?.text ?? '')
 }
 
 /** 开始分析。访问码由访客输入，页面里不带任何密钥。 */
@@ -278,7 +292,15 @@ const DATA_SOURCES: DataSourceStatus[] = [
   { name: '交易执行', kind: '下单、持仓', state: 'not_connected', note: '只出决定，不下单' },
 ]
 
-async function allRuns(): Promise<Run[]> { return AGENTS_ONLINE ? get<Run[]>('/api/analyses/events') : [] }
+/** 总览、Agent 页和动态页同时要这份数据，几秒内共用一次请求。 */
+let runsMemo: { at: number; p: Promise<Run[]> } | null = null
+async function allRuns(): Promise<Run[]> {
+  if (!AGENTS_ONLINE) return []
+  if (runsMemo && Date.now() - runsMemo.at < 5_000) return runsMemo.p
+  const p = get<Run[]>('/api/analyses/events').catch((e) => { runsMemo = null; throw e })
+  runsMemo = { at: Date.now(), p }
+  return p
+}
 
 async function agents(): Promise<AgentInfo[]> {
   const runs = await allRuns()

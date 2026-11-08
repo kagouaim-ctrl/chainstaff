@@ -33,9 +33,12 @@ const DEFAULT_SORT: Record<TabKey, SortKey> = { trending: 'volume', agent: 'volu
 
 export interface Filter { tab: TabKey; tf: Timeframe; safeOnly: boolean; strictSafe?: boolean; minMcap: number; launchpad: string; chain?: string; watch: Record<string, boolean>; sort: SortKey; dir: 1 | -1 }
 
+export const isBlueChip = (t: Token) => t.verified || (t.mcapUsd >= 1e7 && (t.liquidityUsd ?? 0) >= 5e5 && (t.ageMinutes ?? 0) >= 30 * 1440)
+
 export function filterTokens(list: Token[], o: Filter) {
   let r = list.slice()
-  if (o.tab === 'blue') r = r.filter((t) => t.verified)
+  // 蓝筹：有认证标记的，或者市值 ≥ $1000 万、流动性 ≥ $50 万、上线 30 天以上的老币
+  if (o.tab === 'blue') r = r.filter(isBlueChip)
   if (o.tab === 'graduated') r = r.filter((t) => t.graduated)
   if (o.tab === 'bonding') r = r.filter((t) => !t.graduated)
   if (o.tab === 'agent') r = r.filter((t) => t.verdict === 'bought' || t.verdict === 'buy_signal')
@@ -45,7 +48,8 @@ export function filterTokens(list: Token[], o: Filter) {
   // 「只看安全」（原有）：只留全部安全项都通过的代币
   if (o.strictSafe) r = r.filter((t) => securityPass(t.security) === true)
   if (o.minMcap) r = r.filter((t) => t.mcapUsd >= o.minMcap)
-  if (o.launchpad !== 'all') r = r.filter((t) => t.launchpad === o.launchpad)
+  // 平台按前缀比，不分大小写：Raydium 包括 raydium、raydium-clmm 这些交易所 ID
+  if (o.launchpad !== 'all') r = r.filter((t) => (t.launchpad ?? '').toLowerCase().startsWith(o.launchpad.toLowerCase()))
   if (o.chain && o.chain !== 'all') r = r.filter((t) => t.chain === o.chain)
   // 热门里默认不出现疑似已 Rug 的代币（跌 90% 以上且流动性不足 $1 万）
   if (o.tab === 'trending') r = r.filter((t) => !rugLike(t))
@@ -180,7 +184,10 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
       </div>
       {tab === 'bonding' && <p className="mb-3 rounded-lg bg-panel px-3 py-2 text-[12px] font-normal text-sub">内盘代币还在发射曲线上，没有 LP，Agent 按风控规则不会交易，只能手动关注。</p>}
 
-      <DataState q={q} rows={8} isEmpty={() => rows.length === 0} empty={tab === 'watch' ? '还没有自选代币。点代币左侧的星标加入自选。' : tab === 'agent' && !demo && !AGENTS_ONLINE ? 'Agent 分析后端上线后，这里会列出 Agent 正在买的代币。' : '当前这个分类没有符合条件的代币。'}>
+      <DataState q={q} rows={8} isEmpty={() => rows.length === 0} empty={tab === 'watch' ? '还没有自选代币。点代币左侧的星标加入自选。' : tab === 'agent' && !demo && !AGENTS_ONLINE ? 'Agent 分析后端上线后，这里会列出 Agent 正在买的代币。'
+        : tab === 'agent' ? '目前没有 Agent 建议买入的代币。在代币页「Agent 研究」里发起分析，结论是买入的会出现在这里。'
+        : tab === 'blue' ? '当前列表里没有蓝筹币（市值 ≥ $1000 万、流动性 ≥ $50 万、上线 30 天以上）。'
+        : '当前这个分类没有符合条件的代币。'}>
         {() => (
           <>
             <div className="hidden overflow-x-auto md:block">

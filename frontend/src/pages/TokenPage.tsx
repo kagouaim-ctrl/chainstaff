@@ -29,6 +29,7 @@ import { VerdictTag, securityFlags, riskItems, riskLevel, VERDICT, RiskStrip, Qu
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
 import { ROLE_MAP } from '@/domain/agents'
+import { copyText } from '@/lib/copy'
 import type { ChartMarker, ChartTf, Holder, MarkerKind, Token } from '@/domain/types'
 
 type TabKey = 'holders' | 'trades' | 'traders' | 'research'
@@ -136,7 +137,7 @@ function Header({ t }: { t: Token }) {
         </div>
         <span className="text-[14px] text-sub">{age(t.ageMinutes)}</span>
         <button className="flex items-center gap-1 rounded-md px-1 text-[14px] text-sub hover:bg-raised hover:text-fg" title={t.address}
-          onClick={() => { navigator.clipboard?.writeText(t.address).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500) }} aria-label="复制合约地址">
+          onClick={() => { void copyText(t.address); setCopied(true); setTimeout(() => setCopied(false), 1500) }} aria-label="复制合约地址">
           {shortAddr(t.address, 4, 4)}{copied ? <ICheck className="text-up" /> : <ICopy />}
         </button>
         <VerdictTag v={t.verdict} />
