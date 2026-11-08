@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { errText } from '@/lib/format'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Segmented, TokenAvatar, cx } from '@/components/ui'
@@ -60,7 +61,7 @@ export function CommunityChat({ t }: { t: Token }) {
         <span className="num">{people} 个钱包发过言</span>
       </div>
       {q.isError
-        ? <p role="alert" className="p-4 text-[13px] text-down">{(q.error as Error).message}</p>
+        ? <p role="alert" className="p-4 text-[13px] text-down">{errText(q.error)}</p>
         : !q.data ? <p className="p-4 text-[13px] text-sub">加载中…</p>
           : q.data.length === 0 ? <p className="p-6 text-center text-[13px] text-sub">群里还没有人说话。</p>
             : (
@@ -135,7 +136,7 @@ export function CommunityTheses({ t }: { t: Token }) {
           <Button type="submit" variant="primary" disabled={!text.trim() || save.isPending}>发布</Button>
         </form>
       )}
-      {q.isError ? <p role="alert" className="p-4 text-[13px] text-down">{(q.error as Error).message}</p>
+      {q.isError ? <p role="alert" className="p-4 text-[13px] text-down">{errText(q.error)}</p>
         : !q.data ? <p className="p-4 text-[13px] text-sub">加载中…</p>
           : rows.length === 0 ? <p className="p-6 text-center text-[13px] text-sub">还没有人写观点。</p>
             : (

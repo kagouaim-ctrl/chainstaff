@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { errText } from '@/lib/format'
 import { useWatched } from '@/features/watch'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
@@ -568,7 +569,7 @@ function Research({ t }: { t: Token }) {
     const s = summary.data
     const btn = s?.status !== 'running' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{s ? '重新研究' : '交给 Agent 研究'}</Button>
     if (summary.isPending) return <p className="p-6 text-center text-[13px] text-sub" aria-busy="true">正在读取 Agent 研究记录…</p>
-    if (summary.isError) return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>研究记录暂时读不到（{summary.error instanceof Error ? summary.error.message : '后端没有响应'}），稍后再试。</p>{btn}</div>
+    if (summary.isError) return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>研究记录暂时读不到（{errText(summary.error, '后端没有响应')}），稍后再试。</p>{btn}</div>
     if (!s) return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。交给 Agent 后，多个分析师会读链上、安全和行情数据，辩论后给出结论。</p>{btn}</div>
     const steps2 = steps.data ?? []
     return (
