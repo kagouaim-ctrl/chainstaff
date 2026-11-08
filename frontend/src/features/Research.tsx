@@ -7,8 +7,8 @@ import { useToast } from '@/app/store'
 import { Button, Dialog } from '@/components/ui'
 
 const CODE_KEY = 'meme-access-code'
-const readCode = () => { try { return sessionStorage.getItem(CODE_KEY) ?? '' } catch { return '' } }
-const saveCode = (v: string) => { try { if (v) sessionStorage.setItem(CODE_KEY, v); else sessionStorage.removeItem(CODE_KEY) } catch { /* 隐私模式：这次会话不记住 */ } }
+export const readCode = () => { try { return sessionStorage.getItem(CODE_KEY) ?? '' } catch { return '' } }
+export const saveCode = (v: string) => { try { if (v) sessionStorage.setItem(CODE_KEY, v); else sessionStorage.removeItem(CODE_KEY) } catch { /* 隐私模式：这次会话不记住 */ } }
 
 interface Target { address: string; symbol: string }
 const useTarget = create<{ target: Target | null; set: (t: Target | null) => void }>((set) => ({ target: null, set: (target) => set({ target }) }))

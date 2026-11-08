@@ -31,7 +31,7 @@ export const WALLETS_ONLINE = !!API_URL
 async function get<T>(path: string): Promise<T> {
   if (!API_URL) throw new NotConfigured('后端未接入')
   const r = await fetch(`${API_URL}${path}`)
-  if (r.status === 503) throw new NotConfigured('钱包数据源未配置')
+  if (r.status === 503) throw new NotConfigured((await r.json().catch(() => null))?.detail ?? '钱包数据源未配置')
   if (!r.ok) throw new Error((await r.json().catch(() => null))?.detail ?? `后端返回 ${r.status}`)
   return r.json()
 }

@@ -23,7 +23,7 @@ function keep(s: Session) { try { localStorage.setItem(KEY, JSON.stringify({ ...
 async function call<T>(path: string, init: RequestInit = {}, wallet?: string): Promise<T> {
   if (!API_URL) throw new Error('社区功能待后端上线')
   const s = sessionFor(wallet)
-  const r = await fetch(`${API_URL}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(s ? { Authorization: `Bearer ${s.token}` } : {}) } })
+  const r = await fetch(`${API_URL}${path}`, { ...init, headers: { ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(s ? { Authorization: `Bearer ${s.token}` } : {}) } })
   if (r.status === 204) return undefined as T
   const body = await r.json().catch(() => null)
   if (!r.ok) throw new Error(body?.detail ?? `后端返回 ${r.status}`)

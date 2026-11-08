@@ -3,12 +3,18 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { Button, NotConnected, Segmented, Skeleton, cx } from '@/components/ui'
 import { usd, shortAddr, compactCN } from '@/lib/format'
+import { copyText } from '@/lib/copy'
 import { leaderboard, topTraders, walletDetail, NotConfigured, TAG_TEXT, TAGS, type PnlSummary } from '@/api/wallets'
 
 /** 钱包数据的加载、未配置、出错三种状态。未配置时说清楚，不显示空表。 */
 function WalletState<T>({ q, children, empty }: { q: UseQueryResult<T>; children: (d: T) => React.ReactNode; empty: (d: T) => boolean }) {
   if (q.isPending) return <div className="space-y-2 p-4" aria-busy="true">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
-  if (q.error instanceof NotConfigured) return <NotConnected what="钱包情报（Birdeye）" how="需要在后端服务器配置 BIRDEYE_API_KEY 后才有数据。" />
+  if (q.error instanceof NotConfigured) {
+    const refused = q.error.message.includes('拒绝')
+    return <NotConnected what="钱包情报（Birdeye）" how={refused
+      ? 'Birdeye 拒绝了后端配置的 API key：key 填错了，或者当前 Birdeye 套餐不包含钱包和交易员接口。请在 Birdeye 后台确认套餐后更新 BIRDEYE_API_KEY。'
+      : '需要在后端服务器配置 BIRDEYE_API_KEY 后才有数据。'} />
+  }
   if (q.isError) return (
     <div role="alert" className="flex flex-col items-start gap-2 p-4 text-sm">
       <p className="text-down">加载失败：{(q.error as Error).message}</p>
@@ -123,12 +129,13 @@ function PnlCards({ p }: { p: PnlSummary }) {
 export function WalletPage() {
   const { address = '' } = useParams()
   const [duration, setDuration] = useState('30d')
+  const [copied, setCopied] = useState('')
   const q = useQuery({ queryKey: ['wallet', address, duration], queryFn: () => walletDetail(address, duration), retry: (n, e) => !(e instanceof NotConfigured) && n < 1 })
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-4">
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <h1 className="num text-[18px] font-bold" title={address}>{shortAddr(address, 6, 6)}</h1>
-        <button className="text-[12px] text-sub hover:text-fg" onClick={() => navigator.clipboard?.writeText(address)}>复制地址</button>
+        <button className="text-[12px] text-sub hover:text-fg" onClick={() => { void copyText(address).then((ok) => setCopied(ok ? '已复制' : '复制失败')); setTimeout(() => setCopied(''), 1500) }}>{copied || '复制地址'}</button>
         <a className="text-[12px] text-sub hover:text-fg" href={`https://solscan.io/account/${address}`} target="_blank" rel="noreferrer">在 Solscan 查看</a>
         <div className="ml-auto"><Segmented size="sm" label="统计周期" value={duration} onChange={setDuration} options={[{ value: '24h', label: '24h' }, { value: '7d', label: '7 天' }, { value: '30d', label: '30 天' }, { value: '90d', label: '90 天' }, { value: 'all', label: '全部' }]} /></div>
       </div>
