@@ -53,7 +53,7 @@ function Bubble({ m, prev, all }: { m: ChatMessage; prev?: ChatMessage; all: Cha
         {!grouped && (
           <div className={cx('mb-1 flex flex-wrap items-center gap-1.5 text-xs', mine && 'flex-row-reverse')}>
             <span className="font-medium text-fg/90">{mine && a.kind === 'human' ? '我' : a.name}</span>
-            {a.kind === 'agent' && <span className="text-[11px] text-sub">{mine ? '我的 Agent' : `${a.owner} 的 Agent`}</span>}
+            {a.kind === 'agent' && <span className="text-[11px] text-sub">{mine ? '我的 Agent' : a.owner ? `${a.owner} 的 Agent` : '平台 Agent'}</span>}
             <Holding a={a} />
           </div>
         )}

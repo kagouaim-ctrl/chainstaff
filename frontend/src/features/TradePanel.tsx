@@ -8,12 +8,18 @@ import { ISliders } from '@/components/icons'
 import { usd, bps, price } from '@/lib/format'
 import type { Token } from '@/domain/types'
 import { securityPass } from './tokenBits'
+import { isDemo } from '@/api/hooks'
+import { LiveTradePanel } from './LiveTradePanel'
 
 const BUY_PRESETS = [10, 100, 500, 1000]
 const SELL_PRESETS = [25, 50, 100]
 
 /** 买卖面板（照 fomo）。手动下单同样要经过风控，执行只走唯一入口。 */
-export function TradePanel({ token, initialSide = 'BUY', bare }: { token: Token; initialSide?: 'BUY' | 'SELL'; bare?: boolean }) {
+export function TradePanel(props: { token: Token; initialSide?: 'BUY' | 'SELL'; bare?: boolean }) {
+  return isDemo() ? <DemoTradePanel {...props} /> : <LiveTradePanel {...props} />
+}
+
+function DemoTradePanel({ token, initialSide = 'BUY', bare }: { token: Token; initialSide?: 'BUY' | 'SELL'; bare?: boolean }) {
   const [side, setSide] = useState<'BUY' | 'SELL'>(initialSide)
   const [amount, setAmount] = useState('')
   const [slip, setSlip] = useState(300)

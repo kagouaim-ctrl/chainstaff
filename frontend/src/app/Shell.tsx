@@ -1,28 +1,49 @@
 import { NavLink, Link, useLocation } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from './store'
-import { usePortfolio, usePositions, useOrders } from '@/api/hooks'
+import { usePortfolio, usePositions, useOrders, isDemo } from '@/api/hooks'
 import { Button, Chg, Dialog, ModeTag, Signed, TokenAvatar, cx } from '@/components/ui'
-import { IPause, IPlay, ISearch, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders } from '@/components/icons'
+import { IPause, IPlay, ISearch, ILock, ICompass, IBot, IPulse, IPie, IList, ISliders, ISpark } from '@/components/icons'
 import { usd } from '@/lib/format'
 import { TERMINAL } from '@/domain/orderMachine'
+import { WalletButton } from '@/wallet/WalletUI'
+import { LEGAL_LINKS } from '@/pages/Legal'
+import { useQuery } from '@tanstack/react-query'
+import { prices } from '@/api/chain'
+import type { Chain } from '@/domain/types'
+import { WALLETS_ONLINE } from '@/api/wallets'
 
-/** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。 */
-export const NAV = [
+/** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。演示模式的入口。 */
+const DEMO_NAV = [
   { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
+  { to: '/new', label: '新币', icon: ISpark, end: false, mobile: false },
   { to: '/agents', label: 'Agent', icon: IBot, mobile: true },
   { to: '/activity', label: '动态', icon: IPulse, mobile: true },
   { to: '/orders', label: '交易', icon: IList, mobile: false },
   { to: '/strategy', label: '策略', icon: ISliders, mobile: true },
 ]
-/** 总览和持仓不在导航里，从顶栏金额进入（手机上是底部导航的「资产」）。 */
-const MOBILE_EXTRA = { to: '/portfolio', label: '资产', icon: IPie, end: false, mobile: true }
+/** 实时模式：保留原来的全部入口（Agent、动态、交易、策略），加上新币、持仓和帮助。没有后端数据的页面显示空状态说明。 */
+const LIVE_NAV = [
+  { to: '/', label: '发现', icon: ICompass, end: true, mobile: true },
+  { to: '/new', label: '新币', icon: ISpark, end: false, mobile: true },
+  { to: '/agents', label: 'Agent', icon: IBot, end: false, mobile: true },
+  { to: '/activity', label: '动态', icon: IPulse, end: false, mobile: true },
+  { to: '/orders', label: '交易', icon: IList, end: false, mobile: false },
+  { to: '/strategy', label: '策略', icon: ISliders, end: false, mobile: true },
+  // 钱包情报要后端和 Birdeye 密钥，没有后端时不放入口
+  ...(WALLETS_ONLINE ? [{ to: '/smart-money', label: '聪明钱', icon: IPulse, end: false, mobile: false }] : []),
+  { to: '/portfolio', label: '持仓', icon: IPie, end: false, mobile: true },
+  { to: '/legal/help', label: '帮助', icon: IList, end: false, mobile: false },
+]
+export const NAV = isDemo() ? DEMO_NAV : LIVE_NAV
+/** 演示模式：总览和持仓不在导航里，从顶栏金额进入（手机上是底部导航的「资产」）。 */
+const MOBILE_EXTRA = isDemo() ? [{ to: '/portfolio', label: '资产', icon: IPie, end: false, mobile: true }] : []
 
 export function BottomNav() {
   return (
     <nav aria-label="主导航（手机）" className="fixed inset-x-0 bottom-3 z-30 flex justify-center px-4 md:hidden">
       <div className="flex w-full max-w-sm items-center justify-around rounded-full border border-line bg-panel px-2 py-1.5">
-        {[...NAV.filter((n) => n.mobile), MOBILE_EXTRA].map((n) => (
+        {[...NAV.filter((n) => n.mobile), ...MOBILE_EXTRA].map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end} aria-label={n.label}
             className={({ isActive }) => cx('flex flex-col items-center gap-0.5 rounded-full px-3 py-1 text-[10px]', isActive ? 'text-fg' : 'text-sub')}>
             <n.icon width={20} height={20} />{n.label}
@@ -39,7 +60,7 @@ export function TopBar() {
   return (
     <header className="relative z-20 h-16 border-b border-line bg-bg">
       <div className="flex h-16 items-center gap-4 px-4">
-        <Link to="/" className="shrink-0 text-[22px] font-bold leading-none tracking-[-0.9px]" aria-label="Meme Agent 首页">memeagent</Link>
+        <Link to="/" className="shrink-0 text-[22px] font-bold leading-none tracking-[-0.9px]" aria-label="KAGOUAI 首页">KAGOUAI</Link>
         <nav aria-label="主导航" className="hidden items-center gap-1 lg:flex">
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end}
@@ -60,9 +81,11 @@ export function TopBar() {
         </button>
 
         <div className="flex shrink-0 items-center gap-2">
-          <ModeSwitchBadge />
-          <PauseButton />
-          <Balance />
+          {isDemo() ? <>
+            <ModeSwitchBadge />
+            <PauseButton />
+            <Balance />
+          </> : <WalletButton />}
           <span className="hidden sm:block" title="DI JIAHAO" aria-label="账户"><TokenAvatar symbol="u_dj" hue={160} size={36} /></span>
         </div>
       </div>
@@ -154,16 +177,37 @@ function Balance() {
 export function FooterBar() {
   return (
     <footer className="fixed inset-x-0 bottom-0 z-20 hidden h-8 items-center gap-4 border-t border-line bg-bg px-4 text-[12px] md:flex">
-      {['BTC', 'ETH', 'SOL'].map((s) => (
-        <span key={s} className="flex items-center gap-1.5"><span className="text-sub">{s}</span><span className="text-mute">--</span></span>
-      ))}
-      <span className="text-mute">行情未接入</span>
+      {isDemo()
+        ? ['BTC', 'ETH', 'SOL'].map((s) => <span key={s} className="flex items-center gap-1.5"><span className="text-sub">{s}</span><span className="text-mute">--</span></span>)
+        : <MajorPrices />}
+      {isDemo() && <span className="text-mute">行情未接入</span>}
       <span className="ml-auto flex items-center gap-3 text-sub">
-        <span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span>
-        <span>后端未接入</span><span>·</span><span>隐私</span><span>·</span><span>条款</span><span>·</span><span>帮助</span>
+        {isDemo()
+          ? <><span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span><span>后端未接入</span></>
+          : <><span className="flex items-center gap-1.5 text-up"><span className="h-1.5 w-1.5 rounded-full bg-up" />实时数据</span><span>自托管交易，每笔由你的钱包签名</span></>}
+        {LEGAL_LINKS.map(([k, l]) => <span key={k} className="flex items-center gap-3"><span>·</span><Link to={`/legal/${k}`} className="hover:text-fg">{l}</Link></span>)}
       </span>
     </footer>
   )
+}
+
+/** 底栏 BTC / ETH / SOL：WBTC、WETH、WSOL 主交易对的价格，取不到就显示「--」而不是 0。 */
+const MAJORS: [string, Chain, string][] = [
+  ['BTC', 'ethereum', '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'],
+  ['ETH', 'ethereum', '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'],
+  ['SOL', 'solana', 'So11111111111111111111111111111111111111112'],
+]
+function MajorPrices() {
+  const q = useQuery({
+    queryKey: ['majors'], refetchInterval: 60_000,
+    queryFn: async () => {
+      const [eth, sol] = await Promise.all([prices('ethereum', MAJORS.slice(0, 2).map((m) => m[2])), prices('solana', [MAJORS[2][2]])])
+      return MAJORS.map(([s, c, a]) => [s, (c === 'solana' ? sol : eth).get(a)?.priceUsd ?? null] as const)
+    },
+  })
+  return <>{(q.data ?? MAJORS.map(([s]) => [s, null] as const)).map(([s, p]) => (
+    <span key={s} className="flex items-center gap-1.5"><span className="text-sub">{s}</span><span className={p == null ? 'text-mute' : 'num text-fg'}>{p == null ? '--' : usd(p, { compact: p > 10_000 })}</span></span>
+  ))}</>
 }
 
 function ModeSwitchBadge() {
