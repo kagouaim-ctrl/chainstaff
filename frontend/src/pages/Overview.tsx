@@ -20,7 +20,8 @@ export function Overview() {
       } right={<ModeTag mode="paper" />}>
         <DataState q={pf} rows={2}>
           {(p) => {
-            const used = p.todayLossUsd / p.todayLossLimitUsd
+            const hasLimit = p.todayLossLimitUsd > 0
+            const used = hasLimit ? p.todayLossUsd / p.todayLossLimitUsd : 0
             return (
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-3 xl:grid-cols-5">
                 <Stat label="总资产（模拟）" value={usd(p.totalUsd)} sub={`可用 ${usd(p.cashUsd)}`} />
@@ -29,11 +30,11 @@ export function Overview() {
                 <Stat label="交易成本" value={usd(p.costsUsd)} sub="网络费 + 滑点 + 平台手续费" />
                 <div className="col-span-2 md:col-span-1">
                   <div className="text-xs text-sub">风险状态 · 今日亏损</div>
-                  <div className="num mt-1 text-xl font-medium sm:text-2xl">{usd(p.todayLossUsd)} <span className="text-sm font-normal text-sub">/ {usd(p.todayLossLimitUsd)}</span></div>
+                  <div className="num mt-1 text-xl font-medium sm:text-2xl">{usd(p.todayLossUsd)} <span className="text-sm font-normal text-sub">/ {hasLimit ? usd(p.todayLossLimitUsd) : '未设置上限'}</span></div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-raised" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(used * 100)} aria-label="今日亏损已用比例">
                     <div className={cx('h-full rounded-full', used > 0.8 ? 'bg-down' : used > 0.5 ? 'bg-warn' : 'bg-up')} style={{ width: `${Math.min(100, used * 100)}%` }} />
                   </div>
-                  <div className="mt-1 text-xs text-sub">已用 {(used * 100).toFixed(0)}%，到上限当日自动暂停</div>
+                  <div className="mt-1 text-xs text-sub">{hasLimit ? `已用 ${(used * 100).toFixed(0)}%，到上限当日自动暂停` : '未设置每日亏损上限，不会自动暂停'}</div>
                 </div>
               </div>
             )

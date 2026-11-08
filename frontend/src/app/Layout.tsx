@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { tr } from '@/lib/i18n'
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import { TopBar, BottomNav, FooterBar } from './Shell'
 import { DemoBanner, PauseBanner } from './Banners'
@@ -11,7 +12,7 @@ import { OrderDrawer } from '@/features/OrderDrawer'
 import { QuickBuyDialog } from '@/features/QuickBuy'
 import { AlertRunner } from '@/features/alerts'
 
-const TITLES: Record<string, string> = { '/': '发现', '/discover': '发现', '/overview': '总览', '/agents': 'AI Agent', '/activity': '动态', '/portfolio': '持仓', '/orders': '订单', '/strategy': '策略', '/new': '新币', '/smart-money': '聪明钱' }
+const TITLES: Record<string, string> = { '/': '发现', '/discover': '发现', '/overview': '总览', '/agents': 'AI Agent', '/activity': '动态', '/portfolio': '持仓', '/orders': '订单', '/strategy': '策略', '/new': '新币', '/smart-money': '聪明钱', '/paper': '模拟盘' }
 
 /** 子页面（/agents/about、/wallet/地址）用上一级的标题，只有真的没有这个页面时才写「页面不存在」 */
 export function titleOf(pathname: string): string {
@@ -25,7 +26,7 @@ export function Layout() {
   const { pathname } = useLocation()
   useEffect(() => {
     // 代币页自己设置标题（带价格）
-    if (!pathname.startsWith('/token/')) document.title = `${titleOf(pathname)} · KAGOUAI`
+    if (!pathname.startsWith('/token/')) document.title = `${tr(titleOf(pathname))} · KAGOUAI`
   }, [pathname])
   const [params, setParams] = useSearchParams()
   const agent = params.get('agent')

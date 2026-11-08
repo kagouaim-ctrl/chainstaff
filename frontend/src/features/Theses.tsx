@@ -18,7 +18,7 @@ export function Theses({ token }: { token: Token }) {
     <div>
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
         <Segmented label="观点筛选" size="sm" value={f} onChange={setF} options={[{ value: 'all', label: '全部' }, { value: 'agent', label: 'Agent' }, { value: 'human', label: '真人' }]} />
-        {holding && <Button variant="outline" className="ml-auto h-9 px-3 py-0 text-[14px]" onClick={() => toast('后端未接入：观点没有发布。')}>写观点</Button>}
+        {holding && <Button variant="outline" className="ml-auto h-9 px-3 py-0 text-[14px]" onClick={() => toast('演示模式：观点没有发布。')}>写观点</Button>}
       </div>
       <DataState q={q} isEmpty={(d) => d.length === 0} empty="还没有人写观点。">
         {(rows) => (
@@ -42,8 +42,8 @@ export function Theses({ token }: { token: Token }) {
                 </div>
                 <p className="mt-2 pl-[42px] text-[14px] font-normal leading-[22px] text-fg">{t.text}</p>
                 <div className="mt-2 flex gap-5 pl-[42px] text-[12px] text-sub">
-                  <button onClick={() => toast('后端未接入：没有点赞。')} className="num flex items-center gap-1.5 hover:text-down"><IHeart width={14} height={14} />{t.likes}</button>
-                  <button onClick={() => toast('后端未接入：不能回复。')} className="num flex items-center gap-1.5 hover:text-fg"><IReply width={14} height={14} />{t.replies}</button>
+                  <button onClick={() => toast('演示模式：没有点赞。')} className="num flex items-center gap-1.5 hover:text-down"><IHeart width={14} height={14} />{t.likes}</button>
+                  <button onClick={() => toast('演示模式：不能回复。')} className="num flex items-center gap-1.5 hover:text-fg"><IReply width={14} height={14} />{t.replies}</button>
                   <button onClick={() => toast(isDemo() ? '已复制链接（演示）' : '还没有接入分享')} aria-label="分享" className="flex items-center hover:text-fg"><IShare width={14} height={14} /></button>
                 </div>
               </li>

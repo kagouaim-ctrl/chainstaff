@@ -37,6 +37,8 @@ const MARKER_STYLE: Record<ChartMarker['kind'], { color: string; shape: SeriesMa
   risk_rejected: { color: '#FF622E', shape: 'square', position: 'aboveBar' },
   buy: { color: '#21C95E', shape: 'arrowUp', position: 'belowBar' },
   sell: { color: '#FF622E', shape: 'arrowDown', position: 'aboveBar' },
+  dev_buy: { color: '#F5A524', shape: 'circle', position: 'belowBar' },
+  dev_sell: { color: '#F5A524', shape: 'circle', position: 'aboveBar' },
 }
 
 /** K 线 + Agent 决策点（发现、NO_TRADE、风控否决、买卖）。 */

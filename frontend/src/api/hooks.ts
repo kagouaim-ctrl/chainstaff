@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { source } from './source'
+import { AGENTS_ONLINE, latestSummary } from './live'
 import type { ChartTf } from '@/domain/types'
 
 const live = () => source().info.kind === 'live'
@@ -15,6 +16,11 @@ export const useChat = (a: string) => useQuery({ queryKey: ['chat', a], queryFn:
 export const useAgentDM = () => useQuery({ queryKey: ['agentDM'], queryFn: () => source().agentDM() })
 export const useTheses = (a: string) => useQuery({ queryKey: ['theses', a], queryFn: () => source().theses(a) })
 export const useResearchSteps = (a: string) => useQuery({ queryKey: ['research', a], queryFn: () => source().research(a) })
+/** 最近一次 Agent 分析的摘要。只在接了后端时请求；分析进行中每 10 秒刷新。 */
+export const useResearchSummary = (a: string) => useQuery({
+  queryKey: ['research', a, 'summary'], queryFn: () => latestSummary(a), enabled: live() && AGENTS_ONLINE,
+  refetchInterval: (q) => (q.state.data?.status === 'running' ? 10_000 : false),
+})
 export const useTrades = (a: string) => useQuery({ queryKey: ['trades', a], queryFn: () => source().trades(a), refetchInterval: live() ? 60_000 : false })
 export const useMainAgent = () => useQuery({ queryKey: ['mainAgent'], queryFn: () => source().mainAgent() })
 export const useAgents = () => useQuery({ queryKey: ['agents'], queryFn: () => source().agents() })

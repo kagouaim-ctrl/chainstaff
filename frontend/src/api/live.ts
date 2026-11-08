@@ -8,8 +8,8 @@
 import { ROLES } from '@/domain/agents'
 import { DEFAULT_POLICY } from '@/domain/risk'
 import type {
-  AgentEvent, AgentInfo, AgentRole, ChatAuthor, ChatMessage, DataSourceStatus, DecisionStep, EventStatus, Holder,
-  Portfolio, StrategyConfig, Thesis, Token, Trade, Candle,
+  AgentEvent, AgentInfo, AgentRole, ChatAuthor, ChatMessage, DataSourceStatus, DecisionStep, EventStatus,
+  Portfolio, StrategyConfig, Thesis, Token,
 } from '@/domain/types'
 import type { DataSource } from './source'
 import * as chain from './chain'
@@ -148,6 +148,61 @@ export function runToSteps(run: Run): DecisionStep[] {
   })
 }
 
+/** 一次分析的摘要：只取后端事件里真实存在的字段，缺的就是 null，不补默认值。 */
+export interface RunSummary {
+  id: string
+  status: Run['status']
+  startedAt: string
+  updatedAt: string
+  /** 最终决定；分析没跑到这一步时为 null */
+  decision: { action: 'buy' | 'skip'; positionPct: number; blocked: string; executed: boolean } | null
+  /** 研究主管的结论 */
+  stance: { label: string; rationale: string } | null
+  /** 风控结论 */
+  review: { label: string; veto: boolean; worstCase: string } | null
+  prescreen: { passed: boolean; failed: string[] } | null
+  analysts: { name: string; score: number; confidence: number; summary: string; redFlags: string[] }[]
+  bull: string | null
+  bear: string | null
+  error: string | null
+}
+
+export function runToSummary(run: Run): RunSummary {
+  const ev = run.events
+  const last = (type: string, agent?: string) => [...ev].reverse().find((e) => e.type === type && (!agent || e.agent === agent))
+  const d = last('decision')?.decision
+  const plan = last('research_plan')?.plan as { stance?: string; rationale?: string } | null | undefined
+  const rv = last('risk_review')
+  const pre = last('prescreen')?.prescreen
+  const latest = new Map<string, RunEvent>()
+  for (const e of ev) if (e.type === 'analyst_report' && e.report) latest.set(e.agent, e)
+  const ts = ev.length ? Math.max(...ev.map((e) => e.ts)) : run.created_at
+  return {
+    id: run.id,
+    status: run.status,
+    startedAt: new Date(run.created_at * 1000).toISOString(),
+    updatedAt: new Date(ts * 1000).toISOString(),
+    decision: d ? { action: d.action, positionPct: d.position_pct, blocked: blockedText(d.blocked_by, ev), executed: d.executed } : null,
+    stance: plan?.stance ? { label: STANCE[plan.stance] ?? plan.stance, rationale: plan.rationale ?? '' } : null,
+    review: rv ? (rv.review
+      ? { label: VERDICT[rv.review.verdict] ?? rv.review.verdict, veto: rv.review.verdict === 'veto', worstCase: rv.review.worst_case }
+      : { label: '回答无法解析，按否决处理', veto: true, worstCase: '' }) : null,
+    prescreen: pre ? { passed: pre.passed, failed: pre.rules.filter((r) => r.status === 'fail').map((r) => `${r.label}（${r.detail}）`) } : null,
+    analysts: [...latest.values()].map((e) => ({
+      name: e.label ?? e.agent, score: e.report!.score, confidence: e.report!.confidence, summary: e.report!.summary, redFlags: e.report!.red_flags,
+    })),
+    bull: last('debate_message', 'Bull Researcher')?.text ?? null,
+    bear: last('debate_message', 'Bear Researcher')?.text ?? null,
+    error: last('run_failed')?.error ?? null,
+  }
+}
+
+/** 这个代币最近一次 Agent 分析的摘要；没有后端或没分析过时为 null。 */
+export async function latestSummary(mint: string): Promise<RunSummary | null> {
+  const run = await latestRun(mint)
+  return run ? runToSummary(run) : null
+}
+
 export function runToEvents(run: Run, symbolOf: (mint: string) => string): AgentEvent[] {
   return run.events.flatMap((e) => {
     const said = describe(e, run.events)
@@ -250,11 +305,13 @@ async function agents(): Promise<AgentInfo[]> {
 
 export const liveSource: DataSource = {
   info: { kind: 'live', label: '实时数据', now: () => new Date() },
-  tokens: () => AGENTS_ONLINE ? get<Token[]>('/api/tokens') : chain.tokens(),
-  token: (a) => AGENTS_ONLINE ? get<Token | null>(`/api/tokens/${encodeURIComponent(a)}`) : chain.token(a),
-  candles: async (a, tf = '5m') => ({ candles: AGENTS_ONLINE && tf === '5m' ? await get<Candle[]>(`/api/tokens/${encodeURIComponent(a)}/candles`) : await chain.candles(a, tf), markers: [] }),
-  holders: (a) => AGENTS_ONLINE ? get<Holder[]>(`/api/tokens/${encodeURIComponent(a)}/holders`) : chain.holders(a),
-  trades: (a) => AGENTS_ONLINE ? get<Trade[]>(`/api/tokens/${encodeURIComponent(a)}/trades`) : chain.trades(a),
+  // 行情、K 线、持有者、成交一直由浏览器直接读公开接口（多链、选池规则和安全分级都在前端），
+  // 接上后端后也不换成后端的 Solana 列表，免得接后端反而少了链和字段。后端只负责 Agent、社区和钱包情报。
+  tokens: () => chain.tokens(),
+  token: (a) => chain.token(a),
+  candles: async (a, tf = '5m') => ({ candles: await chain.candles(a, tf), markers: [] }),
+  holders: (a) => chain.holders(a),
+  trades: (a) => chain.trades(a),
   chat: async (a) => { const run = await latestRun(a); return run ? runToChat(run) : [] },
   theses: async (a) => { const run = await latestRun(a); return run ? runToTheses(run) : [] },
   research: async (a) => { const run = await latestRun(a); return run ? runToSteps(run) : [] },

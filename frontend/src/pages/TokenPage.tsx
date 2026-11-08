@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
+import { errText } from '@/lib/format'
 import { useWatched } from '@/features/watch'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
-import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
+import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useResearchSummary, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { TopTraders } from '@/features/WalletIntel'
@@ -17,10 +18,13 @@ import { readTrades } from '@/wallet/history'
 import { TokenChat } from '@/features/TokenChat'
 import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
+import { PaperBox } from '@/features/PaperTrading'
 import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
+import { ResearchSummaryCard } from '@/features/ResearchSummary'
 import { AGENTS_ONLINE } from '@/api/live'
 import { CHAIN_LABEL } from '@/api/chain'
+import { txUrl } from '@/wallet/chains'
 import { VerdictTag, securityFlags, riskItems, riskLevel, VERDICT, RiskStrip, QualityBadge, Masked, dataBad, qualityTitle, rugLike, ChangeCell } from '@/features/tokenBits'
 import { usd, price, age, compactCN, shortAddr, relTime, pct, duration, clock } from '@/lib/format'
 import { STATUS_LABEL, STATUS_TONE } from '@/domain/orderMachine'
@@ -74,6 +78,7 @@ function TokenView({ t }: { t: Token }) {
         <div className="hidden lg:block"><TradePanel token={t} /></div>
         <About t={t} />
         <MyPosition t={t} />
+        {!isDemo() && <PaperBox t={t} />}
         <SecurityBlock t={t} />
       </div>
       <MobileTradeBar t={t} />
@@ -157,21 +162,32 @@ function Header({ t }: { t: Token }) {
 }
 
 const TF: [ChartTf, string][] = [['1s', '1秒'], ['5s', '5秒'], ['15s', '15秒'], ['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时'], ['4h', '4小时'], ['1d', '1天']]
-const OVERLAY: Record<'mine' | 'research', MarkerKind[]> = { mine: ['buy', 'sell'], research: ['discovered', 'no_trade', 'risk_rejected'] }
+const OVERLAY: Record<'mine' | 'research' | 'dev', MarkerKind[]> = { mine: ['buy', 'sell'], research: ['discovered', 'no_trade', 'risk_rejected'], dev: ['dev_buy', 'dev_sell'] }
 
 function ChartPanel({ t }: { t: Token }) {
   const [tf, setTf] = useState<ChartTf>('5m')
   const q = useCandles(t.address, tf)
   const [unit, setUnit] = useState<'price' | 'mcap'>('price')
-  const [ov, setOv] = useState({ mine: true, research: true })
+  const [ov, setOv] = useState({ mine: true, research: true, dev: true })
+  const dev = t.security.devAddress?.toLowerCase() ?? null
+  const recent = useTrades(t.address)
+  const devTrades = !isDemo() && dev ? (recent.data ?? []).filter((x) => x.wallet?.toLowerCase() === dev) : []
   const [ind, setInd] = useState<Indicators>({ ma20: false, ema50: false })
   const live = !isDemo()
   // 市值 = 价格 × 流通量，用当前市值和价格的比值换算整条 K 线
   const factor = unit === 'mcap' && t.priceUsd > 0 ? t.mcapUsd / t.priceUsd : 1
   const mine = live ? readTrades().filter((x) => x.chain === t.chain && x.address.toLowerCase() === t.address.toLowerCase()) : []
   const tfLabel = TF.find(([v]) => v === tf)?.[1] ?? tf
+  // 放大：铺满窗口，Esc 退出
+  const [full, setFull] = useState(false)
+  useEffect(() => {
+    if (!full) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [full])
   return (
-    <section className="border-b border-line" aria-label="K 线">
+    <section className={cx('border-b border-line', full && 'fixed inset-0 z-50 overflow-auto bg-bg')} aria-label="K 线">
       <div className="scrollbar-none flex h-10 items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-line px-2 text-[13px]">
         {(live ? TF : TF.filter(([v]) => v === '5m')).map(([v, l]) => (
           <button key={v} onClick={() => setTf(v)} aria-pressed={tf === v} className={cx('rounded-md px-2 py-1', tf === v ? 'text-fg' : 'text-sub hover:text-fg')}>{l}</button>
@@ -186,6 +202,7 @@ function ChartPanel({ t }: { t: Token }) {
         <button onClick={() => setUnit('mcap')} className={cx('rounded-md px-1 py-1', unit === 'mcap' ? 'text-fg' : 'text-sub hover:text-fg')}>市值</button>
         {!live && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">演示 K 线固定 5 分钟</span>}
         {live && tf.endsWith('s') && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline" title="免费数据只有最近 300 笔成交，页面开着会一直累积；数据源本身有约半分钟延迟">秒级 K 线由最近成交合成，延迟约半分钟</span>}
+        <button onClick={() => setFull(!full)} aria-pressed={full} title={full ? '退出放大（Esc）' : '放大 K 线'} className={cx('rounded-md px-2 py-1 text-sub hover:text-fg', live && !tf.endsWith('s') && 'ml-auto')}>{full ? '退出放大' : '放大'}</button>
       </div>
       <DataState q={q} rows={1} isEmpty={(d) => d.candles.length === 0} empty="这个周期还没有 K 线数据。">
         {(d) => {
@@ -196,15 +213,19 @@ function ChartPanel({ t }: { t: Token }) {
             const bar = series.reduce((best, c) => (c.time <= x.time / 1000 && c.time > best ? c.time : best), series[0]?.time ?? 0)
             return { time: bar, kind: (x.side === 'BUY' ? 'buy' : 'sell') as MarkerKind, label: x.side === 'BUY' ? '买' : '卖' }
           }).filter((m) => m.time >= (series[0]?.time ?? 0) && m.time <= (series[series.length - 1]?.time ?? 0) + step)
-          const all = [...d.markers, ...myMarkers].filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))
+          const barOf = (ms: number) => series.reduce((best, c) => (c.time <= ms / 1000 && c.time > best ? c.time : best), series[0]?.time ?? 0)
+          const inRange = (m: ChartMarker) => m.time >= (series[0]?.time ?? 0) && m.time <= (series[series.length - 1]?.time ?? 0) + step
+          const devMarkers: ChartMarker[] = devTrades.map((x) => ({ time: barOf(Date.parse(x.at)), kind: (x.side === 'BUY' ? 'dev_buy' : 'dev_sell') as MarkerKind, label: x.side === 'BUY' ? 'Dev买' : 'Dev卖' })).filter(inRange)
+          const all = [...d.markers, ...myMarkers, ...devMarkers].filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)) && (ov.dev || !OVERLAY.dev.includes(m.kind)))
           return (
             <>
               <div className="px-1 pt-1">
-                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} viewKey={`${t.address}:${tf}:${unit}`} />
+                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} viewKey={`${t.address}:${tf}:${unit}`} height={full ? Math.max(360, window.innerHeight - 110) : undefined} />
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
                 <span>图表叠加层</span>
                 <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.mine} onChange={(e) => setOv({ ...ov, mine: e.target.checked })} className="accent-[var(--c-agent)]" />{live ? '我的买卖' : '我的 Agent 买卖'}</label>
+                {live && dev && <label className="flex cursor-pointer items-center gap-1.5 text-fg" title="只看得到最近约 300 笔成交里的 Dev 买卖，更早的不显示"><input type="checkbox" checked={ov.dev} onChange={(e) => setOv({ ...ov, dev: e.target.checked })} className="accent-[var(--c-agent)]" />{devTrades.length ? `Dev 买卖（最近 ${devTrades.length} 笔）` : 'Dev 买卖（最近成交里没有）'}</label>}
                 {!live && <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.research} onChange={(e) => setOv({ ...ov, research: e.target.checked })} className="accent-[var(--c-agent)]" />Agent 研究</label>}
               </div>
             </>
@@ -309,7 +330,7 @@ function About({ t }: { t: Token }) {
         {(t.links ?? []).map((l) => (
           <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" title={l.url} className="flex h-9 items-center rounded-lg bg-panel px-3 text-[14px] hover:bg-raised">{l.label}</a>
         ))}
-        <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜 ${t.symbol}</a>
+        <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />{`在 X 上搜 $${t.symbol}`}</a>
         <a href={`https://x.com/search?q=${encodeURIComponent(t.address)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜合约地址</a>
       </div>
       {!isDemo() && !(t.links ?? []).length && <p className="mt-2 text-[12px] font-normal text-sub">项目方没有在 DexScreener 登记官网或社交账号。</p>}
@@ -398,6 +419,9 @@ function Holders({ t }: { t: Token }) {
     <DataState q={q} isEmpty={(d) => d.length === 0}>
       {(all) => {
         const rows = all.filter((h) => (!agentOnly || h.kind === 'agent') && (!thesisOnly || h.hasThesis))
+        // 没有数据的列不显示，免得一整列「--」
+        const showPnl = all.some((h) => h.pnlPct != null)
+        const showHeld = all.some((h) => h.heldMinutes != null)
         return (
           <div>
             <HolderBar all={all} top10={t.security.top10Pct} />
@@ -410,7 +434,7 @@ function Holders({ t }: { t: Token }) {
                 <thead className="text-xs text-sub"><tr className="border-y border-line">
                   <th className="px-4 py-2 text-left font-normal">持有者</th>
                   <th className="px-2 py-2 text-right font-normal">持仓</th><th className="px-2 py-2 text-right font-normal">占比</th>
-                  <th className="px-2 py-2 text-right font-normal">盈亏</th><th className="px-4 py-2 text-right font-normal">持有时长</th>
+                  {showPnl && <th className="px-2 py-2 text-right font-normal">盈亏</th>}{showHeld && <th className="px-4 py-2 text-right font-normal">持有时长</th>}
                 </tr></thead>
                 <tbody>
                   {rows.map((h) => (
@@ -422,8 +446,8 @@ function Holders({ t }: { t: Token }) {
                       </td>
                       <td className="num px-2 py-2.5 text-right">{usd(h.amountUsd)}</td>
                       <td className="num px-2 py-2.5 text-right">{h.pct.toFixed(2)}%</td>
-                      <td className="px-2 py-2.5 text-right"><Pct v={h.pnlPct} digits={1} /></td>
-                      <td className="num px-4 py-2.5 text-right text-sub">{h.heldMinutes === null ? '--' : duration(h.heldMinutes * 60000)}</td>
+                      {showPnl && <td className="px-2 py-2.5 text-right"><Pct v={h.pnlPct} digits={1} /></td>}
+                      {showHeld && <td className="num px-4 py-2.5 text-right text-sub">{h.heldMinutes == null ? '--' : duration(h.heldMinutes * 60000)}</td>}
                     </tr>
                   ))}
                 </tbody>
@@ -452,6 +476,9 @@ function HolderBar({ all, top10 }: { all: Holder[]; top10: number | null }) {
   )
 }
 
+/** 单笔成交达到这个金额就标「大额」 */
+const BIG_TRADE_USD = 5_000
+
 function Trades({ t }: { t: Token }) {
   const q = useTrades(t.address)
   const [side, setSide] = useState<'all' | 'BUY' | 'SELL'>('all')
@@ -460,6 +487,8 @@ function Trades({ t }: { t: Token }) {
     <DataState q={q} isEmpty={(d) => d.length === 0} empty="还没有成交。">
       {(all) => {
         const rows = all.filter((r) => (side === 'all' || r.side === side) && (!agentOnly || r.kind === 'agent'))
+        const showAmt = all.some((r) => r.amount != null)
+        const showTx = all.some((r) => r.tx)
         return (
         <div className="overflow-x-auto">
           <div className="flex items-center gap-3 px-4 py-2.5">
@@ -470,16 +499,20 @@ function Trades({ t }: { t: Token }) {
           <table className="w-full min-w-[560px] text-[13px]">
             <thead className="text-xs text-sub"><tr className="border-b border-line">
               <th className="px-4 py-2 text-left font-normal">时间</th><th className="px-2 py-2 text-left font-normal">方向</th>
-              <th className="px-2 py-2 text-left font-normal">交易者</th><th className="px-2 py-2 text-right font-normal">金额</th><th className="px-4 py-2 text-right font-normal">价格</th>
+              <th className="px-2 py-2 text-left font-normal">交易者</th><th className="px-2 py-2 text-right font-normal">金额</th>
+              {showAmt && <th className="px-2 py-2 text-right font-normal">数量</th>}<th className="px-2 py-2 text-right font-normal">价格</th>
+              {showTx && <th className="px-4 py-2 text-right font-normal"><span className="sr-only">交易</span></th>}
             </tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-line last:border-0">
                   <td className="num px-4 py-2 text-xs text-sub">{relTime(r.at, now())}</td>
                   <td className={cx('px-2 py-2', r.side === 'BUY' ? 'text-up' : 'text-down')}>{r.side === 'BUY' ? '买' : '卖'}</td>
-                  <td className="px-2 py-2"><span className="flex items-center gap-1.5"><TokenAvatar symbol={r.who} hue={r.who.length * 37 % 360} size={20} />{r.kind === 'agent' ? <>{r.who} <span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span> <span className="text-xs text-sub">{r.owner}</span></> : <span className="num text-[13px] text-sub">{shortAddr(r.who, 4, 4)}</span>}</span></td>
-                  <td className={cx('num px-2 py-2 text-right', r.side === 'BUY' ? 'text-up' : 'text-down')}>{usd(r.usd)}</td>
-                  <td className="num px-4 py-2 text-right">{price(r.price)}</td>
+                  <td className="px-2 py-2"><span className="flex items-center gap-1.5"><TokenAvatar symbol={r.who} hue={r.who.length * 37 % 360} size={20} />{r.kind === 'agent' ? <>{r.who} <span className="rounded bg-agent/15 px-1 text-[10px] text-agent">AI</span> <span className="text-xs text-sub">{r.owner}</span></> : (r.wallet && t.chain === 'solana' ? <Link to={`/wallet/${r.wallet}`} className="num text-[13px] text-sub hover:text-fg hover:underline" title="查看这个钱包">{shortAddr(r.wallet, 4, 4)}</Link> : <span className="num text-[13px] text-sub">{shortAddr(r.who, 4, 4)}</span>)}</span></td>
+                  <td className={cx('num px-2 py-2 text-right', r.side === 'BUY' ? 'text-up' : 'text-down', r.usd >= BIG_TRADE_USD && 'font-semibold')}>{usd(r.usd)}{r.usd >= BIG_TRADE_USD && <span className="ml-1 rounded bg-paper/15 px-1 text-[10px] font-normal text-paper">大额</span>}</td>
+                  {showAmt && <td className="num px-2 py-2 text-right text-sub">{r.amount != null ? compactCN(r.amount) : '--'}</td>}
+                  <td className="num px-2 py-2 text-right">{price(r.price)}</td>
+                  {showTx && <td className="px-4 py-2 text-right text-xs">{r.tx ? <a href={txUrl(t.chain, r.tx)} target="_blank" rel="noreferrer" className="text-sub hover:text-fg">浏览器</a> : ''}</td>}
                 </tr>
               ))}
             </tbody>
@@ -529,9 +562,26 @@ function Research({ t }: { t: Token }) {
   const orders = useOrders()
   const steps = useResearchSteps(t.address)
   const research = useResearch()
+  const summary = useResearchSummary(t.address)
   const o = (orders.data ?? []).find((x) => x.token.address === t.address)
+  if (!isDemo() && AGENTS_ONLINE) {
+    // 实时模式：行情来自公开接口，代币上没有研究状态，以后端最近一次分析为准
+    const s = summary.data
+    const btn = s?.status !== 'running' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{s ? '重新研究' : '交给 Agent 研究'}</Button>
+    if (summary.isPending) return <p className="p-6 text-center text-[13px] text-sub" aria-busy="true">正在读取 Agent 研究记录…</p>
+    if (summary.isError) return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>研究记录暂时读不到（{errText(summary.error, '后端没有响应')}），稍后再试。</p>{btn}</div>
+    if (!s) return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。交给 Agent 后，多个分析师会读链上、安全和行情数据，辩论后给出结论。</p>{btn}</div>
+    const steps2 = steps.data ?? []
+    return (
+      <div className="space-y-4 p-4">
+        <div className="flex justify-end">{btn}</div>
+        <ResearchSummaryCard s={s} />
+        {steps2.length > 0 ? <DecisionChain steps={steps2} /> : s.status === 'running' && <p className="text-[13px] text-sub">研究中：分析师正在读数据，发言会陆续出现。</p>}
+      </div>
+    )
+  }
   const again = AGENTS_ONLINE && t.verdict !== 'researching' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{t.verdict === 'unresearched' ? '交给 Agent 研究' : '重新研究'}</Button>
-  if (t.verdict === 'unresearched') return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。{isDemo() ? '点发现页的「交给 Agent」开始研究（后端未接入）。' : AGENTS_ONLINE ? '' : 'Agent 分析还没上线。'}</p>{again}</div>
+  if (t.verdict === 'unresearched') return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。{isDemo() ? '点发现页的「交给 Agent」开始研究（演示模式）。' : AGENTS_ONLINE ? '' : 'Agent 分析还没上线。'}</p>{again}</div>
   const live = steps.data ?? []
   if (t.verdict === 'researching' && live.length === 0) return <p className="p-6 text-center text-[13px] text-sub">研究中：链上、安全、情绪、量化并行分析，完成后主 Agent 给出结论。</p>
   return (

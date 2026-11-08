@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { errText } from '@/lib/format'
 import { useEffect, useId, useRef, type ReactNode, useState } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import type { AgentStatus, Mode } from '@/domain/types'
@@ -160,7 +161,7 @@ export function DataState<T>({ q, empty, isEmpty, children, rows = 4, notConnect
   if (q.isPending) return <div className="space-y-2 p-4" aria-busy="true" aria-label="加载中">{Array.from({ length: rows }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
   if (q.isError) return (
     <div role="alert" className="flex flex-col items-start gap-2 p-4 text-sm">
-      <p className="text-down">加载失败：{(q.error as Error)?.message ?? '未知错误'}</p>
+      <p className="text-down">加载失败：{errText(q.error)}</p>
       <p className="text-sub">可能是后端服务不可用或网络中断，数据显示的是最后一次成功获取的结果。</p>
       <Button variant="outline" onClick={() => q.refetch()}>重试</Button>
     </div>

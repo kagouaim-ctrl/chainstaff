@@ -4,7 +4,7 @@ import { IAlert, IClose } from '@/components/icons'
 export function Toast() {
   const { msg, clear } = useToast()
   if (!msg) return null
-  const warn = msg.startsWith('后端未接入')
+  const warn = msg.startsWith('演示模式')
   return (
     <div role="status" className="anim-enter fixed bottom-20 left-1/2 z-[60] flex w-[min(92vw,440px)] -translate-x-1/2 items-start gap-2.5 rounded-xl border border-line bg-raised px-4 py-3 text-[13px] font-normal leading-5 shadow-[0_8px_32px_rgba(0,0,0,.5)] md:bottom-12">
       {warn && <IAlert className="mt-0.5 shrink-0 text-warn" />}

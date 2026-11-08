@@ -65,7 +65,7 @@ describe('紧急暂停', () => {
     renderRoute('/overview')
     await u.click(screen.getAllByRole('button', { name: '紧急暂停' })[0])
     const dlg = screen.getByRole('dialog', { name: '确认紧急暂停？' })
-    expect(within(dlg).getByText(/后端未接入/)).toBeInTheDocument()
+    expect(within(dlg).getByText(/演示模式/)).toBeInTheDocument()
     await u.click(within(dlg).getByRole('button', { name: '确认暂停' }))
     expect(useApp.getState().paused).toBe(true)
     expect(await screen.findByText(/仍在追踪确认/)).toBeInTheDocument()

@@ -67,3 +67,10 @@ input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--c-agent); 
   .anim-enter, .anim-drawer, .anim-pulse, .anim-sheet { animation: none !important; }
   * { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* 数值变化时闪一下：涨绿跌红，0.6 秒 */
+@keyframes flash-up { from { background: color-mix(in srgb, var(--c-up) 22%, transparent); } to { background: transparent; } }
+@keyframes flash-down { from { background: color-mix(in srgb, var(--c-down) 22%, transparent); } to { background: transparent; } }
+.flash-up { animation: flash-up .6s ease-out; }
+.flash-down { animation: flash-down .6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .flash-up, .flash-down { animation: none; } }

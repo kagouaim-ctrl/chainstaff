@@ -10,7 +10,7 @@ import { DataState, Segmented, TokenAvatar, Chg, cx } from '@/components/ui'
 import { IStar, IBot } from '@/components/icons'
 import { VerdictTag, SecurityBadge, riskLevel, QualityBadge, Masked, dataBad, rugLike, ChangeCell } from '@/features/tokenBits'
 import { QuickBuyButton } from '@/features/QuickBuy'
-import { COLS, ALL_COLS, useColumns, visibleCols, type ColKey } from '@/features/columns'
+import { COLS, ALL_COLS, useColumns, visibleCols, FlashTd, type ColKey } from '@/features/columns'
 import { AGENTS_ONLINE } from '@/api/live'
 import { usd, price, age, relTime } from '@/lib/format'
 import type { Timeframe, Token, Chain } from '@/domain/types'
@@ -121,9 +121,13 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
   const watched = useWatched(q.data)
   // 自选页签用合并后的自选列表（包括不在热门列表里的代币）
   const base = tab === 'watch' ? watched : q.data ?? []
-  const rows = filterTokens(base, { tab, tf, safeOnly, strictSafe, minMcap, launchpad, chain, watch, sort, dir })
+  const fresh = filterTokens(base, { tab, tf, safeOnly, strictSafe, minMcap, launchpad, chain, watch, sort, dir })
+  // 鼠标停在表格上时冻结行顺序，免得要点的那一行被刷新挤走；数值照常更新
+  const [frozen, setFrozen] = useState<string[] | null>(null)
+  const byAddr = new Map(fresh.map((t) => [t.address, t]))
+  const rows = frozen ? frozen.flatMap((a) => byAddr.get(a) ?? []) : fresh
   const demo = isDemo()
-  const demoBuy = (t: Token) => toast(`后端未接入：没有下单。接入后「+ $10」会把 ${t.symbol} 的模拟买入交给风控审批。`)
+  const demoBuy = (t: Token) => toast(`演示模式：没有下单。接入后「+ $10」会把 ${t.symbol} 的模拟买入交给风控审批。`)
   // 实时模式只显示有数据的分类：没有 Agent 后端就没有「Agent 在买」，没有认证数据就没有「蓝筹币」
   // 所有分类都保留；当前没有数据的分类显示空状态说明，不隐藏入口
   const tabs = TABS
@@ -166,6 +170,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
               <option value="all">链：全部</option>{(Object.keys(CHAIN_LABEL) as Chain[]).map((c) => <option key={c} value={c}>{CHAIN_LABEL[c]}</option>)}
             </select>}
         <ColumnMenu />
+        {frozen && <span role="status" className="hidden text-[12px] text-sub md:inline">鼠标在表格上，排序暂停刷新</span>}
         <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-[14px] text-sub">
           <input type="checkbox" checked={strictSafe} onChange={(e) => setStrictSafe(e.target.checked)} className="accent-[var(--c-agent)]" />只看安全
         </label>
@@ -190,7 +195,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                     {showAgent && <th className="px-3 text-left font-normal">Agent</th>}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody onMouseEnter={() => setFrozen(fresh.map((t) => t.address))} onMouseLeave={() => setFrozen(null)}>
                   {rows.map((t) => {
                     const w = watch[t.address] ?? t.watch
                     return (
@@ -226,7 +231,7 @@ function TokenTable({ initial, compact }: { initial: TabKey; compact?: boolean }
                             <div className="ml-auto flex w-28 items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-raised"><div className="h-full rounded-full bg-up" style={{ width: `${t.bondingPct ?? 0}%` }} /></div><span className="num w-9 text-xs">{t.bondingPct ?? '--'}%</span></div>
                           </td>
                         )}
-                        {cols.map((c) => <td key={c.key} className="num whitespace-nowrap px-3 text-right">{c.cell(t, tf)}</td>)}
+                        {cols.map((c) => <FlashTd key={c.key} v={c.value(t, tf)} className="num whitespace-nowrap px-3 text-right">{c.cell(t, tf)}</FlashTd>)}
                         {showAgent && <td className="px-3"><VerdictTag v={t.verdict} /></td>}
                       </tr>
                     )

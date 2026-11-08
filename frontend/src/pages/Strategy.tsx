@@ -131,7 +131,7 @@ export function Strategy() {
           <Button onClick={() => setConfirm(0)}>取消</Button>
           {confirm === 1 && loosen
             ? <Button variant="danger" onClick={() => setConfirm(2)}>继续</Button>
-            : <Button variant={loosen ? 'down' : 'primary'} onClick={() => { setConfirm(0); toast('后端未接入：参数没有保存，也没有写入审计日志。') }}>确认保存</Button>}
+            : <Button variant={loosen ? 'down' : 'primary'} onClick={() => { setConfirm(0); toast('演示模式：参数没有保存，也没有写入审计日志。') }}>确认保存</Button>}
         </>}>
         <ul className="space-y-1.5">
           {changes.map((c) => (

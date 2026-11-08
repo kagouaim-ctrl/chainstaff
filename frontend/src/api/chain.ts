@@ -145,6 +145,7 @@ function solanaSecurity(report: Json, sell: Json | undefined): SecurityCheck {
     transferFeeBps: fee == null ? null : Math.round(fee * 100),
     top10Pct: holders.length ? holders.slice(0, 10).reduce((s, h) => s + (h.pct ?? 0), 0) : null,
     devHoldPct: supply && creator != null ? (creator / supply) * 100 : null,
+    devAddress: typeof report.creator === 'string' && report.creator ? report.creator : null,
     checkedAt: new Date().toISOString(),
   }
 }
@@ -170,6 +171,7 @@ export function evmSecurity(g: Json): SecurityCheck {
     transferFeeBps: taxes.length ? Math.round(Math.max(...taxes) * 10_000) : null,
     top10Pct: g.holders ? people.slice(0, 10).reduce((s: number, h: Json) => s + (Number(h.percent) || 0) * 100, 0) : null,
     devHoldPct: creator == null ? null : creator * 100,
+    devAddress: typeof g.creator_address === 'string' && g.creator_address ? g.creator_address : null,
     checkedAt: new Date().toISOString(),
   }
 }
@@ -416,6 +418,7 @@ export async function trades(mint: string): Promise<Trade[]> {
       id: `${t.tx_hash ?? ''}-${i}`, at: t.block_timestamp, side: buy ? 'BUY' : 'SELL',
       who: w ? `${w.slice(0, 4)}…${w.slice(-4)}` : '未知', kind: 'wallet',
       usd: num(t.volume_in_usd) ?? 0, price: num(buy ? t.price_to_in_usd : t.price_from_in_usd) ?? 0,
+      amount: num(buy ? t.to_token_amount : t.from_token_amount), tx: t.tx_hash || undefined, wallet: w || undefined,
     }
   })
 }
@@ -439,12 +442,18 @@ export async function holders(addr: string): Promise<Holder[]> {
   }))
 }
 
-export interface SearchHit { chain: Chain; address: string; symbol: string; name: string; liquidityUsd: number; volumeH24: number; priceUsd: number | null }
+export interface SearchHit { chain: Chain; address: string; symbol: string; name: string; liquidityUsd: number; volumeH24: number; priceUsd: number | null; ageMinutes: number | null }
 
 /**
  * 在 DexScreener 上按名称、符号或地址搜三条链的代币。
  * 按 24 小时总成交额排序：骗子盘常常报出离谱的流动性，但很难有真实成交。
  */
+/** 最早一个池子创建到现在的分钟数；都没有创建时间时为 null */
+function oldest(pools: Json[]): number | null {
+  const ts = pools.map((p) => Number(p.pairCreatedAt)).filter((x) => x > 0)
+  return ts.length ? Math.max(0, Math.round((Date.now() - Math.min(...ts)) / 60_000)) : null
+}
+
 export async function search(q: string): Promise<SearchHit[]> {
   const term = q.trim()
   if (term.length < 2) return []
@@ -468,6 +477,7 @@ export async function search(q: string): Promise<SearchHit[]> {
     return {
       chain: p.chainId, address: p.baseToken.address, symbol: p.baseToken.symbol ?? '', name: p.baseToken.name ?? '',
       liquidityUsd: pools.reduce((s: number, x: Json) => s + liq(x), 0), volumeH24: volume, priceUsd: bad ? null : num(p.priceUsd),
+      ageMinutes: oldest(pools),
     }
   })
 }

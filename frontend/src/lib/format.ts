@@ -87,3 +87,11 @@ export function duration(ms: number): string {
   if (h < 48) return `${h} 小时 ${m % 60} 分`
   return `${Math.floor(h / 24)} 天 ${h % 24} 小时`
 }
+
+/** 把浏览器的英文网络错误换成用户看得懂的话；其他错误原样返回。 */
+export function errText(e: unknown, fallback = '未知错误'): string {
+  const m = e instanceof Error ? e.message : typeof e === 'string' ? e : ''
+  if (!m) return fallback
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(m)) return '网络连不上服务器，稍后会自动重试'
+  return m
+}

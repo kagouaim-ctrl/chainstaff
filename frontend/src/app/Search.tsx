@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { isDemo, useAgents, useOrders, useTokens } from '@/api/hooks'
 import { ISearch } from '@/components/icons'
 import { TokenAvatar, cx } from '@/components/ui'
-import { shortAddr, usd } from '@/lib/format'
+import { age, shortAddr, usd } from '@/lib/format'
 import { CHAIN_LABEL, isAddress, search } from '@/api/chain'
 import type { AgentInfo, Order, Token } from '@/domain/types'
 
@@ -72,11 +72,17 @@ export function SearchPalette() {
     const seen = new Set(local.filter((h) => h.kind === 'token').map((h) => h.token.address.toLowerCase()))
     const extra: Hit[] = (term === q.trim() ? remote.data ?? [] : []).filter((r) => !seen.has(r.address.toLowerCase())).map((r) => ({
       kind: 'token', key: `s${r.chain}${r.address}`, title: r.symbol,
-      sub: `${r.name} · ${CHAIN_LABEL[r.chain]} · 24h 成交 ${usd(r.volumeH24, { compact: true })} · ${shortAddr(r.address)}`,
+      sub: `${r.name} · ${CHAIN_LABEL[r.chain]} · 流动性 ${usd(r.liquidityUsd, { compact: true })} · 24h 成交 ${usd(r.volumeH24, { compact: true })}${r.ageMinutes != null ? ` · ${age(r.ageMinutes)}` : ''} · ${shortAddr(r.address)}`,
       token: { address: r.address, symbol: r.symbol, name: r.name, hue: 0, chain: r.chain } as Token,
     }))
     return [...local.filter((h) => h.kind === 'token'), ...extra, ...local.filter((h) => h.kind !== 'token')].slice(0, 20)
   }, [local, remote.data, term, q])
+  // 同一个符号对应多个合约时提醒核对，仿盘常用同名
+  const dupes = useMemo(() => {
+    const n = new Map<string, number>()
+    for (const h of hits) if (h.kind === 'token') n.set(h.title.toLowerCase(), (n.get(h.title.toLowerCase()) ?? 0) + 1)
+    return [...n.entries()].filter(([, c]) => c > 1)
+  }, [hits])
   const searching = !isDemo() && q.trim().length >= 2 && !isAddress(q.trim()) && (term !== q.trim() || remote.isFetching)
 
   useEffect(() => {
@@ -118,6 +124,7 @@ export function SearchPalette() {
           <kbd className="rounded border border-line px-1.5 text-[11px] text-sub">Esc</kbd>
         </div>
         <ul role="listbox" aria-label="搜索结果" className="max-h-[50vh] overflow-y-auto p-1.5">
+          {dupes.length > 0 && <li role="note" className="mx-1.5 mb-1 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">{dupes.map(([sym, c]) => `有 ${c} 个叫「${sym.toUpperCase()}」的代币`).join('，')}，名字可以随便起，请核对合约地址。已按成交额排序，流动性和币龄写在每一行里。</li>}
           {q && hits.length === 0 && <li className="p-4 text-center text-sm text-sub">{searching ? '正在搜索…' : remote.isError ? '搜索暂时不可用，可以直接粘贴合约地址。' : `没有找到「${q}」。可以输入代币名称、符号或完整的合约地址。`}</li>}
           {!q && <Suggest tokens={tokens.data ?? []} onPick={(t) => go({ kind: 'token', key: t.address, title: t.symbol, sub: t.name, token: t })} />}
           {hits.map((h, i) => (

@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import { prices } from '@/api/chain'
 import type { Chain } from '@/domain/types'
 import { WALLETS_ONLINE } from '@/api/wallets'
+import { useLang } from '@/lib/i18n'
 
 /** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。演示模式的入口。 */
 const DEMO_NAV = [
@@ -30,6 +31,7 @@ const LIVE_NAV = [
   { to: '/activity', label: '动态', icon: IPulse, end: false, mobile: true },
   { to: '/orders', label: '交易', icon: IList, end: false, mobile: false },
   { to: '/strategy', label: '策略', icon: ISliders, end: false, mobile: true },
+  { to: '/paper', label: '模拟盘', icon: ISpark, end: false, mobile: false },
   // 钱包情报要后端和 Birdeye 密钥，没有后端时不放入口
   ...(WALLETS_ONLINE ? [{ to: '/smart-money', label: '聪明钱', icon: IPulse, end: false, mobile: false }] : []),
   { to: '/portfolio', label: '持仓', icon: IPie, end: false, mobile: true },
@@ -64,7 +66,7 @@ export function TopBar() {
         <nav aria-label="主导航" className="hidden items-center gap-1 lg:flex">
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end}
-              className={({ isActive }) => cx('rounded-lg px-3 py-2 text-[14px] leading-5', isActive ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
+              className={({ isActive }) => cx('whitespace-nowrap rounded-lg px-3 py-2 text-[14px] leading-5', isActive ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
               {n.label}
             </NavLink>
           ))}
@@ -81,6 +83,7 @@ export function TopBar() {
         </button>
 
         <div className="flex shrink-0 items-center gap-2">
+          <LangButton />
           {isDemo() ? <>
             <ModeSwitchBadge />
             <PauseButton />
@@ -90,6 +93,18 @@ export function TopBar() {
         </div>
       </div>
     </header>
+  )
+}
+
+/** 中文 / English 切换。英文按词表替换界面文字，没翻译到的保持中文。 */
+function LangButton() {
+  const { lang, set } = useLang()
+  return (
+    <button onClick={() => set(lang === 'en' ? 'zh' : 'en')} data-no-i18n
+      aria-label={lang === 'en' ? '切换到中文' : 'Switch to English'} title={lang === 'en' ? '切换到中文' : 'Switch to English'}
+      className="h-11 shrink-0 rounded-lg border border-line px-2.5 text-[13px] text-sub hover:text-fg">
+      {lang === 'en' ? '中文' : 'EN'}
+    </button>
   )
 }
 
@@ -183,7 +198,7 @@ export function FooterBar() {
       {isDemo() && <span className="text-mute">行情未接入</span>}
       <span className="ml-auto flex items-center gap-3 text-sub">
         {isDemo()
-          ? <><span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span><span>后端未接入</span></>
+          ? <><span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span><span>样例数据</span></>
           : <><span className="flex items-center gap-1.5 text-up"><span className="h-1.5 w-1.5 rounded-full bg-up" />实时数据</span><span>自托管交易，每笔由你的钱包签名</span></>}
         {LEGAL_LINKS.map(([k, l]) => <span key={k} className="flex items-center gap-3"><span>·</span><Link to={`/legal/${k}`} className="hover:text-fg">{l}</Link></span>)}
       </span>
@@ -247,7 +262,7 @@ function PauseButton({ rail }: { rail?: boolean }) {
           <li>研究任务可以继续运行，但不会下单。</li>
           <li>恢复前会先对账链上余额和订单状态。</li>
         </ul>
-        <p className="mt-3 rounded-lg border border-dashed border-warn/50 p-2.5 text-warn">后端未接入：现在点确认只会在本页面显示暂停状态，不会真正通知任何服务。</p>
+        <p className="mt-3 rounded-lg border border-dashed border-warn/50 p-2.5 text-warn">演示模式：现在点确认只会在本页面显示暂停状态，不会真正通知任何服务。</p>
       </Dialog>
     </>
   )

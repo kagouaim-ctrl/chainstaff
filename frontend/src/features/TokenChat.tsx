@@ -128,7 +128,7 @@ export function TokenChat({ token }: { token: Token }) {
       </DataState>
       <div className="border-t border-line p-3">
         {everHeld ? (
-          <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (!text.trim()) return; toast('后端未接入：消息没有发送。'); setText('') }}>
+          <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (!text.trim()) return; toast('演示模式：消息没有发送。'); setText('') }}>
             <input value={text} onChange={(e) => setText(e.target.value)} aria-label="发言" placeholder={`发消息… @${ma.data?.name ?? 'Agent'} 可以让它回你`}
               className="h-10 min-w-0 flex-1 rounded-full border border-line bg-bg px-4 text-[14px] outline-none placeholder:text-sub focus:border-agent" />
             <button type="submit" aria-label="发送" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-agent text-white disabled:opacity-40" disabled={!text.trim()}>

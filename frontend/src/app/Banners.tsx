@@ -17,7 +17,7 @@ export function DemoBanner() {
     <div role="note" className="border-b border-line">
       <div className="flex items-center gap-2 px-4 py-2 text-[12px] font-normal text-sub">
         <span className="shrink-0 font-medium text-warn">演示数据</span>
-        <span className="truncate">后端未接入，行情、Agent、群聊和交易都是固定样例，不是真实数据，也不会变化。</span>
+        <span className="truncate">这是演示模式：行情、Agent、群聊和交易都是固定样例，不是真实数据，也不会变化。</span>
       </div>
     </div>
   )
