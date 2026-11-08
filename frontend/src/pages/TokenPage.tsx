@@ -225,7 +225,7 @@ function ChartPanel({ t }: { t: Token }) {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
                 <span>图表叠加层</span>
                 <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.mine} onChange={(e) => setOv({ ...ov, mine: e.target.checked })} className="accent-[var(--c-agent)]" />{live ? '我的买卖' : '我的 Agent 买卖'}</label>
-                {live && dev && <label className="flex cursor-pointer items-center gap-1.5 text-fg" title="只看得到最近约 300 笔成交里的 Dev 买卖，更早的不显示"><input type="checkbox" checked={ov.dev} onChange={(e) => setOv({ ...ov, dev: e.target.checked })} className="accent-[var(--c-agent)]" />Dev 买卖{devTrades.length ? `（最近 ${devTrades.length} 笔）` : '（最近成交里没有）'}</label>}
+                {live && dev && <label className="flex cursor-pointer items-center gap-1.5 text-fg" title="只看得到最近约 300 笔成交里的 Dev 买卖，更早的不显示"><input type="checkbox" checked={ov.dev} onChange={(e) => setOv({ ...ov, dev: e.target.checked })} className="accent-[var(--c-agent)]" />{devTrades.length ? `Dev 买卖（最近 ${devTrades.length} 笔）` : 'Dev 买卖（最近成交里没有）'}</label>}
                 {!live && <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.research} onChange={(e) => setOv({ ...ov, research: e.target.checked })} className="accent-[var(--c-agent)]" />Agent 研究</label>}
               </div>
             </>
@@ -330,7 +330,7 @@ function About({ t }: { t: Token }) {
         {(t.links ?? []).map((l) => (
           <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" title={l.url} className="flex h-9 items-center rounded-lg bg-panel px-3 text-[14px] hover:bg-raised">{l.label}</a>
         ))}
-        <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜 ${t.symbol}</a>
+        <a href={`https://x.com/search?q=${encodeURIComponent('$' + t.symbol)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />{`在 X 上搜 $${t.symbol}`}</a>
         <a href={`https://x.com/search?q=${encodeURIComponent(t.address)}&f=live`} target="_blank" rel="noreferrer" className="flex h-9 items-center gap-1.5 rounded-lg bg-panel px-3 text-[14px] hover:bg-raised"><ISearch />在 X 上搜合约地址</a>
       </div>
       {!isDemo() && !(t.links ?? []).length && <p className="mt-2 text-[12px] font-normal text-sub">项目方没有在 DexScreener 登记官网或社交账号。</p>}

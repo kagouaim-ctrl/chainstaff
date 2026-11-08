@@ -58,7 +58,7 @@ export function CommunityChat({ t }: { t: Token }) {
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-[12px] text-sub">
         <span className="font-medium text-fg">{t.symbol} 群</span>
-        <span className="num">{people} 个钱包发过言</span>
+        <span className="num">{`${people} 个钱包发过言`}</span>
       </div>
       {q.isError
         ? <p role="alert" className="p-4 text-[13px] text-down">{errText(q.error)}</p>

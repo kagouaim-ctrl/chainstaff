@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { tr } from '@/lib/i18n'
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import { TopBar, BottomNav, FooterBar } from './Shell'
 import { DemoBanner, PauseBanner } from './Banners'
@@ -25,7 +26,7 @@ export function Layout() {
   const { pathname } = useLocation()
   useEffect(() => {
     // 代币页自己设置标题（带价格）
-    if (!pathname.startsWith('/token/')) document.title = `${titleOf(pathname)} · KAGOUAI`
+    if (!pathname.startsWith('/token/')) document.title = `${tr(titleOf(pathname))} · KAGOUAI`
   }, [pathname])
   const [params, setParams] = useSearchParams()
   const agent = params.get('agent')

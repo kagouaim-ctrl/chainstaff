@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import { prices } from '@/api/chain'
 import type { Chain } from '@/domain/types'
 import { WALLETS_ONLINE } from '@/api/wallets'
+import { useLang } from '@/lib/i18n'
 
 /** 一级入口：照 fomo 网页版放在顶栏（手机上是底部悬浮导航）。发现是首页。演示模式的入口。 */
 const DEMO_NAV = [
@@ -65,7 +66,7 @@ export function TopBar() {
         <nav aria-label="主导航" className="hidden items-center gap-1 lg:flex">
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end}
-              className={({ isActive }) => cx('rounded-lg px-3 py-2 text-[14px] leading-5', isActive ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
+              className={({ isActive }) => cx('whitespace-nowrap rounded-lg px-3 py-2 text-[14px] leading-5', isActive ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
               {n.label}
             </NavLink>
           ))}
@@ -82,6 +83,7 @@ export function TopBar() {
         </button>
 
         <div className="flex shrink-0 items-center gap-2">
+          <LangButton />
           {isDemo() ? <>
             <ModeSwitchBadge />
             <PauseButton />
@@ -91,6 +93,18 @@ export function TopBar() {
         </div>
       </div>
     </header>
+  )
+}
+
+/** 中文 / English 切换。英文按词表替换界面文字，没翻译到的保持中文。 */
+function LangButton() {
+  const { lang, set } = useLang()
+  return (
+    <button onClick={() => set(lang === 'en' ? 'zh' : 'en')} data-no-i18n
+      aria-label={lang === 'en' ? '切换到中文' : 'Switch to English'} title={lang === 'en' ? '切换到中文' : 'Switch to English'}
+      className="h-11 shrink-0 rounded-lg border border-line px-2.5 text-[13px] text-sub hover:text-fg">
+      {lang === 'en' ? '中文' : 'EN'}
+    </button>
   )
 }
 
