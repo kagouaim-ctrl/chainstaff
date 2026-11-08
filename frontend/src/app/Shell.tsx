@@ -42,15 +42,39 @@ export const NAV = isDemo() ? DEMO_NAV : LIVE_NAV
 const MOBILE_EXTRA = isDemo() ? [{ to: '/portfolio', label: '资产', icon: IPie, end: false, mobile: true }] : []
 
 export function BottomNav() {
+  // 底部放不下全部入口：其余的（交易、模拟盘、聪明钱、帮助）收进「更多」
+  const [more, setMore] = useState(false)
+  const loc = useLocation()
+  useEffect(() => setMore(false), [loc.pathname])
+  const rest = NAV.filter((n) => !n.mobile)
   return (
-    <nav aria-label="主导航（手机）" className="fixed inset-x-0 bottom-3 z-30 flex justify-center px-4 md:hidden">
+    <nav aria-label="主导航（手机）" className="fixed inset-x-0 bottom-3 z-30 flex justify-center px-4 lg:hidden">
+      {more && (
+        <>
+          <button aria-label="关闭更多" className="fixed inset-0 -z-10 cursor-default" onClick={() => setMore(false)} />
+          <div role="menu" aria-label="更多入口" className="absolute bottom-16 w-full max-w-sm rounded-2xl border border-line bg-panel p-2 shadow-lg">
+            {rest.map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.end} role="menuitem"
+                className={({ isActive }) => cx('flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px]', isActive ? 'bg-raised text-fg' : 'text-sub hover:text-fg')}>
+                <n.icon width={18} height={18} />{n.label}
+              </NavLink>
+            ))}
+          </div>
+        </>
+      )}
       <div className="flex w-full max-w-sm items-center justify-around rounded-full border border-line bg-panel px-2 py-1.5">
         {[...NAV.filter((n) => n.mobile), ...MOBILE_EXTRA].map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end} aria-label={n.label}
-            className={({ isActive }) => cx('flex flex-col items-center gap-0.5 rounded-full px-3 py-1 text-[10px]', isActive ? 'text-fg' : 'text-sub')}>
+            className={({ isActive }) => cx('flex flex-col items-center gap-0.5 rounded-full px-2 py-1 text-[10px]', isActive ? 'text-fg' : 'text-sub')}>
             <n.icon width={20} height={20} />{n.label}
           </NavLink>
         ))}
+        {rest.length > 0 && (
+          <button aria-label="更多" aria-expanded={more} onClick={() => setMore((v) => !v)}
+            className={cx('flex flex-col items-center gap-0.5 rounded-full px-2 py-1 text-[10px]', more || rest.some((n) => loc.pathname.startsWith(n.to)) ? 'text-fg' : 'text-sub')}>
+            <IList width={20} height={20} />更多
+          </button>
+        )}
       </div>
     </nav>
   )

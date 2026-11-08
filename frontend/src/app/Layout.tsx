@@ -40,7 +40,7 @@ export function Layout() {
         <ResearchRunner />
         <WalletPicker />
         <PauseBanner />
-        <main className="w-full flex-1 px-4 pb-24 pt-4 md:pb-12">
+        <main className="w-full flex-1 px-4 pb-24 pt-4 lg:pb-12">
           <Outlet />
         </main>
       </div>

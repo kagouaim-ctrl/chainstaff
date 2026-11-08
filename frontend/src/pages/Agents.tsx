@@ -76,7 +76,7 @@ export function Agents() {
           </DataState>
         </div>
 
-        <div className="mx-auto w-full max-w-[760px] px-4 pb-24 md:pb-4">
+        <div className="mx-auto w-full max-w-[760px] px-4 pb-24 lg:pb-4">
           <div className="scrollbar-none mb-2 flex gap-2 overflow-x-auto">
             {SUGGEST.map((s) => (
               <button key={s} onClick={() => void send(s)} className="h-8 shrink-0 rounded-full border border-line px-3 text-[12px] text-sub hover:text-fg">{s}</button>
