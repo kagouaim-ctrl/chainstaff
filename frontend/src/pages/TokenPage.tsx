@@ -161,21 +161,32 @@ function Header({ t }: { t: Token }) {
 }
 
 const TF: [ChartTf, string][] = [['1s', '1秒'], ['5s', '5秒'], ['15s', '15秒'], ['1m', '1分'], ['5m', '5分'], ['15m', '15分'], ['1h', '1小时'], ['4h', '4小时'], ['1d', '1天']]
-const OVERLAY: Record<'mine' | 'research', MarkerKind[]> = { mine: ['buy', 'sell'], research: ['discovered', 'no_trade', 'risk_rejected'] }
+const OVERLAY: Record<'mine' | 'research' | 'dev', MarkerKind[]> = { mine: ['buy', 'sell'], research: ['discovered', 'no_trade', 'risk_rejected'], dev: ['dev_buy', 'dev_sell'] }
 
 function ChartPanel({ t }: { t: Token }) {
   const [tf, setTf] = useState<ChartTf>('5m')
   const q = useCandles(t.address, tf)
   const [unit, setUnit] = useState<'price' | 'mcap'>('price')
-  const [ov, setOv] = useState({ mine: true, research: true })
+  const [ov, setOv] = useState({ mine: true, research: true, dev: true })
+  const dev = t.security.devAddress?.toLowerCase() ?? null
+  const recent = useTrades(t.address)
+  const devTrades = !isDemo() && dev ? (recent.data ?? []).filter((x) => x.wallet?.toLowerCase() === dev) : []
   const [ind, setInd] = useState<Indicators>({ ma20: false, ema50: false })
   const live = !isDemo()
   // 市值 = 价格 × 流通量，用当前市值和价格的比值换算整条 K 线
   const factor = unit === 'mcap' && t.priceUsd > 0 ? t.mcapUsd / t.priceUsd : 1
   const mine = live ? readTrades().filter((x) => x.chain === t.chain && x.address.toLowerCase() === t.address.toLowerCase()) : []
   const tfLabel = TF.find(([v]) => v === tf)?.[1] ?? tf
+  // 放大：铺满窗口，Esc 退出
+  const [full, setFull] = useState(false)
+  useEffect(() => {
+    if (!full) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFull(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [full])
   return (
-    <section className="border-b border-line" aria-label="K 线">
+    <section className={cx('border-b border-line', full && 'fixed inset-0 z-50 overflow-auto bg-bg')} aria-label="K 线">
       <div className="scrollbar-none flex h-10 items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-line px-2 text-[13px]">
         {(live ? TF : TF.filter(([v]) => v === '5m')).map(([v, l]) => (
           <button key={v} onClick={() => setTf(v)} aria-pressed={tf === v} className={cx('rounded-md px-2 py-1', tf === v ? 'text-fg' : 'text-sub hover:text-fg')}>{l}</button>
@@ -190,6 +201,7 @@ function ChartPanel({ t }: { t: Token }) {
         <button onClick={() => setUnit('mcap')} className={cx('rounded-md px-1 py-1', unit === 'mcap' ? 'text-fg' : 'text-sub hover:text-fg')}>市值</button>
         {!live && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline">演示 K 线固定 5 分钟</span>}
         {live && tf.endsWith('s') && <span className="ml-auto hidden pr-1 text-[12px] font-normal text-mute sm:inline" title="免费数据只有最近 300 笔成交，页面开着会一直累积；数据源本身有约半分钟延迟">秒级 K 线由最近成交合成，延迟约半分钟</span>}
+        <button onClick={() => setFull(!full)} aria-pressed={full} title={full ? '退出放大（Esc）' : '放大 K 线'} className={cx('rounded-md px-2 py-1 text-sub hover:text-fg', live && !tf.endsWith('s') && 'ml-auto')}>{full ? '退出放大' : '放大'}</button>
       </div>
       <DataState q={q} rows={1} isEmpty={(d) => d.candles.length === 0} empty="这个周期还没有 K 线数据。">
         {(d) => {
@@ -200,15 +212,19 @@ function ChartPanel({ t }: { t: Token }) {
             const bar = series.reduce((best, c) => (c.time <= x.time / 1000 && c.time > best ? c.time : best), series[0]?.time ?? 0)
             return { time: bar, kind: (x.side === 'BUY' ? 'buy' : 'sell') as MarkerKind, label: x.side === 'BUY' ? '买' : '卖' }
           }).filter((m) => m.time >= (series[0]?.time ?? 0) && m.time <= (series[series.length - 1]?.time ?? 0) + step)
-          const all = [...d.markers, ...myMarkers].filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)))
+          const barOf = (ms: number) => series.reduce((best, c) => (c.time <= ms / 1000 && c.time > best ? c.time : best), series[0]?.time ?? 0)
+          const inRange = (m: ChartMarker) => m.time >= (series[0]?.time ?? 0) && m.time <= (series[series.length - 1]?.time ?? 0) + step
+          const devMarkers: ChartMarker[] = devTrades.map((x) => ({ time: barOf(Date.parse(x.at)), kind: (x.side === 'BUY' ? 'dev_buy' : 'dev_sell') as MarkerKind, label: x.side === 'BUY' ? 'Dev买' : 'Dev卖' })).filter(inRange)
+          const all = [...d.markers, ...myMarkers, ...devMarkers].filter((m) => (ov.mine || !OVERLAY.mine.includes(m.kind)) && (ov.research || !OVERLAY.research.includes(m.kind)) && (ov.dev || !OVERLAY.dev.includes(m.kind)))
           return (
             <>
               <div className="px-1 pt-1">
-                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} viewKey={`${t.address}:${tf}:${unit}`} />
+                <CandleChart label={`${t.symbol}/USD${unit === 'mcap' ? ' 市值' : ''} · ${tfLabel}`} candles={series} markers={all} indicators={ind} viewKey={`${t.address}:${tf}:${unit}`} height={full ? Math.max(360, window.innerHeight - 110) : undefined} />
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 text-[12px] font-normal text-sub">
                 <span>图表叠加层</span>
                 <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.mine} onChange={(e) => setOv({ ...ov, mine: e.target.checked })} className="accent-[var(--c-agent)]" />{live ? '我的买卖' : '我的 Agent 买卖'}</label>
+                {live && dev && <label className="flex cursor-pointer items-center gap-1.5 text-fg" title="只看得到最近约 300 笔成交里的 Dev 买卖，更早的不显示"><input type="checkbox" checked={ov.dev} onChange={(e) => setOv({ ...ov, dev: e.target.checked })} className="accent-[var(--c-agent)]" />Dev 买卖{devTrades.length ? `（最近 ${devTrades.length} 笔）` : '（最近成交里没有）'}</label>}
                 {!live && <label className="flex cursor-pointer items-center gap-1.5 text-fg"><input type="checkbox" checked={ov.research} onChange={(e) => setOv({ ...ov, research: e.target.checked })} className="accent-[var(--c-agent)]" />Agent 研究</label>}
               </div>
             </>

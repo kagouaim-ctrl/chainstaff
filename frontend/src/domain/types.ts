@@ -58,6 +58,8 @@ export interface SecurityCheck {
   transferFeeBps: number | null
   top10Pct: number | null
   devHoldPct: number | null
+  /** 创建者（Dev）地址；查不到时没有 */
+  devAddress?: string | null
   checkedAt: string | null
 }
 
@@ -112,7 +114,7 @@ export interface TokenLink { kind: 'website' | 'x' | 'telegram' | 'discord' | 'o
 
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
 
-export type MarkerKind = 'discovered' | 'no_trade' | 'risk_rejected' | 'buy' | 'sell'
+export type MarkerKind = 'discovered' | 'no_trade' | 'risk_rejected' | 'buy' | 'sell' | 'dev_buy' | 'dev_sell'
 export interface ChartMarker { time: number; kind: MarkerKind; label: string; orderId?: string }
 
 export type OrderStatus =

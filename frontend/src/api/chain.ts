@@ -145,6 +145,7 @@ function solanaSecurity(report: Json, sell: Json | undefined): SecurityCheck {
     transferFeeBps: fee == null ? null : Math.round(fee * 100),
     top10Pct: holders.length ? holders.slice(0, 10).reduce((s, h) => s + (h.pct ?? 0), 0) : null,
     devHoldPct: supply && creator != null ? (creator / supply) * 100 : null,
+    devAddress: typeof report.creator === 'string' && report.creator ? report.creator : null,
     checkedAt: new Date().toISOString(),
   }
 }
@@ -170,6 +171,7 @@ export function evmSecurity(g: Json): SecurityCheck {
     transferFeeBps: taxes.length ? Math.round(Math.max(...taxes) * 10_000) : null,
     top10Pct: g.holders ? people.slice(0, 10).reduce((s: number, h: Json) => s + (Number(h.percent) || 0) * 100, 0) : null,
     devHoldPct: creator == null ? null : creator * 100,
+    devAddress: typeof g.creator_address === 'string' && g.creator_address ? g.creator_address : null,
     checkedAt: new Date().toISOString(),
   }
 }
