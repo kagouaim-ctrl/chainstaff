@@ -148,6 +148,61 @@ export function runToSteps(run: Run): DecisionStep[] {
   })
 }
 
+/** 一次分析的摘要：只取后端事件里真实存在的字段，缺的就是 null，不补默认值。 */
+export interface RunSummary {
+  id: string
+  status: Run['status']
+  startedAt: string
+  updatedAt: string
+  /** 最终决定；分析没跑到这一步时为 null */
+  decision: { action: 'buy' | 'skip'; positionPct: number; blocked: string; executed: boolean } | null
+  /** 研究主管的结论 */
+  stance: { label: string; rationale: string } | null
+  /** 风控结论 */
+  review: { label: string; veto: boolean; worstCase: string } | null
+  prescreen: { passed: boolean; failed: string[] } | null
+  analysts: { name: string; score: number; confidence: number; summary: string; redFlags: string[] }[]
+  bull: string | null
+  bear: string | null
+  error: string | null
+}
+
+export function runToSummary(run: Run): RunSummary {
+  const ev = run.events
+  const last = (type: string, agent?: string) => [...ev].reverse().find((e) => e.type === type && (!agent || e.agent === agent))
+  const d = last('decision')?.decision
+  const plan = last('research_plan')?.plan as { stance?: string; rationale?: string } | null | undefined
+  const rv = last('risk_review')
+  const pre = last('prescreen')?.prescreen
+  const latest = new Map<string, RunEvent>()
+  for (const e of ev) if (e.type === 'analyst_report' && e.report) latest.set(e.agent, e)
+  const ts = ev.length ? Math.max(...ev.map((e) => e.ts)) : run.created_at
+  return {
+    id: run.id,
+    status: run.status,
+    startedAt: new Date(run.created_at * 1000).toISOString(),
+    updatedAt: new Date(ts * 1000).toISOString(),
+    decision: d ? { action: d.action, positionPct: d.position_pct, blocked: blockedText(d.blocked_by, ev), executed: d.executed } : null,
+    stance: plan?.stance ? { label: STANCE[plan.stance] ?? plan.stance, rationale: plan.rationale ?? '' } : null,
+    review: rv ? (rv.review
+      ? { label: VERDICT[rv.review.verdict] ?? rv.review.verdict, veto: rv.review.verdict === 'veto', worstCase: rv.review.worst_case }
+      : { label: '回答无法解析，按否决处理', veto: true, worstCase: '' }) : null,
+    prescreen: pre ? { passed: pre.passed, failed: pre.rules.filter((r) => r.status === 'fail').map((r) => `${r.label}（${r.detail}）`) } : null,
+    analysts: [...latest.values()].map((e) => ({
+      name: e.label ?? e.agent, score: e.report!.score, confidence: e.report!.confidence, summary: e.report!.summary, redFlags: e.report!.red_flags,
+    })),
+    bull: last('debate_message', 'Bull Researcher')?.text ?? null,
+    bear: last('debate_message', 'Bear Researcher')?.text ?? null,
+    error: last('run_failed')?.error ?? null,
+  }
+}
+
+/** 这个代币最近一次 Agent 分析的摘要；没有后端或没分析过时为 null。 */
+export async function latestSummary(mint: string): Promise<RunSummary | null> {
+  const run = await latestRun(mint)
+  return run ? runToSummary(run) : null
+}
+
 export function runToEvents(run: Run, symbolOf: (mint: string) => string): AgentEvent[] {
   return run.events.flatMap((e) => {
     const said = describe(e, run.events)

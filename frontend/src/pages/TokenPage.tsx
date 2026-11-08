@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useWatched } from '@/features/watch'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useLocation } from 'react-router-dom'
-import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
+import { useTokens, useCandles, useEvents, useHolders, useOrders, usePositions, useResearchSteps, useResearchSummary, useToken, useTrades, useTheses, useClosed, isDemo, now } from '@/api/hooks'
 import { useApp } from '@/app/store'
 import { useDrawerLink } from '@/app/links'
 import { TopTraders } from '@/features/WalletIntel'
@@ -20,6 +20,7 @@ import { TradePanel } from '@/features/TradePanel'
 import { PaperBox } from '@/features/PaperTrading'
 import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
+import { ResearchSummaryCard } from '@/features/ResearchSummary'
 import { AGENTS_ONLINE } from '@/api/live'
 import { CHAIN_LABEL } from '@/api/chain'
 import { VerdictTag, securityFlags, riskItems, riskLevel, VERDICT, RiskStrip, QualityBadge, Masked, dataBad, qualityTitle, rugLike, ChangeCell } from '@/features/tokenBits'
@@ -531,7 +532,24 @@ function Research({ t }: { t: Token }) {
   const orders = useOrders()
   const steps = useResearchSteps(t.address)
   const research = useResearch()
+  const summary = useResearchSummary(t.address)
   const o = (orders.data ?? []).find((x) => x.token.address === t.address)
+  if (!isDemo() && AGENTS_ONLINE) {
+    // 实时模式：行情来自公开接口，代币上没有研究状态，以后端最近一次分析为准
+    const s = summary.data
+    const btn = s?.status !== 'running' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{s ? '重新研究' : '交给 Agent 研究'}</Button>
+    if (summary.isPending) return <p className="p-6 text-center text-[13px] text-sub" aria-busy="true">正在读取 Agent 研究记录…</p>
+    if (summary.isError) return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>研究记录暂时读不到（{summary.error instanceof Error ? summary.error.message : '后端没有响应'}），稍后再试。</p>{btn}</div>
+    if (!s) return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。交给 Agent 后，多个分析师会读链上、安全和行情数据，辩论后给出结论。</p>{btn}</div>
+    const steps2 = steps.data ?? []
+    return (
+      <div className="space-y-4 p-4">
+        <div className="flex justify-end">{btn}</div>
+        <ResearchSummaryCard s={s} />
+        {steps2.length > 0 ? <DecisionChain steps={steps2} /> : s.status === 'running' && <p className="text-[13px] text-sub">研究中：分析师正在读数据，发言会陆续出现。</p>}
+      </div>
+    )
+  }
   const again = AGENTS_ONLINE && t.verdict !== 'researching' && <Button variant="outline" className="h-9 px-3 py-0 text-[14px]" onClick={() => research(t)}>{t.verdict === 'unresearched' ? '交给 Agent 研究' : '重新研究'}</Button>
   if (t.verdict === 'unresearched') return <div className="space-y-3 p-6 text-center text-[13px] text-sub"><p>还没有研究。{isDemo() ? '点发现页的「交给 Agent」开始研究（后端未接入）。' : AGENTS_ONLINE ? '' : 'Agent 分析还没上线。'}</p>{again}</div>
   const live = steps.data ?? []
