@@ -8,8 +8,8 @@
 import { ROLES } from '@/domain/agents'
 import { DEFAULT_POLICY } from '@/domain/risk'
 import type {
-  AgentEvent, AgentInfo, AgentRole, ChatAuthor, ChatMessage, DataSourceStatus, DecisionStep, EventStatus, Holder,
-  Portfolio, StrategyConfig, Thesis, Token, Trade, Candle,
+  AgentEvent, AgentInfo, AgentRole, ChatAuthor, ChatMessage, DataSourceStatus, DecisionStep, EventStatus,
+  Portfolio, StrategyConfig, Thesis, Token,
 } from '@/domain/types'
 import type { DataSource } from './source'
 import * as chain from './chain'
@@ -250,11 +250,13 @@ async function agents(): Promise<AgentInfo[]> {
 
 export const liveSource: DataSource = {
   info: { kind: 'live', label: '实时数据', now: () => new Date() },
-  tokens: () => AGENTS_ONLINE ? get<Token[]>('/api/tokens') : chain.tokens(),
-  token: (a) => AGENTS_ONLINE ? get<Token | null>(`/api/tokens/${encodeURIComponent(a)}`) : chain.token(a),
-  candles: async (a, tf = '5m') => ({ candles: AGENTS_ONLINE && tf === '5m' ? await get<Candle[]>(`/api/tokens/${encodeURIComponent(a)}/candles`) : await chain.candles(a, tf), markers: [] }),
-  holders: (a) => AGENTS_ONLINE ? get<Holder[]>(`/api/tokens/${encodeURIComponent(a)}/holders`) : chain.holders(a),
-  trades: (a) => AGENTS_ONLINE ? get<Trade[]>(`/api/tokens/${encodeURIComponent(a)}/trades`) : chain.trades(a),
+  // 行情、K 线、持有者、成交一直由浏览器直接读公开接口（多链、选池规则和安全分级都在前端），
+  // 接上后端后也不换成后端的 Solana 列表，免得接后端反而少了链和字段。后端只负责 Agent、社区和钱包情报。
+  tokens: () => chain.tokens(),
+  token: (a) => chain.token(a),
+  candles: async (a, tf = '5m') => ({ candles: await chain.candles(a, tf), markers: [] }),
+  holders: (a) => chain.holders(a),
+  trades: (a) => chain.trades(a),
   chat: async (a) => { const run = await latestRun(a); return run ? runToChat(run) : [] },
   theses: async (a) => { const run = await latestRun(a); return run ? runToTheses(run) : [] },
   research: async (a) => { const run = await latestRun(a); return run ? runToSteps(run) : [] },
