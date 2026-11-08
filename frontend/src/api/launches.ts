@@ -42,6 +42,8 @@ export interface Launches {
   /** 这条链的「快毕业」是否有真实进度 */
   hasProgress: boolean
   updatedAt: string
+  /** 有几页没读到（被限流等），列表可能不全 */
+  partial?: boolean
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- 外部接口的原始 JSON */
@@ -122,10 +124,21 @@ async function readPumpCurves(addrs: string[]): Promise<Map<string, { pct: numbe
   return out
 }
 
-async function pools(chain: LaunchChain, path: string): Promise<{ pools: Json[]; tokens: Map<string, Json> }> {
-  const body = await cached(`gt:${chain}:${path}`, () => getJson(`${GECKO}/${NET[chain]}/${path}${path.includes('?') ? '&' : '?'}include=base_token,quote_token,dex`), TTL).catch(() => null)
-  const tokens = new Map<string, Json>((body?.included ?? []).map((t: Json) => [t.id, t]))
-  return { pools: body?.data ?? [], tokens }
+interface PoolPage { pools: Json[]; tokens: Map<string, Json>; error?: string }
+
+async function pools(chain: LaunchChain, path: string): Promise<PoolPage> {
+  try {
+    const body = await cached(`gt:${chain}:${path}`, () => getJson(`${GECKO}/${NET[chain]}/${path}${path.includes('?') ? '&' : '?'}include=base_token,quote_token,dex`), TTL)
+    const tokens = new Map<string, Json>((body?.included ?? []).map((t: Json) => [t.id, t]))
+    return { pools: body?.data ?? [], tokens }
+  } catch (e) {
+    return { pools: [], tokens: new Map(), error: (e as Error).message }
+  }
+}
+
+/** 一页读不到就少一部分，全都读不到时报错，不把「没读到」显示成「没有新币」 */
+function allFailed(pages: PoolPage[]): void {
+  if (pages.every((p) => p.error)) throw new Error(`新币数据暂时读不到（${pages[0].error}），稍后会自动重试`)
 }
 
 function toToken(chain: LaunchChain, pool: Json, tokens: Map<string, Json>, progress?: { pct: number; complete: boolean }): Token | null {
@@ -159,6 +172,7 @@ export async function launches(chain: LaunchChain): Promise<Launches> {
       pools(chain, 'new_pools?page=1'), pools(chain, 'new_pools?page=2'),
       pools(chain, 'dexes/pump-fun/pools?sort=h24_tx_count_desc'), pools(chain, 'dexes/pumpswap/pools?sort=h24_tx_count_desc'),
     ])
+    allFailed([n1, n2, curve, swap])
     const tokens = new Map([...n1.tokens, ...n2.tokens, ...curve.tokens, ...swap.tokens])
     const fresh = [...n1.pools, ...n2.pools]
     const pumpAddrs = [...fresh, ...curve.pools].filter((p) => p.relationships?.dex?.data?.id === 'pump-fun').map((p) => p.attributes.address)
@@ -172,9 +186,10 @@ export async function launches(chain: LaunchChain): Promise<Launches> {
       .filter((p) => now - Date.parse(p.attributes?.pool_created_at ?? '') < DAY_MS)
       .map((p) => toToken(chain, p, tokens)).filter((t): t is Token => !!t)
       .sort((a, b) => a.ageMinutes - b.ageMinutes)
-    return { fresh: dedupe(freshTokens), soon: dedupe(soon), graduated: dedupe(graduated), hasProgress: true, updatedAt: new Date().toISOString() }
+    return { fresh: dedupe(freshTokens), soon: dedupe(soon), graduated: dedupe(graduated), hasProgress: true, updatedAt: new Date().toISOString(), partial: [n1, n2, curve, swap].some((p) => p.error) }
   }
   const [n1, n2, curve] = await Promise.all([pools(chain, 'new_pools?page=1'), pools(chain, 'new_pools?page=2'), pools(chain, 'dexes/four-meme/pools?sort=h24_tx_count_desc')])
+  allFailed([n1, n2, curve])
   const tokens = new Map([...n1.tokens, ...n2.tokens, ...curve.tokens])
   const fresh = [...n1.pools, ...n2.pools]
   const make = (p: Json) => toToken(chain, p, tokens)
@@ -183,6 +198,6 @@ export async function launches(chain: LaunchChain): Promise<Launches> {
     soon: dedupe(curve.pools.map(make).filter((t): t is Token => !!t)),
     graduated: dedupe(fresh.filter((p) => looksGraduated(chain, p.relationships?.dex?.data?.id ?? '', String(p.relationships?.base_token?.data?.id ?? '').replace('bsc_', '')))
       .map(make).filter((t): t is Token => !!t).sort((a, b) => a.ageMinutes - b.ageMinutes)),
-    hasProgress: false, updatedAt: new Date().toISOString(),
+    hasProgress: false, updatedAt: new Date().toISOString(), partial: [n1, n2, curve].some((p) => p.error),
   }
 }

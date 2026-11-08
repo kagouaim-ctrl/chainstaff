@@ -1,6 +1,7 @@
-import { geckoPair, looksGraduated, pumpProgress, PUMP_INITIAL_REAL_TOKENS } from './launches'
+import { geckoPair, launches, looksGraduated, pumpProgress, PUMP_INITIAL_REAL_TOKENS } from './launches'
 import { tokenView } from './chain'
 import { applyFilters } from '@/pages/NewTokens'
+import { titleOf } from '@/app/Layout'
 
 function curve(realTokens: bigint, complete = false): Uint8Array {
   const b = new Uint8Array(49)
@@ -71,5 +72,22 @@ describe('新币筛选', () => {
     const bad = { ...t, quality: { level: 'bad' as const, flags: ['no_price' as const] } }
     expect(applyFilters([bad], { minLiq: 0, hideBad: true, minTxns1h: 0 })).toHaveLength(0)
     expect(applyFilters([bad], { minLiq: 0, hideBad: false, minTxns1h: 0 })).toHaveLength(1)
+  })
+})
+
+describe('读不到数据时', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('GeckoTerminal 全部失败时报错，而不是显示「没有新币」', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 429 })))
+    await expect(launches('bsc')).rejects.toThrow(/新币数据暂时读不到/)
+  })
+})
+
+describe('页面标题', () => {
+  it('子页面不显示「页面不存在」', () => {
+    expect(titleOf('/agents/about')).toBe('AI Agent')
+    expect(titleOf('/new')).toBe('新币')
+    expect(titleOf('/wallet/abc')).toBe('钱包')
+    expect(titleOf('/nope')).toBe('页面不存在')
   })
 })
