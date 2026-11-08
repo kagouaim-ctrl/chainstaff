@@ -20,7 +20,7 @@ export function Agents() {
   const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight }, [dm.data])
   const name = ma.data?.name ?? '主 Agent'
-  const send = (t: string) => { if (!t.trim()) return; toast('后端未接入：消息没有发送，Agent 也不会执行任何操作。'); setText('') }
+  const send = (t: string) => { if (!t.trim()) return; toast('演示模式：消息没有发送，Agent 也不会执行任何操作。'); setText('') }
 
   return (
     <div className="-mx-4 -mt-4 grid grid-cols-1 [&>*]:min-w-0 xl:grid-cols-[minmax(0,1fr)_360px]">

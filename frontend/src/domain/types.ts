@@ -222,7 +222,14 @@ export interface Holder {
   hasThesis?: boolean
 }
 
-export interface Trade { id: string; at: string; side: 'BUY' | 'SELL'; who: string; kind: 'agent' | 'wallet'; owner?: string; usd: number; price: number }
+export interface Trade {
+  id: string; at: string; side: 'BUY' | 'SELL'; who: string; kind: 'agent' | 'wallet'; owner?: string; usd: number; price: number
+  /** 代币数量；读不到时没有 */
+  amount?: number | null
+  /** 交易哈希和完整钱包地址，用来跳到区块浏览器和钱包页 */
+  tx?: string
+  wallet?: string
+}
 
 export interface ChatAuthor {
   id: string

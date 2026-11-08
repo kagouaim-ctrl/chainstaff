@@ -46,7 +46,7 @@ function DemoTradePanel({ token, initialSide = 'BUY', bare }: { token: Token; in
   const buy = side === 'BUY'
   const submit = () => {
     if (!usdAmt) return toast(buy ? '先输入金额' : '先选择卖出比例')
-    toast('后端未接入：没有创建订单。接入后，这笔指令会先交给风控审批，批准后才由执行服务模拟成交。')
+    toast('演示模式：没有创建订单。接入后，这笔指令会先交给风控审批，批准后才由执行服务模拟成交。')
   }
 
   return (

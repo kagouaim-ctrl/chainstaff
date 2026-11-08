@@ -184,7 +184,7 @@ export function FooterBar() {
       {isDemo() && <span className="text-mute">行情未接入</span>}
       <span className="ml-auto flex items-center gap-3 text-sub">
         {isDemo()
-          ? <><span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span><span>后端未接入</span></>
+          ? <><span className="flex items-center gap-1.5 text-warn"><span className="h-1.5 w-1.5 rounded-full bg-warn" />演示</span><span>样例数据</span></>
           : <><span className="flex items-center gap-1.5 text-up"><span className="h-1.5 w-1.5 rounded-full bg-up" />实时数据</span><span>自托管交易，每笔由你的钱包签名</span></>}
         {LEGAL_LINKS.map(([k, l]) => <span key={k} className="flex items-center gap-3"><span>·</span><Link to={`/legal/${k}`} className="hover:text-fg">{l}</Link></span>)}
       </span>
@@ -248,7 +248,7 @@ function PauseButton({ rail }: { rail?: boolean }) {
           <li>研究任务可以继续运行，但不会下单。</li>
           <li>恢复前会先对账链上余额和订单状态。</li>
         </ul>
-        <p className="mt-3 rounded-lg border border-dashed border-warn/50 p-2.5 text-warn">后端未接入：现在点确认只会在本页面显示暂停状态，不会真正通知任何服务。</p>
+        <p className="mt-3 rounded-lg border border-dashed border-warn/50 p-2.5 text-warn">演示模式：现在点确认只会在本页面显示暂停状态，不会真正通知任何服务。</p>
       </Dialog>
     </>
   )

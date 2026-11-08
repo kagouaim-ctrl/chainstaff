@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { cx } from '@/components/ui'
 import type { Timeframe, Token } from '@/domain/types'
 import { usd, price, compactCN, age } from '@/lib/format'
 import { ChangeCell, Masked } from './tokenBits'
@@ -81,4 +82,19 @@ export const useColumns = create<ColState>((set, get) => ({
 /** 当前要显示的列：用户选中的，去掉在这些行里整列没有数据的。 */
 export function visibleCols(cols: ColKey[], rows: Token[], tf: Timeframe): Col[] {
   return cols.map((k) => COLS[k]).filter((c) => !c.optional || rows.some((t) => c.value(t, tf) != null))
+}
+
+/** 表格单元格：值变了就闪一下（涨绿跌红），第一次渲染不闪。 */
+export function FlashTd({ v, className, children }: { v: number | null; className?: string; children: ReactNode }) {
+  const prev = useRef(v)
+  const [dir, setDir] = useState<'up' | 'down' | null>(null)
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    const p = prev.current
+    prev.current = v
+    if (p == null || v == null || p === v) return
+    setDir(v > p ? 'up' : 'down')
+    setN((x) => x + 1)
+  }, [v])
+  return <td key={n} className={cx(className, dir && `flash-${dir}`)}>{children}</td>
 }

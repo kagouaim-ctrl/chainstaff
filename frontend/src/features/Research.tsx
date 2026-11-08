@@ -18,7 +18,7 @@ export function useResearch() {
   const toast = useToast((s) => s.show)
   const set = useTarget((s) => s.set)
   return (t: Target) => {
-    if (isDemo()) toast(`后端未接入：没有为 ${t.symbol} 创建研究任务。`)
+    if (isDemo()) toast(`演示模式：没有为 ${t.symbol} 创建研究任务。`)
     else if (!AGENTS_ONLINE) toast(`Agent 分析还没上线：没有为 ${t.symbol} 创建研究任务。`)
     else set(t)
   }
