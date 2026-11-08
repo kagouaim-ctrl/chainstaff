@@ -30,6 +30,7 @@ const LIVE_NAV = [
   { to: '/activity', label: '动态', icon: IPulse, end: false, mobile: true },
   { to: '/orders', label: '交易', icon: IList, end: false, mobile: false },
   { to: '/strategy', label: '策略', icon: ISliders, end: false, mobile: true },
+  { to: '/paper', label: '模拟盘', icon: ISpark, end: false, mobile: false },
   // 钱包情报要后端和 Birdeye 密钥，没有后端时不放入口
   ...(WALLETS_ONLINE ? [{ to: '/smart-money', label: '聪明钱', icon: IPulse, end: false, mobile: false }] : []),
   { to: '/portfolio', label: '持仓', icon: IPie, end: false, mobile: true },

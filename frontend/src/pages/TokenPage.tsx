@@ -17,6 +17,7 @@ import { readTrades } from '@/wallet/history'
 import { TokenChat } from '@/features/TokenChat'
 import { Theses } from '@/features/Theses'
 import { TradePanel } from '@/features/TradePanel'
+import { PaperBox } from '@/features/PaperTrading'
 import { DecisionChain } from '@/features/DecisionChain'
 import { useResearch } from '@/features/Research'
 import { AGENTS_ONLINE } from '@/api/live'
@@ -74,6 +75,7 @@ function TokenView({ t }: { t: Token }) {
         <div className="hidden lg:block"><TradePanel token={t} /></div>
         <About t={t} />
         <MyPosition t={t} />
+        {!isDemo() && <PaperBox t={t} />}
         <SecurityBlock t={t} />
       </div>
       <MobileTradeBar t={t} />

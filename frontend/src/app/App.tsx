@@ -16,6 +16,7 @@ import { Legal } from '@/pages/Legal'
 import { NewTokens } from '@/pages/NewTokens'
 import { SmartMoney, WalletPage } from '@/features/WalletIntel'
 import { LIVE } from '@/api/live'
+import { PaperPage } from '@/features/PaperTrading'
 
 export const routes: RouteObject[] = [
   {
@@ -35,6 +36,7 @@ export const routes: RouteObject[] = [
       { path: 'portfolio', element: LIVE ? <><MyWallet /><div className="mt-10 border-t border-line pt-6"><Portfolio /></div></> : <Portfolio /> },
       { path: 'legal/:doc', element: <Legal /> },
       { path: 'orders', element: <Orders /> },
+      { path: 'paper', element: <PaperPage /> },
       { path: 'strategy', element: <Strategy /> },
       { path: '*', element: <NotFound /> },
     ],
