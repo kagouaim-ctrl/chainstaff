@@ -1,0 +1,69 @@
+@import '@fontsource/inter-tight/400.css';
+@import '@fontsource/inter-tight/500.css';
+@import '@fontsource/inter-tight/700.css';
+@import '@fontsource/noto-sans-sc/400.css';
+@import '@fontsource/noto-sans-sc/500.css';
+@import '@fontsource/noto-sans-sc/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 设计 Token：深色为默认（MVP 只做深色，颜色全部走变量，以后加浅色只需新增一组变量） */
+:root {
+  --c-bg: #060510;
+  --c-panel: #12111A;
+  --c-raised: #161522;
+  --c-line: rgba(203,208,235,0.1);
+  --c-fg: #F7F7F7;
+  --c-sub: #9899A3;
+  --c-mute: #474B52;
+  --c-up: #21C95E;
+  --c-down: #FF622E;
+  --c-agent: #516AF6;
+  --c-paper: #f5b544;
+  --c-live: #38bdf8;
+  --c-warn: #f59e0b;
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-bg text-fg font-sans antialiased;
+  font-size: 14px;
+  font-weight: 500;
+}
+button, a { transition: color .15s, background-color .15s, border-color .15s; }
+.num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+:focus-visible:not(input):not(textarea):not(select) { outline: 2px solid var(--c-agent); outline-offset: 2px; border-radius: 6px; }
+input:focus-visible, textarea:focus-visible { outline: none; }
+input[class*='border']:focus, select:focus { border-color: var(--c-agent); outline: none; }
+
+::selection { background: rgba(81,106,246,.35); }
+input, textarea { caret-color: var(--c-agent); }
+* { scrollbar-width: thin; scrollbar-color: rgba(203,208,235,.14) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(203,208,235,.14); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(203,208,235,.26); }
+::-webkit-scrollbar-track { background: transparent; }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--c-agent); }
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* 状态变化动效：新事件进入、订单状态推进 */
+@keyframes enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.anim-enter { animation: enter 240ms ease-out; }
+@keyframes drawer { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.anim-drawer { animation: drawer 200ms ease-out; }
+@keyframes sheet { from { transform: translateY(100%); } to { transform: none; } }
+.anim-sheet { animation: sheet 220ms cubic-bezier(.2,.8,.2,1); }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.anim-pulse { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-enter, .anim-drawer, .anim-pulse, .anim-sheet { animation: none !important; }
+  * { transition: none !important; scroll-behavior: auto !important; }
+}

@@ -1,82 +1,55 @@
-# 链工 ChainStaff
+# Meme Agent
 
-带限额钱包的 AI 员工团队（BNB Chain）。一次部署、一个 Telegram 机器人，里面可以雇佣多个 AI 员工：财务运营员、社区客服、链上监控员、公告翻译员、营销结算员、空投反女巫，另有 4 个岗位即将上线。
+7×24 小时自主运行的 Meme 币交易 Agent 平台。用户的主 Agent（交易 Agent，同时担任总策划）在云端盯盘、研究、决策、执行经风控批准的交易、确认链上结果并管理持仓。
 
-团队在 Telegram 群里发「付 Alice 300 USDT 设计费」，员工按老板定的规则核对：白名单内的小额自动付（绿），超限额生成 Safe 多签提案等老板签字（黄），陌生地址、风险地址、重复付款直接拦截（红）。每周一自动发周报，国库有异常立刻预警。
+> **当前状态：默认全部是演示数据。** 接上后端后，行情和 Agent 分析是真实的；风控只出决定，执行和持仓尚未实现。界面上所有数字、Agent 状态、活动和交易都是固定的演示样例，每个模块都标有「演示」，不代表真实行情或交易，也不会实时变化。需要后端的操作（交给 Agent 研究、下单、保存风控参数、群聊发言、紧急暂停）都会明确提示「后端未接入」，不会假装成功。
 
-只有财务运营员会动钱。社区客服只按项目写的 FAQ 原文回答、识别骗子、查交易、转人工；链上监控员只读链上数据报警；公告翻译员出草稿，老板确认后才发。营销结算员只出 Safe 批量提案，钱要多签人在 Safe 里签了才动；空投反女巫只读链上数据。
-
-## 现在有什么
-
-| 模块 | 说明 |
-|---|---|
-| `agent/rules/` 规则引擎 | 唯一决定钱动不动的代码。[规格](docs/specs/rules_engine.md) |
-| `agent/team.py` | 岗位库（6 个可雇佣、4 个即将上线），雇佣、停用、解雇，每个员工独立的日志 |
-| `agent/front_desk.py` | 一个机器人托管全部员工：每条群消息先查骗局，再分给财务或客服 |
-| `agent/skills/finance_ops/` | 付款请求解析、员工服务、周报、国库预警。[规格](docs/specs/execution.md) |
-| `agent/skills/community_support/` | 社区客服：FAQ 原文回答，规则识别骗局（索要助记词、冒充管理员含形近字、仿冒和 punycode 域名、私聊诱导、转币翻倍），查交易，转人工工单 |
-| `agent/skills/chain_monitor/` | 链上监控员：大额转出、陌生对手方、地址投毒、无限授权和 NFT 全部授权、余额过低，每条只报一次，每日简报 |
-| `agent/rules/batch.py` + `agent/skills/campaign_payouts/` | 营销结算员：名单核对（格式、重复、风险名单、同一活动重复领取、反女巫剔除），按固定金额或积分分奖池，单人上限、最低额、预算；老板确认后导出 Safe Transaction Builder JSON 和 CSV Airdrop 文件 |
-| `agent/skills/airdrop_sybil/` | 空投反女巫：逐个地址读首笔资金来源和前 100 笔交易，规则找出同一资金来源、名单内互相打钱、批量创建、操作完全相同的团伙，以及几乎没活动和快照前新建的钱包；每条剔除都有理由，干净名单直接交给营销结算员 |
-| `agent/skills/translator/` | 公告翻译员：调用 Claude（`claude-opus-5-5`）一次出多语言草稿，规则核对数字、地址、链接、@账号和术语，老板确认后才发 |
-| `agent/execution/` | ERC-20 / BNB 转账、发送前模拟、Safe 提案和 EIP-712 哈希、只读 RPC |
-| `agent/store.py` | SQLite 账本：先记账后付款，重启不丢，同一请求不会付两次 |
-| `bot/` | Telegram 机器人：付款请求和财务命令，`/faq` `/tx` `/human` `/tickets`，`/watch` `/alerts` `/brief`，`/translate` `/post` `/discard`，`/team` `/help`；定时周报、简报和预警 |
-| `backend/` + `web/` | 老板控制台：团队总览（雇佣、停用、改称呼、岗位库）、社区客服（设置、FAQ、骗局试算、工单）、链上监控（盯盘地址、预警线、预警、简报）、公告翻译（写公告、草稿核对、术语表、分语言发群）、营销结算（名单核对预览、批次、导出 Safe 文件、标记执行）、空投反女巫（检查进度、团伙、逐个地址理由、导出、判定规则、导入链上资料）；财务的总览、审批、账本筛选和 CSV、收款人、规则和试算、国库预警、员工档案、Telegram 管理（通知群、自动通知、发消息、群聊模拟器、消息记录）、报告、审计日志、一键暂停 |
-| `scripts/register_agent.py` | 用 bnbagent SDK 注册 ERC-8004 链上工号（测试网免 gas） |
-| `scripts/stage0_gate.py` | 读阶段 0 访谈记录表，算漏斗、中位数和关卡 A 是否通过 |
-| `tests/` | 310 个用例，覆盖率 99.9%；CI 跑测试、pip-audit、Semgrep |
-
-没配置钱包时一切都在测试模式，不碰链。
-
-## 快速开始
+## 本地运行
 
 ```bash
-pip install -e ".[dev]"
-pytest
-
-cp config/policy.example.json config/policy.json   # 白名单、限额、老板用户名
-export TELEGRAM_BOT_TOKEN=...                       # 不要写进代码或提交
-python3 -m bot.main
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+npm test           # 单元与页面测试
+npm run lint && npm run typecheck && npm run build
 ```
 
-群里使用前，在 BotFather 发 `/setprivacy` 选 Disable，机器人才能看到普通消息。
-
-控制台：
+截图自查（每个页面 1440px 和 375px 各一张，同时检查控制台报错和横向溢出）：
 
 ```bash
-export CHAINSTAFF_CONSOLE_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(24))")
-uvicorn backend.app:app --port 8000      # 打开 http://localhost:8000，粘贴令牌
+npm run build && npm run preview &
+TOKEN=<演示代币地址> npm run screenshots   # 输出到 frontend/screenshots/
 ```
 
-控制台和机器人共用同一个账本文件（`CHAINSTAFF_DB`），所以在控制台改的通知群、自动通知、要发到群里的消息，机器人几秒内就会执行。员工档案页另外读 `CHAINSTAFF_AGENT_ID`（ERC-8004 工号）和 `CHAINSTAFF_WALLET_ADDRESS`（测试模式下显示的钱包地址）。
-
-其他员工需要的环境变量（都是可选的，没设置时控制台会提示）：链上监控员读转账和授权、空投反女巫查地址资料要 `ETHERSCAN_API_KEY`；营销结算员导出 Safe 文件要在链配置里填 `safe_address` 和代币合约地址；公告翻译员要 `ANTHROPIC_API_KEY`。社区客服要删骗子消息时，把机器人设为群管理员并给「删除消息」权限。
-
-上测试网和主网：见 [docs/deploy-bnb.md](docs/deploy-bnb.md)。上线前对照 [安全清单](docs/security-checklist.md)。
-
-## 目录
+## 前端结构
 
 ```
-agent/
-  rules/               # 规则引擎（放款判断只在这里）
-  execution/           # 链上执行：转账、Safe 提案、RPC
-  skills/finance_ops/  # 财务运营员：解析、员工服务、周报、预警
-  skills/community_support/ chain_monitor/ translator/  # 其他岗位
-  team.py front_desk.py   # 团队名册和消息分派
-  store.py             # SQLite 账本
-  config.py runtime.py # 配置加载和组装
-bot/                   # Telegram 机器人
-backend/ web/          # 控制台
-config/                # 示例配置（真实配置不提交）
-scripts/               # ERC-8004 注册
-docs/                  # 规格、部署、安全清单
-tests/
+frontend/src
+├── app/          路由、顶部导航、全局横幅、搜索（/）、状态（暂停、自选）
+├── api/          数据源接口 source.ts + 演示数据 demo.ts + TanStack Query hooks
+├── domain/       类型、订单状态机、风控默认值与放宽检测、角色定义
+├── components/   基础组件（四态 DataState、抽屉、对话框、标签……）
+├── features/     K 线与资金曲线、交易/Agent 详情抽屉、决策链、代币群聊、交易面板
+└── pages/        总览、发现、代币详情、Agents、实时动态、持仓、交易记录、策略
 ```
 
-## 硬规定（来自策划书）
+默认用演示数据。设置 `VITE_MEME_API_URL` 后改用 `api/live.ts`，连接 [KAGOUAI-meme-agent](https://github.com/kagouaim-ctrl/KAGOUAI-meme-agent) 后端：行情、安全检查和 Agent 分析是真实的；交易、持仓和私聊还没有后端，显示为空。
 
-1. 放款判断只写在 `agent/rules/`，模型输出只是建议。
-2. 私钥只在钱包服务商的签名层，代码、日志、数据库里都不出现。
-3. 先测试网后主网；主网前 4 周用小额真实资金试运行。
-4. 阶段 4 之前不写自己的智能合约。
+```bash
+VITE_MEME_API_URL=http://127.0.0.1:8100 npm run dev
+BASE=/meme/ VITE_MEME_API_URL=https://后端地址 npm run build   # 发布到官网 /meme/
+```
+
+页面不带任何密钥。访客点「交给 Agent 研究」时输入访问码（后端的 `MEME_API_TOKEN`）。
+
+## 设计
+
+- 视觉照搬 fomo 的实测数值：背景 #060510、面板 #12111A / #161522、1px rgba(203,208,235,0.1) 细线、主文字 #F7F7F7、次文字 #9899A3、强调色 #516AF6、涨 #21C95E、跌 #FF622E；默认字重 500，表格 14/500、表头 12/400；圆角 8 / 12 / 全圆；基本无阴影，过渡 0.15s。颜色在 `src/index.css` 和 `tailwind.config.js`。
+- 字体：fomo 用的 Aeonik 是商业授权字体，这里用免费可商用的 Inter Tight 代替；买了 Aeonik 授权后放进 `@font-face`，`tailwind.config.js` 里已把 Aeonik 排在第一位。
+- 布局照 fomo 网页版：顶栏（高 64）放 logo、一级入口、居中 384×44 搜索、现金 / 24 小时盒子和头像；底部状态栏；手机上是底部悬浮导航。发现页是首页。模拟盘徽标、紧急暂停全局常驻。演示标识统一放在顶部横幅和底部状态栏。
+- 代币详情是独立页面，照 fomo 代币页三栏：代币列表 / 头部数据盒 + K 线 + 群聊、持有者、交易、观点标签 / 买卖面板、关于卡片、你的持仓、安全检查，K 线上标注 Agent 的发现、NO_TRADE 和买卖点。
+- 每个代币一个群（LINE / Grok 群组样式的气泡聊天，真人和 Agent 混排）：不持有也能看；持有中的主 Agent 和持有过的真人可以发言；群聊不影响任何交易。另有「观点」标签（参考 fomo Thesis）。
+- 交易平台的常见细节：K 线左上角开高低收图例跟随鼠标；代币头部风险速览（前十持有、开发者、权限、LP）；买入时显示预计得到的数量、回车下单；手机代币页底部固定买入 / 卖出，点开是底部弹层；持有者分布条；搜索框记住最近看过的代币。
+- Agent 详情、交易详情以右侧抽屉打开，可以通过 URL 直接访问（`?agent=risk`、`?order=ord_7f3a`）。
+
+产品计划见 [docs/PLAN.md](docs/PLAN.md)。
